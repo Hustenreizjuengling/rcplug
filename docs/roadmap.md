@@ -27,7 +27,8 @@ show. Ideas and comments are welcome as issues.
   0.6.6 ran without a dropout.
 - The console reads along, also after its own update without reading the state again.
 - The meters and the hardware fader positions.
-- Mute and listen through the device's buttons.
+- Mute and listen through the device's buttons, and a physical fader set from the
+  browser (the real fader takes over again as soon as it is moved).
 
 ## Now: the rest of the first run on hardware
 
@@ -38,14 +39,24 @@ show. Ideas and comments are welcome as issues.
 2. **A restart of the device:**
    - The console starts before the device's screen and reads along on its own.
    - With full control on, it takes the mixer's place at boot.
-3. **A physical fader set from the browser** (expert level, through the device's
-   buttons): does the device follow, and does the real fader take over again?
-4. **Open values** ([device-notes.md](device-notes.md#assumptions-to-confirm-on-hardware)):
+3. **Open values** ([device-notes.md](device-notes.md#assumptions-to-confirm-on-hardware)):
    - the real gain ranges;
    - the meaning of a few integer settings;
    - the CPU load of Sonar's JACK bridge.
 
-## Next: the platform
+## Next: the core
+
+The host's own features, in this order. They belong to rcplug itself, not to a plugin:
+every plugin builds on them.
+
+| Topic | What | Why |
+|---|---|---|
+| **Update notices** | An opt-in daily check and a badge in the navigation; installing stays a click. | Users miss updates they never look for. |
+| **Dashboard access** | An optional password for the dashboard and all plugin pages; sessions instead of only the console PIN. | Today everyone on the network can use every page. |
+| **Event bus** | Plugins publish and subscribe to events through the host (*marker dropped*, *segment started*, *recording saved*). The console's mirror can already report every change to watchers (since 0.6.4), the basis for desk events. | Plugins can work together without knowing each other's APIs. |
+| **Shared audio taps** | One JACK bridge run by the host: plugins ask for ports and get a stream, one opt-in, one place to watch CPU and dropouts. | Every audio plugin would otherwise add its own client to RØDE's graph. |
+
+## Later: the platform
 
 | Topic | What | Why |
 |---|---|---|
@@ -53,10 +64,6 @@ show. Ideas and comments are welcome as issues.
 | **Plugin catalog** | A signed index of known plugins: install from the dashboard, not only update. Shows author, source, size and what the plugin may do. Other catalogs can be added with their key. | Installing a plugin should not need a computer and SSH. |
 | **Plugin permissions** | The manifest declares what a plugin needs (`desk:write`, `audio`, `network`, `storage`); the dashboard shows it before installing; the console accepts writes only from plugins granted `desk:write` (a token per plugin instead of one control level for all). | With third-party plugins, "everything runs as root and may write" is too coarse. |
 | **Uninstall from the dashboard** | The last step that needs a computer: removing rcplug (the toolkit's setup window can do it today). Everything else works without SSH since 0.6.4: plugin settings in the dashboard, the console's write protection and PIN reset at the device, stopping rcplug in the setup window. | Users of a desk are podcasters, not Linux admins; no step may need a shell on the device. |
-| **Dashboard access** | An optional password for the dashboard and all plugin pages; sessions instead of only the console PIN. | Today everyone on the network can use every page. |
-| **Update notices** | An opt-in daily check and a badge in the navigation; installing stays a click. | Users miss updates they never look for. |
-| **Shared audio taps** | One JACK bridge run by the host: plugins ask for ports and get a stream, one opt-in, one place to watch CPU and dropouts. | Every audio plugin would otherwise add its own client to RØDE's graph. |
-| **Event bus** | Plugins publish and subscribe to events through the host (*marker dropped*, *segment started*, *recording saved*). The console's mirror can already report every change to watchers (since 0.6.4), the basis for desk events. | Plugins can work together without knowing each other's APIs. |
 | **Python SDK** | One file with the environment helpers, a server with the `X-Rcplug` check and a console client. The firmware ships Python 3.10. | Many makers write Python, and nothing needs to be cross-compiled. |
 | **RØDECaster Pro II** | A verified profile from a state capture ([adding-a-model.md](adding-a-model.md)), so control can be enabled. | Same platform, larger audience. |
 | **Flashing from macOS** | The toolkit's flasher on macOS. | Windows and Linux only today. |
@@ -108,4 +115,5 @@ How to build any of them: [plugin-guide.md](plugin-guide.md), [cookbook.md](cook
 - Read-only by default; anything that changes the desk or touches the audio graph is
   opt-in and says so.
 - Nothing in the firmware is changed except the one-time SSH key.
-- Go standard library only; small, static binaries; no background network traffic.
+- Go standard library only; small, static binaries; no background network traffic
+  unless a user switches it on (update notices).

@@ -105,6 +105,9 @@ from Windows to a patched 1.7.6):
 - **The screen mirror worked next to the GUI** (DRM, 2 frames per second; removed in
   0.6.7). The GUI draws its 1280×720 landscape screen into a 720×1280 buffer whose top
   is on the right.
+- **A physical fader set from the console works** (0.6.2, expert level): the device
+  follows the position sent through the front panel, and the real fader takes over
+  again as soon as it is moved.
 - **Reading along works** (0.6.0): after *Read the state again* (the screen app
   restarted, about three seconds) the console mirrored the whole desk; changes on the
   device arrive as described in [protocol.md](protocol.md#what-a-running-duo-sends).
