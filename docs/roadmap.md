@@ -4,13 +4,13 @@ Where rcplug is going, and plugins that would be worth building. Nothing here is
 promise; priorities follow what users need and what the first tests on hardware
 show. Ideas and comments are welcome as issues.
 
-**Today (0.8.0):**
+**Today (0.8.5):**
 
 - **Host:** dashboard and plugin supervisor, signed in-app updates with rollback,
   diagnostics, plugin settings in the dashboard, update notices, an optional dashboard
   password, an event bus for plugins, shared audio taps, plugin permissions, a plugin
   catalog to install and remove plugins, the device's processes with their CPU and RAM,
-  and removing rcplug from the dashboard.
+  backups of its own settings, and removing rcplug from the dashboard.
   - Updates download gently and show a progress bar.
 - **Console:** the whole desk in the browser, with every setting changeable: on the
   device it takes the mixer's connection and the device's screen runs through it (full
@@ -20,7 +20,10 @@ show. Ideas and comments are welcome as issues.
     through the device's buttons.
   - Control levels, write protection and a PIN that can be reset at the device.
   - A change log of the device, to work out what its settings' numbers mean.
-- **Sonar** as a plugin.
+  - A side bar with groups, the EQ curve, the headphone volumes.
+  - Snapshots of the desk's settings, compared and restored through the usual checks.
+- **Plugins:** Sonar, and *Backup*, which keeps and restores rcplug's and the desk's
+  settings with a preview of what a restore changes.
 - **Toolkit** for SSH access, flashing (Windows, Linux), installing, stopping and
   uninstalling, and diagnostics.
 - **For plugin authors:** an SDK, a guide and a cookbook.
@@ -50,10 +53,14 @@ show. Ideas and comments are welcome as issues.
    console does that).
 2. **A restart of the device:** the console takes the mixer's place at boot, before
    the device's screen connects.
-3. **Open values** ([device-notes.md](device-notes.md#assumptions-to-confirm-on-hardware)):
+3. **Backup and restore** on a real Duo: a restore through full control that the
+   device's screen follows, and how long a full restore takes.
+4. **The headphone volumes** (`POT.potLevel`): whether a write moves them.
+5. **Open values** ([device-notes.md](device-notes.md#assumptions-to-confirm-on-hardware)):
    - the real gain ranges;
    - the meaning of a few integer settings (the console's change log, 0.7.3, shows
      them when a setting is changed on the device's screen);
+   - the units of the EQ (Hz, dB, Q) behind the desk's 0–1 values, for the EQ curve;
    - which buses the mixer's unconnected JACK outputs carry
      ([device-notes.md](device-notes.md#the-jack-graph)).
 
@@ -94,8 +101,12 @@ missing:
    recording destination, system settings): full control
    ([protocol.md](protocol.md#full-control)) reaches them; each one is tested on a real
    Duo before it is offered.
-4. **An overview** that makes the whole desk easy to find: the console shows nearly
-   everything already, spread over its pages.
+4. **An overview** that makes the whole desk easy to find: *0.8.3* gave the console a
+   side bar with groups; a search over every setting would be next.
+
+Done on the way: the headphone volumes and fewer inputs and outputs that the Duo does
+not have (0.8.2), the EQ curve (0.8.4), backups of rcplug's and the desk's settings
+with the *Backup* plugin (0.8.5).
 
 Since 0.8.0 there are no switches for experimental features: what the goal needs is
 on, what it does not need is gone.
@@ -123,7 +134,7 @@ Effort: **S** a few days, **M** one or two weeks, **L** more.
 | Plugin | What it does | Builds on | Effort |
 |---|---|---|---|
 | **Recordings** | Browse, play, download and (after confirmation) delete recordings over the network, without taking out the card or switching to USB mode. Optionally copy finished recordings to a NAS or cloud folder (WebDAV). | The firmware's strings point to `/Application/sd-card-mount` (microSD) and `/Application/ssd-mount` (USB SSD); the tree lists `RECORDINGS` and the storage volumes. Read-only, lowest priority while recording. | M |
-| **Scenes** | Save and recall mixer setups (levels, processing, routing) by name, per guest or show, with a preview of what a recall changes. | Console tree and writes at the *Control* level, within the write policy; on the Duo this needs full control. | M |
+| **Scenes** | Save and recall mixer setups (levels, processing, routing) by name, per guest or show, with a preview of what a recall changes. | The console's snapshots (0.8.5), limited to the mixing; on the Duo this needs full control. | S–M |
 | **Remote control bridge** | Simple HTTP endpoints and OSC for Stream Deck, Bitfocus Companion, TouchOSC: mute toggles, pads, markers, record. | Console writes. First check what the firmware's own `OSCPropertyBridge` offers. | S–M |
 | **Home Assistant / MQTT** | Recorder state, mutes and levels as MQTT entities with discovery, commands back: on-air lamps, room light, "do not disturb" on the door. | Summary and events; a small MQTT client in Go. | M |
 | **On-air signal** | Rules like "when recording starts, a mic opens or a pad plays, call this URL". | The [webhook recipe](cookbook.md#call-a-url-when-recording-starts-or-stops). | S |
@@ -135,7 +146,6 @@ Effort: **S** a few days, **M** one or two weeks, **L** more.
 | **Chapter export** | The markers of a recording as chapters (Podlove, MP4, YouTube timestamps), ready to paste. | Recordings; where the device stores markers is to be found out. | S after Recordings |
 | **Scheduled recording** | Start and stop at set times or from a calendar (ICS). | `api/record`. | S |
 | **Pad manager** | Prepare SMART pad sounds in the browser: upload, trim, normalise. | Pad files under `/Application/emmc-data/pads`; the mixer owns them, so read-only first. | L |
-| **Settings export** | Keep a copy of RØDE's own show and pad configuration. | The tree; export only, restoring would go through the write policy. | M |
 | **Sonar games** | Back to Sonar's origin: a hide-and-seek mode with rounds and scores. | Sonar. | S |
 
 How to build any of them: [plugin-guide.md](plugin-guide.md), [cookbook.md](cookbook.md).
