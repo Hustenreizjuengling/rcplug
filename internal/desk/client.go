@@ -318,6 +318,9 @@ func (c *Client) Status() Status {
 func (c *Client) Reconnect() {
 	c.mu.Lock()
 	conn := c.conn
+	if c.relay != nil {
+		conn = nil // full control holds the mixer's place; it is switched off instead
+	}
 	c.mu.Unlock()
 	if conn != nil {
 		_ = conn.Close()

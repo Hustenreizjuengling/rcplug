@@ -275,6 +275,13 @@ func TestFullControlFromTheStart(t *testing.T) {
 		}
 	}
 
+	// A reconnect does not touch full control.
+	c.Reconnect()
+	time.Sleep(200 * time.Millisecond)
+	if st := c.Status(); st.Mode != "relay" || st.State != StateLive || sim.Clients() != 1 {
+		t.Fatalf("after a reconnect: %s %s, %d mixer clients", st.Mode, st.State, sim.Clients())
+	}
+
 	// Switched off: the place goes back, the screen finds the mixer.
 	c.SetFullControl(false)
 	waitFor(t, "screen at the mixer again", func() bool {
