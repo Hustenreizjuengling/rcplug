@@ -45,6 +45,7 @@ func main() {
 		drmDev    = flag.String("drm", "/dev/dri/card0", "DRM card for the screen mirror when the GUI bypasses the framebuffer")
 		fps       = flag.Float64("fps", 2, "max screen mirror frames per second")
 		panel     = flag.Bool("panel", false, "EXPERIMENTAL: allow emulating front-panel buttons via TIOCSTI (expert level only)")
+		touchDev  = flag.String("touch", "auto", "touchscreen event device for operating the device's screen from the mirror: auto | off | /dev/input/eventN (users must still switch it on)")
 		tty       = flag.String("tty", "/dev/ttyAML3", "front-panel serial tty")
 		sim       = flag.Bool("sim", false, "start a built-in simulated desk and connect to it (demo without hardware)")
 		legacyPIN = flag.String("pin", os.Getenv("RCPLUG_CONSOLE_PIN"), "deprecated: taken over once as the console PIN if none is set; set the PIN in the UI instead")
@@ -100,6 +101,13 @@ func main() {
 	opts := console.Options{
 		Client: client, DataDir: dataDir, AllowUntested: *untested, LegacyPIN: *legacyPIN, Version: version,
 		Panel: &hw.Panel{TTY: *tty}, PanelEnabled: *panel, Logf: log.Printf,
+	}
+	if *touchDev != "off" {
+		dev := *touchDev
+		if dev == "auto" {
+			dev = ""
+		}
+		opts.Touch = &hw.Touch{Device: dev}
 	}
 	if *screenSrc != "off" {
 		opts.Screen = &hw.Screen{FB: *fbDev, DRM: *drmDev, Mode: *screenSrc, MaxFPS: *fps}

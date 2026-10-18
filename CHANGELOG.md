@@ -14,8 +14,15 @@ may break compatibility).
   the plugin): it keeps the mirrored state and the screen's connection when it stops
   and continues from them, so no *Read the state again* is needed. Changes made in the
   seconds in between may be missing; the console says so.
+- **Operate the device's screen from the mirror** (experimental, off by default): with
+  *Operate the screen* switched on (Display page, expert level), a click on the
+  mirrored screen taps the device's touchscreen there and a drag swipes. The console
+  writes the touches into the touchscreen's input device, which RØDE's screen app
+  reads directly; *Touch correction* mirrors an axis if taps land mirrored.
+  `--touch auto|off|/dev/input/eventN`.
 - Diagnostics include the device's own logs (RØDE's mixer and screen app, last 400
-  lines) with serial numbers, tokens, passwords and MAC addresses masked.
+  lines) with serial numbers, tokens, passwords and MAC addresses masked, and the
+  input devices with their axis ranges.
 - The update log records each step of an in-app update with the time and the free
   memory, to find out what silences USB audio during an update.
 

@@ -2,7 +2,7 @@
 // front-panel emulation.
 import { h } from '../dom.js';
 import { t } from '../i18n.js';
-import { request, setSettings, panel, report } from '../api.js';
+import { request, setSettings, panel, touch, report } from '../api.js';
 import { confirmDialog } from '../dialogs.js';
 import { controlLevel } from '../policy.js';
 
@@ -47,12 +47,52 @@ function screenCard(scope, hw, rerender) {
   const rot = h('select', { 'aria-label': t('display.rotate') }, ...['auto', '0', '90', '180', '270'].map((v) =>
     h('option', { value: v, selected: (st.rotate || 'auto') === v }, v === 'auto' ? t('display.rotateAuto') : v + '°')));
   rot.addEventListener('change', async () => { if (await setSettings({ screenRotate: rot.value })) rerender(); });
-  c.append(img, h('div', { class: 'row', style: 'margin-top:8px' },
+  c.append(touchArea(img, hw.touch || {}, rerender), h('div', { class: 'row', style: 'margin-top:8px' },
     h('a', { class: 'btn', href: 'api/screen.png', download: '' }, t('display.save')),
     h('button', { class: 'btn', type: 'button', onclick: async () => { if (await setSettings({ screen: false })) rerender(); } }, t('display.disable')),
     h('label', { class: 'small muted' }, t('display.rotate'), ' ', rot),
     h('span', { class: 'muted small' }, t('display.source', { detail: st.detail || st.source }))));
   return c;
+}
+
+// touchArea: with screen control on, a click on the mirror taps the device's
+// touchscreen at that spot and a drag swipes (expert level); otherwise the
+// picture as it is, with the switch below it.
+function touchArea(img, tc, rerender) {
+  const wrap = h('div', { class: 'screenwrap' }, img);
+  if (!tc.available) return wrap;
+  if (!tc.enabled) {
+    return h('div', null, wrap, h('div', { class: 'row', style: 'margin-top:8px' },
+      h('button', { class: 'btn', type: 'button', onclick: async () => {
+        if (await confirmDialog(t('display.touchConfirm'), t('display.touchEnable')) && await setSettings({ screenControl: true })) rerender();
+      } }, t('display.touchEnable')), h('span', { class: 'tag amber' }, t('experimental'))));
+  }
+  const flip = h('select', { 'aria-label': t('display.touchFlip') }, ...[['', 'display.flipNone'], ['x', 'display.flipX'], ['y', 'display.flipY'], ['xy', 'display.flipXY']].map(([v, k]) =>
+    h('option', { value: v, selected: (tc.flip || '') === v }, t(k))));
+  flip.addEventListener('change', async () => { if (await setSettings({ touchFlip: flip.value })) rerender(); });
+  const controls = h('div', { class: 'row', style: 'margin-top:8px' },
+    h('span', { class: 'muted small' }, controlLevel() === 'expert' ? t('display.touchOn') : t('display.touchExpert')),
+    h('label', { class: 'small muted' }, t('display.touchFlip'), ' ', flip),
+    h('button', { class: 'btn small', type: 'button', onclick: async () => { if (await setSettings({ screenControl: false })) rerender(); } }, t('display.touchOff')));
+  if (controlLevel() !== 'expert') return h('div', null, wrap, controls);
+  wrap.classList.add('touch');
+  const at = (e) => { const r = img.getBoundingClientRect(); return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)), t: performance.now() }; };
+  let start = null;
+  const mark = (p) => {
+    const dot = h('span', { class: 'tapdot', style: `left:${p.x * 100}%;top:${p.y * 100}%` });
+    wrap.append(dot);
+    setTimeout(() => dot.remove(), 600);
+  };
+  wrap.addEventListener('pointerdown', (e) => { e.preventDefault(); start = at(e); wrap.setPointerCapture(e.pointerId); });
+  wrap.addEventListener('pointerup', (e) => {
+    if (!start) return;
+    const end = at(e), s = start;
+    start = null;
+    mark(end);
+    if (Math.hypot(end.x - s.x, end.y - s.y) < 0.02) touch({ x: end.x, y: end.y });
+    else touch({ x: s.x, y: s.y, toX: end.x, toY: end.y, ms: Math.round(Math.min(2000, Math.max(80, end.t - s.t))) });
+  });
+  return h('div', null, wrap, controls);
 }
 
 function panelCard(hw, rerender) {

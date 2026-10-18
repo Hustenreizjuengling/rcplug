@@ -42,6 +42,7 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/reconnect", c.withPIN(c.handleReconnect))
 	mux.HandleFunc("POST /api/resync", c.withPIN(c.handleResync))
 	mux.HandleFunc("POST /api/panel", c.withPIN(c.handlePanel))
+	mux.HandleFunc("POST /api/touch", c.withPIN(c.handleTouch))
 	mux.HandleFunc("POST /api/pin", c.handlePIN) // verifies the current PIN itself
 	// Everything else under api/ is an error in the API's own format.
 	notFound := func(w http.ResponseWriter, r *http.Request) {
@@ -207,21 +208,23 @@ func (c *Console) handleAudit(w http.ResponseWriter, r *http.Request) {
 
 // writeReq is the body of every write endpoint.
 type writeReq struct {
-	Epoch   uint64      `json:"epoch"`
-	Path    []int       `json:"path"`
-	Name    string      `json:"name"`
-	Value   interface{} `json:"value"`
-	Ms      int         `json:"ms"`
-	Source  int         `json:"source"`
-	Output  int         `json:"output"`
-	Link    bool        `json:"link"`
-	Level   string      `json:"level"`
-	Screen  *bool       `json:"screen"`
-	Rotate  *string     `json:"screenRotate"`
-	Panel   *bool       `json:"panel"`
-	Current string      `json:"current"`
-	New     string      `json:"new"`
-	Control string      `json:"control"` // panel control id
+	Epoch     uint64      `json:"epoch"`
+	Path      []int       `json:"path"`
+	Name      string      `json:"name"`
+	Value     interface{} `json:"value"`
+	Ms        int         `json:"ms"`
+	Source    int         `json:"source"`
+	Output    int         `json:"output"`
+	Link      bool        `json:"link"`
+	Level     string      `json:"level"`
+	Screen    *bool       `json:"screen"`
+	Rotate    *string     `json:"screenRotate"`
+	Panel     *bool       `json:"panel"`
+	ScreenCtl *bool       `json:"screenControl"`
+	Flip      *string     `json:"touchFlip"`
+	Current   string      `json:"current"`
+	New       string      `json:"new"`
+	Control   string      `json:"control"` // panel control id
 }
 
 func errBadRequest(msg string) error { return sdk.NewError(http.StatusBadRequest, "bad_request", msg) }
@@ -669,6 +672,33 @@ func (c *Console) handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		c.auditAction(r, "screen rotate", *req.Rotate, nil)
 	}
+	if req.ScreenCtl != nil {
+		if *req.ScreenCtl && c.opts.Touch == nil {
+			err := sdk.NewError(http.StatusConflict, "touch_unavailable", "operating the device's screen is not available here")
+			c.auditAction(r, "screen control", "true", err)
+			sdk.WriteError(w, err)
+			return
+		}
+		c.mu.Lock()
+		c.settings.ScreenControl = *req.ScreenCtl
+		c.saveSettingsLocked()
+		c.mu.Unlock()
+		c.opts.Logf("console: screen control %v by %s", *req.ScreenCtl, remoteOf(r))
+		c.auditAction(r, "screen control", strconv.FormatBool(*req.ScreenCtl), nil)
+	}
+	if req.Flip != nil {
+		switch *req.Flip {
+		case "", "x", "y", "xy":
+		default:
+			sdk.WriteError(w, errBadRequest(`touchFlip must be "", "x", "y" or "xy"`))
+			return
+		}
+		c.mu.Lock()
+		c.settings.TouchFlip = *req.Flip
+		c.saveSettingsLocked()
+		c.mu.Unlock()
+		c.auditAction(r, "touch flip", *req.Flip, nil)
+	}
 	if req.Panel != nil {
 		if *req.Panel && c.opts.Panel == nil {
 			err := sdk.NewError(http.StatusConflict, "panel_unavailable", "front-panel emulation is not available here")
@@ -816,6 +846,17 @@ func (c *Console) handleHW(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	doc["panel"] = p
+	c.mu.Lock()
+	tc := map[string]interface{}{"enabled": c.settings.ScreenControl, "flip": c.settings.TouchFlip}
+	c.mu.Unlock()
+	if c.opts.Touch == nil {
+		tc["available"] = false
+	} else if info, err := c.opts.Touch.Info(); err != nil {
+		tc["available"], tc["error"] = false, err.Error()
+	} else {
+		tc["available"], tc["device"], tc["name"] = true, info.Device, info.Name
+	}
+	doc["touch"] = tc
 	sdk.WriteJSON(w, http.StatusOK, doc)
 }
 
@@ -904,6 +945,81 @@ func (c *Console) handleMJPEG(w http.ResponseWriter, r *http.Request) {
 		case <-t.C:
 		}
 	}
+}
+
+// touchInterval is the least time between two gestures (tests change it).
+var touchInterval = 80 * time.Millisecond
+
+// handleTouch taps or swipes on the device's touchscreen at a point of the
+// screen mirror: {"x","y"} (0..1 from the picture's top left), for a swipe
+// also {"toX","toY","ms"}. Needs the mirror and screen control switched on,
+// the expert level, and at most one gesture every 80 ms.
+func (c *Console) handleTouch(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		X, Y     float64
+		ToX, ToY *float64
+		Ms       int
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&req); err != nil {
+		sdk.WriteError(w, errBadRequest("invalid body"))
+		return
+	}
+	what := fmt.Sprintf("%.3f,%.3f", req.X, req.Y)
+	if req.ToX != nil && req.ToY != nil {
+		what += fmt.Sprintf(" to %.3f,%.3f in %d ms", *req.ToX, *req.ToY, req.Ms)
+	}
+	fail := func(err error) {
+		c.auditAction(r, "touch", what, err)
+		sdk.WriteError(w, err)
+	}
+	s, err := c.screen()
+	if err != nil {
+		fail(err)
+		return
+	}
+	c.mu.Lock()
+	on, flip := c.settings.ScreenControl, c.settings.TouchFlip
+	c.mu.Unlock()
+	if c.opts.Touch == nil || !on {
+		fail(sdk.NewError(http.StatusForbidden, "touch_disabled", "operating the device's screen is switched off (Display page)"))
+		return
+	}
+	if lv, _ := c.Level(); lv != LevelExpert {
+		fail(sdk.NewError(http.StatusForbidden, "expert_required", "operating the device's screen requires the expert control level"))
+		return
+	}
+	inRange := func(v float64) bool { return v >= 0 && v <= 1 }
+	if !inRange(req.X) || !inRange(req.Y) || (req.ToX != nil && (!inRange(*req.ToX) || req.ToY == nil || !inRange(*req.ToY))) {
+		fail(errBadRequest("x, y, toX and toY must be between 0 and 1"))
+		return
+	}
+	c.mu.Lock()
+	soon := time.Since(c.lastTouch) < touchInterval
+	if !soon {
+		c.lastTouch = time.Now()
+	}
+	c.mu.Unlock()
+	if soon {
+		fail(sdk.NewError(http.StatusTooManyRequests, "rate_limited", "one gesture at a time"))
+		return
+	}
+	turn, portrait, err := s.Orientation()
+	if err != nil {
+		fail(sdk.NewError(http.StatusServiceUnavailable, "capture_failed", err.Error()))
+		return
+	}
+	g := hw.Gesture{Points: []hw.Point{hw.BufferPoint(hw.Point{X: req.X, Y: req.Y}, turn)}, Portrait: portrait, Flip: hw.TouchFlip(flip)}
+	if req.ToX != nil {
+		g.Points = append(g.Points, hw.BufferPoint(hw.Point{X: *req.ToX, Y: *req.ToY}, turn))
+		g.Duration = time.Duration(min(max(req.Ms, 80), 2000)) * time.Millisecond
+	}
+	if err := c.opts.Touch.Do(g); err != nil {
+		fail(sdk.NewError(http.StatusServiceUnavailable, "touch_failed", err.Error()))
+		return
+	}
+	c.opts.Logf("console: touch %s (from %s)", what, remoteOf(r))
+	c.auditAction(r, "touch", what, nil)
+	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (c *Console) handlePanel(w http.ResponseWriter, r *http.Request) {

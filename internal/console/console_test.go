@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"image"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -616,6 +618,67 @@ func TestReadingAlongWritesThroughTheFrontPanel(t *testing.T) {
 	}
 	if got := strings.Join(fp.pressed, ","); got != "mute1,listen1,fader1" || fp.values[2] != 30 {
 		t.Fatalf("pressed %v, values %v", got, fp.values)
+	}
+}
+
+type fakeTouch struct{ gestures []hw.Gesture }
+
+func (f *fakeTouch) Info() (hw.TouchInfo, error) {
+	return hw.TouchInfo{Device: "/dev/input/event0", Name: "Goodix Capacitive TouchScreen", XMax: 719, YMax: 1279, MT: true}, nil
+}
+func (f *fakeTouch) Do(g hw.Gesture) error { f.gestures = append(f.gestures, g); return nil }
+
+// Clicks on the mirror tap the touchscreen where the device shows that spot:
+// only switched on, at the expert level, one gesture at a time.
+func TestTouchOnTheMirror(t *testing.T) {
+	ft := &fakeTouch{}
+	r := newRig(t, rcsim.Options{}, func(o *Options) {
+		o.Screen = hw.StillScreen(image.NewRGBA(image.Rect(0, 0, 720, 1280))) // like the Duo: portrait, shown turned
+		o.Touch = ft
+	})
+	tap := map[string]float64{"x": 0.1, "y": 0.1}
+	if res := r.post(t, "/api/touch", tap); res.code != 403 || res.body["code"] != "screen_disabled" {
+		t.Fatalf("mirror off: %d %s", res.code, res.raw)
+	}
+	r.post(t, "/api/settings", map[string]bool{"screen": true})
+	if res := r.post(t, "/api/touch", tap); res.code != 403 || res.body["code"] != "touch_disabled" {
+		t.Fatalf("screen control off: %d %s", res.code, res.raw)
+	}
+	r.post(t, "/api/settings", map[string]bool{"screenControl": true})
+	if res := r.post(t, "/api/touch", tap); res.code != 403 || res.body["code"] != "expert_required" {
+		t.Fatalf("not expert: %d %s", res.code, res.raw)
+	}
+	r.post(t, "/api/control", map[string]string{"level": "expert"})
+	old := touchInterval
+	defer func() { touchInterval = old }()
+	touchInterval = time.Hour // the next gesture is always "too soon"
+	if res := r.post(t, "/api/touch", tap); res.code != 200 {
+		t.Fatalf("tap: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/touch", tap); res.code != 429 {
+		t.Fatalf("two at once: %d %s", res.code, res.raw)
+	}
+	touchInterval = 0
+	swipe := map[string]float64{"x": 0.1, "y": 0.5, "toX": 0.9, "toY": 0.5, "ms": 300}
+	if res := r.post(t, "/api/touch", swipe); res.code != 200 {
+		t.Fatalf("swipe: %d %s", res.code, res.raw)
+	}
+	if len(ft.gestures) != 2 {
+		t.Fatalf("gestures %+v", ft.gestures)
+	}
+	g := ft.gestures[0]
+	if len(g.Points) != 1 || !g.Portrait || math.Abs(g.Points[0].X-0.9) > 1e-9 || math.Abs(g.Points[0].Y-0.1) > 1e-9 {
+		t.Fatalf("tap at the top left of the picture: %+v (want the top right of the portrait buffer)", g)
+	}
+	if s := ft.gestures[1]; len(s.Points) != 2 || s.Duration != 300*time.Millisecond {
+		t.Fatalf("swipe %+v", s)
+	}
+	doc := r.do(t, http.MethodGet, "/api/hw", nil).body["touch"].(map[string]interface{})
+	if doc["available"] != true || doc["enabled"] != true || doc["device"] != "/dev/input/event0" {
+		t.Fatalf("hw touch %v", doc)
+	}
+	if res := r.post(t, "/api/touch", map[string]float64{"x": 1.5, "y": 0}); res.code != 400 {
+		t.Fatalf("outside the picture: %d %s", res.code, res.raw)
 	}
 }
 

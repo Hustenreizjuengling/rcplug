@@ -35,6 +35,9 @@ type Options struct {
 	// (Settings.Panel).
 	Panel        FrontPanel
 	PanelEnabled bool
+	// Touch taps the device's touchscreen (hw.Touch), for clicks on the
+	// screen mirror; nil = not available.
+	Touch TouchScreen
 	// AllowUntested offers control on models without a verified profile.
 	AllowUntested bool
 	// LegacyPIN is a PIN from the old --pin flag or RCPLUG_CONSOLE_PIN. It is
@@ -67,6 +70,7 @@ type Console struct {
 	settings      Settings
 	audit         []AuditEntry
 	lastReconnect time.Time
+	lastTouch     time.Time
 	clientsAt     time.Time
 	clientsDoc    interface{}
 }
@@ -173,6 +177,12 @@ func (c *Console) Handler() http.Handler {
 type FrontPanel interface {
 	Do(id string, value int) error
 	Available() error
+}
+
+// TouchScreen taps and swipes on the device's touchscreen (hw.Touch).
+type TouchScreen interface {
+	Info() (hw.TouchInfo, error)
+	Do(hw.Gesture) error
 }
 
 // panelOn reports whether the front-panel emulation is switched on, by

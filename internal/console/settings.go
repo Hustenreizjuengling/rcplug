@@ -26,6 +26,10 @@ type Settings struct {
 	ScreenRotate string `json:"screenRotate,omitempty"`
 	// Panel switches the front-panel emulation on (--panel does it for good).
 	Panel bool `json:"panel,omitempty"`
+	// ScreenControl lets clicks on the screen mirror tap the device's
+	// touchscreen; TouchFlip corrects its orientation ("", "x", "y", "xy").
+	ScreenControl bool   `json:"screenControl,omitempty"`
+	TouchFlip     string `json:"touchFlip,omitempty"`
 }
 
 // rotations are the valid ScreenRotate values besides "" (auto).

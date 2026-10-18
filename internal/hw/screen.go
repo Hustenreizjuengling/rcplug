@@ -232,6 +232,29 @@ func (s *Screen) Status() ScreenStatus {
 	return st
 }
 
+// StillScreen is a Screen that always shows img (tests, demos).
+func StillScreen(img image.Image) *Screen {
+	return &Screen{MaxFPS: 2, grab: func() (image.Image, string, string, error) { return img, "still", "a still picture", nil }}
+}
+
+// Orientation is how the mirrored picture lies: the turn applied to the
+// buffer (degrees clockwise) and whether the buffer itself is portrait. It
+// captures a frame if there is none yet.
+func (s *Screen) Orientation() (turn int, portrait bool, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	img, err := s.frameLocked()
+	if err != nil {
+		return 0, false, err
+	}
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	if s.turned == 90 || s.turned == 270 {
+		w, h = h, w
+	}
+	return s.turned, h > w, nil
+}
+
 // Acquire reserves one stream slot; call the returned release when done.
 func (s *Screen) Acquire() (release func(), err error) {
 	s.mu.Lock()

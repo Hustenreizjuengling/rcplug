@@ -23,3 +23,9 @@ func CaptureDRM(dev string) (image.Image, *DRMInfo, error) { return nil, nil, er
 
 // Do is Linux-only.
 func (p *Panel) Do(id string, value int) error { return errUnsupported }
+
+// Info is Linux-only.
+func (t *Touch) Info() (TouchInfo, error) { return TouchInfo{}, errUnsupported }
+
+// Do is Linux-only.
+func (t *Touch) Do(g Gesture) error { return errUnsupported }

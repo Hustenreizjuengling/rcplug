@@ -94,6 +94,9 @@ func WriteDiagnostics(ctx context.Context, w io.Writer, in DiagnosticsInput) err
 	}
 	add("system/processes.txt", []byte(processTable()))
 	add("system/sockets.txt", []byte(socketTable()))
+	if in := inputDevices(); in != "" {
+		add("system/input-devices.txt", []byte(in))
+	}
 	if t := dbusTable(ctx); t != "" {
 		add("system/dbus.txt", []byte(t))
 	}
@@ -200,7 +203,7 @@ func diagReadme(now time.Time, in DiagnosticsInput) string {
   problems.txt     crashes, panics and restarts found in the logs (start here)
   rcplug.json      versions, plugin states, device vitals
   system/          kernel, memory, mounts, processes, network and unix sockets
-                   with their processes, D-Bus names, kernel log (dmesg)
+                   with their processes, D-Bus names, input devices, kernel log (dmesg)
   device/          the device's own logs (RØDE's mixer and screen app; serial
                    numbers, tokens, passwords and MAC addresses masked)
   config/          rcplug settings (passwords, PINs and keys masked)

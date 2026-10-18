@@ -133,7 +133,7 @@ time.
 | `GET api/clients` | `{"port", "clients": [...]}`: connections to the desk's control port with the process behind each (`pid`, `comm`), e.g. the device's GUI and the console |
 | `GET api/audit` | `{"writes": [...]}`: the last 300 writes and changes to the console itself (node `console`: control level, screen mirror, PIN without its value, reconnect, panel), with time, node type, path, property, value, client address and, for refused ones, the error code |
 | `GET api/diagnostics` | A zip with the console's connection statistics, status, clients, audit log, summary, layout and a sanitized copy of the tree; the host adds it to its diagnostics bundle |
-| `GET api/hw` | Screen mirror and front-panel status |
+| `GET api/hw` | Screen mirror, front-panel and touchscreen status (`touch`: `available`, `enabled`, `flip`, `device`, `name`) |
 | `GET api/screen.jpg`, `api/screen.png`, `api/screen.mjpg` | The device's screen, if the user switched the mirror on |
 
 ## Writing
@@ -156,11 +156,12 @@ Every write:
 | `api/link` | `{"epoch", "source", "output", "link"}` | Links or unlinks a routing cell with the sequence the device expects |
 | `api/record` | `{"epoch", "value"}` | Recorder: 0 stop, 1 pause, 2 record |
 | `api/control` | `{"level": "off" \| "basic" \| "expert"}` | Changes the control level (refused with `read_only` or `untested_model` where control is not possible) |
-| `api/settings` | `{"screen": true}`, `{"screenRotate": "auto"}`, `{"panel": true}` | Switches the screen mirror on or off; turns its picture (`auto`: a portrait buffer such as the Duo's becomes landscape, or `0`, `90`, `180`, `270` degrees clockwise); switches the front-panel emulation on or off. Saved across restarts. |
+| `api/settings` | `{"screen": true}`, `{"screenRotate": "auto"}`, `{"panel": true}`, `{"screenControl": true}`, `{"touchFlip": ""}` | Switches the screen mirror on or off; turns its picture (`auto`: a portrait buffer such as the Duo's becomes landscape, or `0`, `90`, `180`, `270` degrees clockwise); switches the front-panel emulation on or off; switches operating the screen from the mirror on or off, and corrects the touchscreen's orientation (`""`, `x`, `y`, `xy`). Saved across restarts. |
 | `api/pin` | `{"current", "new"}` | Sets, changes (`current` required) or removes (`new: ""`) the PIN |
 | `api/reconnect` | `{}` | Reconnects to the desk, also after the GUI guard stepped back. At most every 10 s. |
 | `api/resync` | `{}` | Reading along only: restarts the device's screen app, whose new connection brings a full sync. At most every 10 s. |
 | `api/panel` | `{"control", "value"}` | Experimental front-panel emulation; needs it switched on (`api/settings` or `--panel`) and the expert level |
+| `api/touch` | `{"x", "y"}`, for a swipe also `{"toX", "toY", "ms"}` | Experimental: taps (or swipes) the device's touchscreen at a point of the screen mirror, 0..1 from the picture's top left; needs the mirror and screen control switched on and the expert level; one gesture every 80 ms |
 
 A **marker** is `api/set` on `RECORDER.requestDropMarker` with the current time in
 milliseconds (an int64), as the console's UI does.
@@ -238,7 +239,8 @@ if errors.As(err, &apiErr) && apiErr.Code == "control_off" {
 | `read_only` | 403 | The console runs with `--read-only` |
 | `untested_model` | 403 | The model has no verified profile; control needs `--allow-untested-model` |
 | `expert_required` | 403 | Needs the expert level |
-| `panel_disabled`, `screen_disabled` | 403 | Feature not switched on |
+| `panel_disabled`, `screen_disabled`, `touch_disabled` | 403 | Feature not switched on |
+| `touch_unavailable`, `touch_failed` | 409, 503 | No touchscreen found, or writing to it failed |
 | `csrf` | 403 | The `X-Rcplug` header is missing |
 | `screen_unavailable` | 404, 409 | No screen source found |
 | `stale_epoch` | 409 | The tree changed since you read the path. Reload and retry. |

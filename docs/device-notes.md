@@ -58,9 +58,17 @@ flashing from Windows (below). What is still open:
    is not known yet, so the console shows no meters on the device.
 7. **USB audio during an rcplug update.** During each update so far the computer's
    playback through the Duo went silent until another output was chosen and the Duo
-   again; the kernel log shows the Duo's USB device being set up anew around those
-   times (`dwc2 … new device is high-speed`, once after `ep_stop_xfr: timeout`).
-   Whether the update causes it, and how, is open.
+   again. The kernel log shows the Duo's USB device set up anew about half a minute
+   after each update (`dwc2 … new device is high-speed`), most likely when the
+   computer selected it again, so the silence starts earlier. The device has about
+   120 MB of memory to spare; since 0.6.2 the update log records each step with the
+   free memory, and the diagnostics include RØDE's own logs, to find the cause.
+8. **Operating the screen** (0.6.2, experimental). RØDE's screen app reads its
+   touchscreen from `/dev/input/event0`/`event1` (evdev, no libinput); which one is the
+   touchscreen, its axis ranges and orientation are in the diagnostics
+   (`system/input-devices.txt`). Whether taps land where clicked is to be confirmed
+   on the device.
+
 ## First test on a real Duo
 
 On 2026-10-18 rcplug ran on a real Duo for the first time (firmware 1.7.3, flashed

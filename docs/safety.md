@@ -193,6 +193,13 @@ trust. Do not expose port 8080 to the internet.
   switches it on (*Display* page, with a confirmation) or the console runs with
   `--panel`, and it works only at the *Expert* level. Every press is in the console's
   log. An emulated fader jumps back when the real one moves.
+- **Operating the screen** from the mirror writes taps and swipes into the
+  touchscreen's input device (`/dev/input/event*`), which RØDE's screen app reads
+  directly, exactly as a finger's would arrive. It is off until a user switches it on
+  (*Display* page, with a warning), needs the screen mirror on and the *Expert* level,
+  allows one gesture every 80 ms, and every gesture is in the console's log. A tap
+  that lands beside its target triggers whatever is there: try it on a harmless spot
+  first; *Touch correction* mirrors an axis if taps land mirrored.
 - **Screen mirror** reads the DRM scanout buffer the GUI draws into (`/dev/dri/card0`)
   or, if that cannot be read or is black, `/dev/fb0` (on the Duo that only holds the
   boot splash). The Duo's GUI draws its landscape screen into a portrait buffer, so
