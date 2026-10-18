@@ -263,3 +263,11 @@ func TestTapReadsAlongOnLoopback(t *testing.T) {
 	screen.Reconnect() // the screen reconnects: a new full sync
 	waitFor(t, "tap live again", func() bool { return tap.Status().Stats.FullSyncs >= 2 && tap.Status().State == StateLive })
 }
+
+func TestPortIsAlwaysAValidPort(t *testing.T) {
+	for addr, want := range map[string]int{"127.0.0.1:2345": 2345, "127.0.0.1:99999": 2345, "127.0.0.1:-1": 2345, "127.0.0.1:0": 2345, "nonsense": 2345, "[::1]:65535": 65535} {
+		if got := NewClient(Config{Addr: addr, Logf: quiet}, NewMirror()).Port(); got != want {
+			t.Errorf("Port(%q) = %d, want %d", addr, got, want)
+		}
+	}
+}

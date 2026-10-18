@@ -6,6 +6,10 @@ may break compatibility).
 
 ## 0.6.1 - Unreleased
 
+### Fixed
+- An invalid port in the console's `--mixer` address (above 65535, zero, negative) falls back
+  to 2345 instead of being cut down to another port (found by code scanning).
+
 ## 0.6.0 - 2026-10-18
 
 ### Added

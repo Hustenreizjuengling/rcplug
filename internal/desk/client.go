@@ -225,17 +225,18 @@ func isLocalAddr(addr string) bool {
 	return false
 }
 
-// Port is the TCP port of the configured desk address.
+// Port is the TCP port of the configured desk address (the default for one
+// that is not a valid port).
 func (c *Client) Port() int {
 	_, p, err := net.SplitHostPort(c.cfg.Addr)
 	if err != nil {
 		return rcproto.DefaultPort
 	}
-	n, err := strconv.Atoi(p)
-	if err != nil {
+	n, err := strconv.ParseUint(p, 10, 16)
+	if err != nil || n == 0 {
 		return rcproto.DefaultPort
 	}
-	return n
+	return int(n)
 }
 
 func (c *Client) setState(s, code, errText string) {
