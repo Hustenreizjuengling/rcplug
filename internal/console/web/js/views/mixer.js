@@ -6,7 +6,7 @@ import { canWrite } from '../policy.js';
 import { toggle, slider, vfader, selectCtl, chip, kv, card } from '../controls.js';
 import { hMeter, vMeter, grMeter, hReduction } from '../meters.js';
 import { openDrawer } from '../dialogs.js';
-import { PROC, faders, faderLabel, faderDb, sourceLabel, sourceColour, sources, stripSource, unityFader, mixLevel } from '../device.js';
+import { PROC, faders, faderLabel, faderDb, sourceLabel, sourceColour, sources, stripSource, unityFader, mixLevel, sourceIndexes } from '../device.js';
 import { recorderCard, monitorCard, inputCard, routingRow } from './parts.js';
 import { actionButtons } from '../plugins.js';
 
@@ -45,7 +45,7 @@ function sourceLevel(src, max) {
 }
 
 export function sourceOptions() {
-  return [[-1, t('mixer.noSource')], ...sources().map((s, i) => [i, sourceLabel(i)])];
+  return [[-1, t('mixer.noSource')], ...sourceIndexes().map((i) => [i, sourceLabel(i)])];
 }
 
 function strip(scope, i) {

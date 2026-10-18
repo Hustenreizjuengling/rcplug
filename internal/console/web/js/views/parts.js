@@ -6,7 +6,7 @@ import { canWrite } from '../policy.js';
 import { toggle, slider, stepper, kv, card, valueText, colourValue } from '../controls.js';
 import { record, setProp, link } from '../api.js';
 import { openDrawer, confirmDialog } from '../dialogs.js';
-import { sourceLabel, outputLabel, sourceColour, isCombo, isCall, mixLevel, inputTypeText, recordStateText, outputs } from '../device.js';
+import { sourceLabel, outputLabel, sourceColour, isCombo, isCall, mixLevel, inputTypeText, recordStateText, outputIndexes } from '../device.js';
 
 export function recorderCard(scope) {
   const rp = single('RECORDER');
@@ -142,7 +142,7 @@ function mixDetails(scope, s, o) {
 
 export function routingRow(scope, src) {
   const row = h('div', { class: 'outmeters' });
-  outputs().forEach((_, o) => row.append(h('div', null, h('div', { class: 'small muted' }, outputLabel(o)), mixCell(scope, src, o))));
+  outputIndexes().forEach((o) => row.append(h('div', null, h('div', { class: 'small muted' }, outputLabel(o)), mixCell(scope, src, o))));
   return row;
 }
 

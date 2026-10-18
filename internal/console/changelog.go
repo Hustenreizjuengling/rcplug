@@ -26,7 +26,7 @@ const changeLogSize = 500
 // noisyProps change continuously while the desk runs.
 var noisyProps = set("faderLevel", "meterLevelL", "meterLevelR", "meterPeakL", "meterPeakR", "meterStereo",
 	"mixLevelWithAnchor", "padProgress", "recordTimeMs", "recordBytesPerSecond", "playerProgress",
-	"playerCurrentPositionTime", "storageVolumeFree", "storageVolumeState", "encoderSignal", "screenTouched", "potLevel",
+	"playerCurrentPositionTime", "storageVolumeFree", "storageVolumeState", "encoderSignal", "screenTouched",
 	"updateDownloadProgress", "updateInstalledProgress", "showControlProgress", "txRssi", "txSignalQuality",
 	"txBatteryLevel", "padRecordSeconds", "sipRemainingCalltime", "sipSlotCallJitter", "sipSlotCallPacketLoss",
 	"sipSlotCallQuality", "sipSlotCallBitrate", "systemDateTime")

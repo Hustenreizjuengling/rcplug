@@ -23,6 +23,10 @@ type Profile struct {
 	PhysicalFaders int // hardware sliders (FADER 0..n-1); the rest are virtual
 	PadsPerBank    int // SMART pads per bank
 	PadBanks       int
+	// MicInputs and Headphones are the sockets the device has; the state
+	// tree has room for four of each on every model.
+	MicInputs  int
+	Headphones int
 	// Controllable offers writes for this model without an explicit opt-in.
 	// Models whose behaviour rcplug has not been checked against stay
 	// read-only unless the operator overrides it.
@@ -34,12 +38,12 @@ type Profile struct {
 // Profiles lists the known models. To add one, see docs/adding-a-model.md.
 var Profiles = map[Model]Profile{
 	ModelDuo: {
-		Model: ModelDuo, Name: "RØDECaster Duo", PhysicalFaders: 4, PadsPerBank: 6, PadBanks: 8,
+		Model: ModelDuo, Name: "RØDECaster Duo", PhysicalFaders: 4, PadsPerBank: 6, PadBanks: 8, MicInputs: 2, Headphones: 2,
 		Controllable: true,
 		Basis:        "captured full sync, firmware 1.7.4 (internal/rcsim/fixture); rodecaster-protocol",
 	},
 	ModelPro2: {
-		Model: ModelPro2, Name: "RØDECaster Pro II", PhysicalFaders: 6, PadsPerBank: 8, PadBanks: 8,
+		Model: ModelPro2, Name: "RØDECaster Pro II", PhysicalFaders: 6, PadsPerBank: 8, PadBanks: 8, MicInputs: 4, Headphones: 4,
 		Controllable: false,
 		Basis:        "rodecaster-protocol and companion-module-rode-rodecaster2; no capture in this repository",
 	},

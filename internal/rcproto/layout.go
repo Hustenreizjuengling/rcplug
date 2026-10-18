@@ -74,6 +74,8 @@ type Layout struct {
 	VirtualFaders  int `json:"virtualFaders"`  // on-screen strips
 	PadsPerBank    int `json:"padsPerBank"`
 	PadBanks       int `json:"padBanks"`
+	MicInputs      int `json:"micInputs,omitempty"`  // microphone sockets (0 = unknown model: all)
+	Headphones     int `json:"headphones,omitempty"` // headphone sockets (0 = unknown model: all)
 	// Meter runs, found when the METER run has the layout of the mixer's
 	// meter memory (see hw.MeterReading): one per strip, the master, three
 	// for the channel open on the device's screen (input, output, gain
@@ -127,6 +129,7 @@ func DiscoverLayout(root *Node) *Layout {
 	p := ProfileOf(l.Model)
 	l.ModelName, l.Controllable = p.Name, p.Controllable
 	l.PhysicalFaders, l.PadsPerBank, l.PadBanks = p.PhysicalFaders, p.PadsPerBank, p.PadBanks
+	l.MicInputs, l.Headphones = p.MicInputs, p.Headphones
 	faders := l.Runs["FADER"].Count
 	if l.PhysicalFaders > faders {
 		l.PhysicalFaders = faders

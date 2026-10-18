@@ -30,12 +30,12 @@ export function meterNorm(v) {
 }
 
 export function vMeter(scope, path, side) {
-  const lv = h('div', { class: 'lv' });
+  const cv = h('div', { class: 'cv' }); // covers what the level does not reach
   const pk = h('div', { class: 'pk' });
-  const el = h('div', { class: 'meter', role: 'meter', 'aria-label': t('meter.side', { side }), 'aria-valuemin': 0, 'aria-valuemax': 100 }, lv, pk);
-  scope.bind(path, 'meterLevel' + side, (v) => schedule(lv, (e) => {
+  const el = h('div', { class: 'meter', role: 'meter', 'aria-label': t('meter.side', { side }), 'aria-valuemin': 0, 'aria-valuemax': 100 }, h('div', { class: 'lvs' }), cv, pk);
+  scope.bind(path, 'meterLevel' + side, (v) => schedule(cv, (e) => {
     const n = meterNorm(v);
-    e.style.transform = `scaleY(${n.toFixed(3)})`;
+    e.style.transform = `scaleY(${(1 - n).toFixed(3)})`;
     el.setAttribute('aria-valuenow', Math.round(n * 100));
   }));
   scope.bind(path, 'meterPeak' + side, (v) => schedule(pk, (e) => { e.style.transform = `translateY(${((1 - meterNorm(v)) * 100).toFixed(1)}%)`; }));
@@ -46,11 +46,11 @@ export function hMeter(scope, path, text) {
   const bar = h('i');
   const upd = () => schedule(bar, (e) => {
     const n = Math.max(meterNorm(val(path, 'meterLevelL')), meterNorm(val(path, 'meterLevelR')));
-    e.style.transform = `scaleX(${n.toFixed(3)})`;
+    e.style.transform = `scaleX(${(1 - n).toFixed(3)})`; // the cover over the colour scale
   });
   scope.bind(path, 'meterLevelL', upd);
   scope.bind(path, 'meterLevelR', upd);
-  return h('div', { class: 'hmeter' }, h('span', null, text), h('div', { class: 'hbar', role: 'meter', 'aria-label': text }, bar));
+  return h('div', { class: 'hmeter' }, h('span', null, text), h('div', { class: 'hbar lvl', role: 'meter', 'aria-label': text }, bar));
 }
 
 // reductionDb turns a compressor's gain (1.0 = no reduction) into dB of

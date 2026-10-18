@@ -3,7 +3,7 @@ import { h } from '../dom.js';
 import { t } from '../i18n.js';
 import { store, famPath, run } from '../store.js';
 import { selectCtl } from '../controls.js';
-import { sourceLabel, outputLabel, outputs, assignedSources, faders } from '../device.js';
+import { sourceLabel, outputLabel, outputIndexes, sourceIndexes, assignedSources, faders } from '../device.js';
 import { mixCell } from './parts.js';
 
 const KEY = 'rcplug-routing-used';
@@ -20,13 +20,14 @@ export const routing = {
     for (let i = 0; i < faders().length; i++) scope.rerenderOn(famPath('CHANNEL', i), 'channelInputSource');
     const used = onlyUsed();
     const head = h('tr', null, h('th', { class: 'src', scope: 'col' }, t('routing.corner')));
-    outputs().forEach((_, o) => head.append(h('th', { scope: 'col' }, outputLabel(o))));
+    const outs = outputIndexes();
+    outs.forEach((o) => head.append(h('th', { scope: 'col' }, outputLabel(o))));
     const tb = h('tbody');
-    for (let s = 0; s < store.L.sourceCount; s++) {
+    for (const s of sourceIndexes()) {
       if (used && !assigned.has(s)) continue;
       const tr = h('tr', { class: assigned.has(s) ? '' : 'unused' },
         h('th', { class: 'src', scope: 'row', title: assigned.has(s) ? t('routing.on', { strips: assigned.get(s).join(', ') }) : t('routing.unassigned') }, sourceLabel(s)));
-      outputs().forEach((_, o) => tr.append(h('td', null, mixCell(scope, s, o))));
+      outs.forEach((o) => tr.append(h('td', null, mixCell(scope, s, o))));
       tb.append(tr);
     }
     const filter = h('label', { class: 'row small muted' },
@@ -35,6 +36,7 @@ export const routing = {
     const mm = run('MIXMINUSES');
     const mmGrid = h('div', { class: 'grid cols-4' });
     for (let i = 0; i < (mm ? mm.count : 0); i++) {
+      if (!outputIndexes().includes(i)) continue;
       const p = famPath('MIXMINUSES', i);
       mmGrid.append(h('div', { class: 'card' }, selectCtl(scope, p, 'outputMixMinus', [0, 1, 2].map((v) => [v, t('mm.' + v)]), { label: outputLabel(i) })));
     }

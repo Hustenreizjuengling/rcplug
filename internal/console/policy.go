@@ -209,7 +209,10 @@ var basicRules = func() map[string]map[string]rule {
 	units(m, "masterCompellorThreshold", "masterCompellorAttack", "masterCompellorRelease", "masterCompellorGain")
 	r["MASTERCHANNEL"] = m
 	r["MIXMINUSES"] = map[string]rule{"outputMixMinus": integer(0, 2)} // main mix, mix-minus, custom
-	r["DUCKER"] = map[string]rule{"duckerDepth": dbl(-60, 0)}          // dB (-9 on a Duo, 1.7.6)
+	// Headphone volume (the knobs are endless encoders on a Duo; POT 0 and 1
+	// are its two headphones), within the node's own potMin/potMax.
+	r["POT"] = map[string]rule{"potLevel": integer(0, 127)}
+	r["DUCKER"] = map[string]rule{"duckerDepth": dbl(-60, 0)} // dB (-9 on a Duo, 1.7.6)
 	r["EMERGENCYMUTE"] = map[string]rule{"emergencyMuteActive": boolean()}
 	r["RECORDER"] = map[string]rule{"requestRecordState": integer(0, 2), "requestDropMarker": integer(0, 1<<53)}
 	r["GUI"] = map[string]rule{

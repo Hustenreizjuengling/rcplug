@@ -1,7 +1,8 @@
 // Outputs & master: monitor, Bluetooth, headphones, master bus, ducking.
 import { h, argbToCss } from '../dom.js';
 import { t } from '../i18n.js';
-import { single, run, famPath } from '../store.js';
+import { single, run, famPath, val } from '../store.js';
+import { headphoneCount } from '../device.js';
 import { toggle, slider, kv, card, valueText } from '../controls.js';
 
 export const outputsView = {
@@ -19,16 +20,21 @@ export const outputsView = {
         kv(scope, [[t('out.autoMuteActive'), o, 'outputBTAutoMuteActive']])));
       cards.push(card(t('out.multitrack'), kv(scope, [[t('out.multiMode'), o, 'outputMultiMode'], [t('out.multiBypass'), o, 'outputMultiBypass'],
         [t('out.prefader'), o, 'outputPrefader'], [t('out.trackMode'), o, 'recordingMultitrackMode'], [t('out.compression'), o, 'recordingCompressionQuality'],
-        [t('out.procBypass'), o, 'recordingProcessingBypass'], [t('out.hp1Level'), o, 'headphone1Level']])));
+        [t('out.procBypass'), o, 'recordingProcessingBypass']])));
     }
     const hp = run('HEADPHONE');
     if (hp) {
       const g = h('div');
-      for (let i = 0; i < hp.count; i++) {
-        const p = famPath('HEADPHONE', i);
+      // The headphones this model has; their volume is the knob's
+      // position (POT 0 and 1 on a Duo, 0..127).
+      for (let i = 0; i < Math.min(hp.count, headphoneCount()); i++) {
+        const p = famPath('HEADPHONE', i), pot = famPath('POT', i);
         const sw = h('span', { class: 'swatch' });
         scope.bind(p, 'headphoneColour', (v) => (sw.style.background = argbToCss(v) || 'var(--dim)'));
-        g.append(h('div', { class: 'row', style: 'margin:4px 0' }, sw, h('b', null, t('out.headphone', { n: i + 1 })), h('span', { class: 'muted small' }, t('out.hpType'), ' ', valueText(scope, p, 'headphoneType'))));
+        g.append(h('div', { class: 'row', style: 'margin:8px 0 2px' }, sw, h('b', null, t('out.headphone', { n: i + 1 })), h('span', { class: 'muted small' }, t('out.hpType'), ' ', valueText(scope, p, 'headphoneType'))));
+        if (pot && val(pot, 'potLevel') !== undefined) {
+          g.append(slider(scope, pot, 'potLevel', { label: t('out.hpVolume'), min: 0, max: 127, step: 1, fmt: (v) => Math.round((v / 127) * 100) + ' %' }));
+        }
       }
       if (sys) g.append(h('div', { class: 'row', style: 'margin-top:8px' }, toggle(scope, sys, 'disableAllHeadphoneOutputs', t('out.allHpOff'), 'mute'), toggle(scope, sys, 'disableAllLineoutOutputs', t('out.lineOff'), 'mute')));
       cards.push(card(t('out.headphones'), g));

@@ -9,7 +9,7 @@ export default {
 
   'readonly.hint': 'display only', 'render.error': 'Could not render: {err}',
   'tab.mixer': 'Mixer', 'tab.routing': 'Routing', 'tab.inputs': 'Inputs', 'tab.outputs': 'Outputs & master', 'tab.effects': 'Effects',
-  'tab.pads': 'SMART pads', 'tab.recorder': 'Recording', 'tab.system': 'System', 'tab.explorer': 'Explorer', 'tab.audit': 'Log',
+  'tab.pads': 'SMART pads', 'tab.recorder': 'Recording', 'tab.system': 'Device', 'tab.explorer': 'Explorer', 'tab.audit': 'Log',
   'header.live': 'Live · {n}/s', 'header.liveTap': 'Live (reading along) · {n}/s', 'header.offline': 'Console unreachable – reconnecting…', 'header.firmware': 'firmware {v}',
   'header.show': 'show “{name}”', 'header.language': 'Switch language',
   'level.group': 'Control', 'level.off': 'Read only', 'level.basic': 'Control', 'level.expert': 'Expert',
@@ -92,8 +92,8 @@ export default {
   'input.phantomOn': 'Turn on', 'input.type-1': '—', 'input.type0': 'Microphone', 'input.typeN': 'type {n}',
   'out.bt': 'Bluetooth output', 'out.fixed': 'fixed level', 'out.autoMuteActive': 'Auto-mute active', 'out.multitrack': 'Multitrack & recording bus',
   'out.multiMode': 'Multi-out mode', 'out.multiBypass': 'Multi-out bypass', 'out.prefader': 'Pre-fader', 'out.trackMode': 'Multitrack mode',
-  'out.compression': 'Compression quality', 'out.procBypass': 'Bypass processing', 'out.hp1Level': 'Headphones 1 level', 'out.headphone': 'Headphones {n}',
-  'out.hpType': 'type', 'out.allHpOff': 'all headphones off', 'out.lineOff': 'line outs off', 'out.headphones': 'Headphones',
+  'out.compression': 'Compression quality', 'out.procBypass': 'Bypass processing', 'out.headphone': 'Headphones {n}',
+  'out.hpVolume': 'Volume', 'out.hpType': 'type', 'out.allHpOff': 'all headphones off', 'out.lineOff': 'line outs off', 'out.headphones': 'Headphones',
   'out.master': 'Master: Compellor & delay', 'out.delay': 'Delay (s)', 'out.ducking': 'Ducking', 'out.depth': 'Depth', 'out.allMuted': 'everything muted',
   'fx.intro': 'Voice effects per channel slot (same order as the channels).', 'fx.slot': 'Effect slot {n}', 'fx.padSlot': 'Pad effect {n}',
   'fx.padTitle': 'SMART pad effects', 'fx.preset': 'FX preset {n}', 'fx.presets': 'FX presets', 'fx.index': 'Index', 'fx.content': 'Content',
@@ -134,7 +134,7 @@ export default {
   'gui.screen': 'Screen brightness', 'gui.buttons': 'Button brightness', 'gui.buttonsActive': 'Buttons active', 'gui.buttonsInactive': 'Buttons inactive',
   'gui.lang': 'Language', 'gui.auto': 'Auto brightness', 'gui.dim': 'Dim', 'gui.meters': 'Broadcast meters',
 
-  'banner.busyHint': 'The device\'s screen holds the mixer\'s connection. On the device the console normally takes it over itself (connection “Automatic” in Plugins → Console → Settings).', 'banner.busyLink': 'To “System”',
+  'banner.busyHint': 'The device\'s screen holds the mixer\'s connection. On the device the console normally takes it over itself (connection “Automatic” in Plugins → Console → Settings).', 'banner.busyLink': 'To “Device”',
   'explorer.tree': 'Device state', 'explorer.search': 'Search property or value…', 'explorer.props': '{n} p', 'explorer.children': '{n} children',
   'explorer.root': '{t} (root)', 'explorer.hits': '{n} hits', 'explorer.notFound': 'Node not found',
   'explorer.pathInfo': 'path [{path}] · {props} properties · {children} children', 'explorer.noProps': 'This node has no properties of its own – expand its children on the left.',

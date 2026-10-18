@@ -12,6 +12,31 @@ export const outputs = () => store.meta.outputs.slice(0, store.L.mixPerSource);
 export const faders = () => store.meta.faders;
 export const unityFader = () => store.meta.unityFader || 90;
 
+// What this model has. The tree has room for four microphone inputs and four
+// headphones on every model; a Duo has two of each (store.L.micInputs,
+// store.L.headphones from the server's profile; 0 = unknown model: all).
+// Positions stay protocol numbers: these filter, they never renumber.
+export function hasSource(i) {
+  const s = store.meta.sources[i];
+  if (!s) return false;
+  const n = store.L.micInputs || 4;
+  const m = s.id.match(/^combo(\d)(?:_(\d))?$/);
+  return !m || (Number(m[1]) <= n && (!m[2] || Number(m[2]) <= n));
+}
+export function hasOutput(o) {
+  const s = store.meta.outputs[o];
+  const m = s && s.id.match(/^headphone(\d)$/);
+  return !!s && (!m || Number(m[1]) <= (store.L.headphones || 4));
+}
+// sourceIndexes and outputIndexes are the protocol numbers this model has;
+// a source assigned to a strip always counts (whatever the profile says).
+export const sourceIndexes = () => {
+  const assigned = assignedSources();
+  return sources().map((_, i) => i).filter((i) => hasSource(i) || assigned.has(i));
+};
+export const outputIndexes = () => outputs().map((_, o) => o).filter(hasOutput);
+export const headphoneCount = () => store.L.headphones || 4;
+
 export function sourceLabel(i) {
   const s = store.meta.sources[i];
   return s ? label('src', s.id, s.label) : '—';

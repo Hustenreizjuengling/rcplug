@@ -9,7 +9,7 @@ export default {
 
   'readonly.hint': 'nur Anzeige', 'render.error': 'Fehler beim Anzeigen: {err}',
   'tab.mixer': 'Mixer', 'tab.routing': 'Routing', 'tab.inputs': 'Eingänge', 'tab.outputs': 'Ausgänge & Master', 'tab.effects': 'Effekte',
-  'tab.pads': 'SMART Pads', 'tab.recorder': 'Aufnahme', 'tab.system': 'System', 'tab.explorer': 'Explorer', 'tab.audit': 'Protokoll',
+  'tab.pads': 'SMART Pads', 'tab.recorder': 'Aufnahme', 'tab.system': 'Gerät', 'tab.explorer': 'Explorer', 'tab.audit': 'Protokoll',
   'header.live': 'Live · {n}/s', 'header.liveTap': 'Live (liest mit) · {n}/s', 'header.offline': 'Konsole nicht erreichbar – verbinde neu…', 'header.firmware': 'Firmware {v}',
   'header.show': 'Show „{name}“', 'header.language': 'Sprache wechseln',
   'level.group': 'Steuerung', 'level.off': 'Nur lesen', 'level.basic': 'Steuern', 'level.expert': 'Experte',
@@ -95,8 +95,8 @@ export default {
   'input.phantomOn': 'Einschalten', 'input.type-1': '—', 'input.type0': 'Mikrofon', 'input.typeN': 'Typ {n}',
   'out.bt': 'Bluetooth-Ausgang', 'out.fixed': 'fester Pegel', 'out.autoMuteActive': 'Auto-Mute aktiv', 'out.multitrack': 'Mehrspur & Aufnahmebus',
   'out.multiMode': 'Multi-Out-Modus', 'out.multiBypass': 'Multi-Out Bypass', 'out.prefader': 'Pre-Fader', 'out.trackMode': 'Mehrspur-Modus',
-  'out.compression': 'Kompressionsqualität', 'out.procBypass': 'Bearbeitung umgehen', 'out.hp1Level': 'Kopfhörer 1 Pegel', 'out.headphone': 'Kopfhörer {n}',
-  'out.hpType': 'Typ', 'out.allHpOff': 'alle Kopfhörer aus', 'out.lineOff': 'Line-Outs aus', 'out.headphones': 'Kopfhörer',
+  'out.compression': 'Kompressionsqualität', 'out.procBypass': 'Bearbeitung umgehen', 'out.headphone': 'Kopfhörer {n}',
+  'out.hpVolume': 'Lautstärke', 'out.hpType': 'Typ', 'out.allHpOff': 'alle Kopfhörer aus', 'out.lineOff': 'Line-Outs aus', 'out.headphones': 'Kopfhörer',
   'out.master': 'Master: Compellor & Delay', 'out.delay': 'Delay (s)', 'out.ducking': 'Ducking', 'out.depth': 'Tiefe', 'out.allMuted': 'alles stumm',
   'fx.intro': 'Stimm-Effekte je Kanal-Slot (Reihenfolge wie die Kanäle).', 'fx.slot': 'Effekt-Slot {n}', 'fx.padSlot': 'Pad-Effekt {n}',
   'fx.padTitle': 'Effekte der SMART Pads', 'fx.preset': 'FX-Preset {n}', 'fx.presets': 'FX-Presets', 'fx.index': 'Index', 'fx.content': 'Inhalt',
@@ -137,7 +137,7 @@ export default {
   'gui.screen': 'Display-Helligkeit', 'gui.buttons': 'Tasten-Helligkeit', 'gui.buttonsActive': 'Tasten aktiv', 'gui.buttonsInactive': 'Tasten inaktiv',
   'gui.lang': 'Sprache', 'gui.auto': 'Auto-Helligkeit', 'gui.dim': 'Abdunkeln', 'gui.meters': 'Meter senden',
 
-  'banner.busyHint': 'Der Bildschirm des Geräts hält die Verbindung zum Mischpult. Am Gerät übernimmt die Konsole sie normalerweise selbst (Verbindung „Automatisch“ unter Plugins → Konsole → Einstellungen).', 'banner.busyLink': 'Zu „System“',
+  'banner.busyHint': 'Der Bildschirm des Geräts hält die Verbindung zum Mischpult. Am Gerät übernimmt die Konsole sie normalerweise selbst (Verbindung „Automatisch“ unter Plugins → Konsole → Einstellungen).', 'banner.busyLink': 'Zu „Gerät“',
   'explorer.tree': 'Gerätezustand', 'explorer.search': 'Eigenschaft oder Wert suchen…', 'explorer.props': '{n} P', 'explorer.children': '{n} Kinder',
   'explorer.root': '{t} (Wurzel)', 'explorer.hits': '{n} Treffer', 'explorer.notFound': 'Knoten nicht gefunden',
   'explorer.pathInfo': 'Pfad [{path}] · {props} Eigenschaften · {children} Kinder', 'explorer.noProps': 'Dieser Knoten hat keine eigenen Eigenschaften – links die Unterknoten aufklappen.',

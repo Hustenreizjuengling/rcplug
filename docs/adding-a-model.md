@@ -62,7 +62,9 @@ Model knowledge lives in [`internal/rcproto/model.go`](../internal/rcproto/model
   falls back to `SYSTEM.systemName`. It never guesses: an unknown model stays
   `unknown` and read-only.
 - **Profile.** `Profiles[model]` holds the display name, the number of physical faders
-  (the rest are virtual), pads per bank and the number of banks, `Controllable` and
+  (the rest are virtual), pads per bank and the number of banks, the microphone inputs
+  and headphones the device has (the tree has room for four of each on every model;
+  the console shows only these), `Controllable` and
   `Basis`, a note on where the facts come from. Start with `Controllable: false`.
 - **Names.** `Sources` and `Outputs` name the routing sources and outputs by index.
   If the new model numbers them differently, make the tables per model.

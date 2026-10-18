@@ -6,6 +6,25 @@ may break compatibility).
 
 ## 0.8.2 - Unreleased
 
+### Added
+- **Headphone volume** in the console (*Outputs*), one slider per headphone. On a
+  Duo the two headphone knobs are endless encoders whose position the mixer keeps in
+  `POT` 0 and 1 (0–127), written at the *Control* level. Whether the mixer follows a
+  written value is to be confirmed on the device; turning a knob shows in the change
+  log, which no longer leaves the knobs out.
+
+### Changed
+- **Only what the device has:** the tree has room for four microphone inputs and four
+  headphones on every model; the console now shows a Duo's two of each (inputs,
+  routing matrix, mix-minus, headphones) and leaves out the tree's spare input nodes.
+  The model profile has `MicInputs` and `Headphones` (layout `micInputs`,
+  `headphones`). A source assigned to a channel strip is always shown.
+- The console's *System* tab is called **Device**, so it is not mistaken for the
+  dashboard's *System* page (rcplug and the operating system).
+- **Level meters:** the colour scale stands still and a cover shrinks over it, so the
+  top turns red only when the level gets there (before, the scale was squeezed into
+  the bar and its top was always red). Green to about −17 dB, amber to about −2 dB.
+
 ## 0.8.1 - 2026-10-18
 
 ### Fixed
