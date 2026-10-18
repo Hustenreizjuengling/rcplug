@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.8.0 - Unreleased
+## 0.8.0 - 2026-10-18
 
 ### Changed
 - **Full control is how the console works on the device.** Tried on a real Duo
