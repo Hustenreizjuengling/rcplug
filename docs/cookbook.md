@@ -177,15 +177,21 @@ func follow(ctx context.Context, c *capi.Client) error {
 
 ### Change something: mute a channel
 
-Writes go through the console, which checks them against the control level the user
-chose (*Read only* after installation) and the PIN. Say in your plugin's
-description what it changes; the user decides by setting the level. Pass the PIN in
-through the operator's settings, never through a web page.
+Writes go through the console. A plugin declares that it changes the desk in its
+`plugin.json`, and the dashboard shows it to the user before they start the plugin:
+
+```json
+"permissions": ["desk:write"]
+```
+
+With it, the console takes the plugin's writes at the *Control* level's rules, without
+the PIN and whatever level the browsers have; write protection stops it like everyone
+else. The SDK's client identifies the plugin by itself (it sends `$RCPLUG_TOKEN`). Say
+in your plugin's description what it changes.
 
 ```go
 // mute mutes the first channel strip and drops a marker into the recording.
-// Writing needs the control level "Control" in the console (it is read-only
-// after installation), and the PIN if the user set one.
+// Its plugin.json declares "permissions": ["desk:write"].
 package main
 
 import (
@@ -193,7 +199,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"os"
 	"slices"
 	"time"
 
@@ -204,7 +209,6 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	c := capi.New("")
-	c.PIN = os.Getenv("CONSOLE_PIN") // from config/<name>.json, never from a web page
 
 	err := set(ctx, c, "CHANNEL", 0, "channelOutputMute", true)
 	if err == nil {
@@ -212,10 +216,10 @@ func main() {
 	}
 	var e *capi.Error
 	switch {
-	case errors.As(err, &e) && e.Code == "control_off":
-		log.Fatal("control is off: switch the console from Read only to Control")
-	case errors.As(err, &e) && e.Code == "pin_required":
-		log.Fatal("the console has a PIN: put it into config/<name>.json as CONSOLE_PIN")
+	case errors.As(err, &e) && e.Code == "permission_desk_write":
+		log.Fatal(`plugin.json lacks "permissions": ["desk:write"]`)
+	case errors.As(err, &e) && e.Code == "read_only":
+		log.Fatal("the console is write-protected (System → Write protection)")
 	case err != nil:
 		log.Fatal(err)
 	}
@@ -259,11 +263,12 @@ or 2 (record). From a shell on the device:
 ```sh
 B="$RCPLUG_HOST_URL/plugins/console"
 E=$(curl -fsS "$B/api/status" | sed -n 's/.*"epoch":\([0-9]*\).*/\1/p')
-curl -fsS -X POST "$B/api/record" -H 'X-Rcplug: 1' -d "{\"epoch\":$E,\"value\":2}"
+curl -fsS -X POST "$B/api/record" -H 'X-Rcplug: 1' -H "X-Rcplug-Token: $RCPLUG_TOKEN" \
+  -d "{\"epoch\":$E,\"value\":2}"
 ```
 
-In Go, send the same request with `net/http`: a POST with the header `X-Rcplug: 1`
-(and `X-Rcplug-Pin` if a PIN is set).
+In Go, send the same request with `net/http`: a POST with the headers `X-Rcplug: 1`
+and `X-Rcplug-Token` (from `$RCPLUG_TOKEN`).
 
 ### React to a SMART pad
 

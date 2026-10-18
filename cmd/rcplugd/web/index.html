@@ -63,6 +63,9 @@
   .bar i{display:block;height:100%;background:var(--accent)}
   .note{color:var(--muted);font-size:12px;margin-top:16px}
   .tag.update{color:var(--blue);border-color:var(--blue)}
+  .perms{margin:0 0 10px;font-size:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .tag.perm{cursor:help}
+  .tag.perm.strong{color:var(--warn);border-color:var(--warn)}
   .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--blue);color:#fff;font-size:11px;font-weight:600;text-align:center;line-height:18px}
   .upd{border-top:1px solid var(--line);padding:10px 0}
   .upd:first-child{border-top:0}
@@ -106,6 +109,11 @@ const T = {
     plugins: 'Plugins', system: 'System', rescan: 'Rescan', rescanHint: 'Read the plugins folder again', skipped: 'Skipped plugin folders:',
     none: 'No plugins installed yet.', noneHint: 'Copy a plugin folder into plugins/ and press “Rescan”.', open: 'Open', newTab: 'new tab ↗',
     stop: 'Stop', restart: 'Restart', start: 'Start', log: 'Log', restarts: 'restarts: {n}', startpage: 'start page', audio: 'audio',
+    perms: 'Permissions:', 'perm_desk:write': 'changes the desk', perm_audio: 'hears the desk', perm_network: 'network', perm_device: 'device',
+    'permHint_desk:write': 'May change the mixer, the recorder and the pads through the console, without the PIN and whatever control level the console has; write protection stops it.',
+    permHint_audio: 'May listen to the desk\'s inputs and outputs through the shared audio taps (when they are switched on under System).',
+    permHint_network: 'Talks to other machines on the network or the internet.',
+    permHint_device: 'Uses the device\'s hardware or files outside its own directory.',
     unknown: 'unknown plugin.json fields: {f}', notFound: 'Plugin not found.', isState: 'The plugin is {state}', autoRestart: 'It is restarted automatically…',
     failed: 'Action failed: {err}', emptyLog: '(empty)', noLog: '(no log)', footer: 'rcplug – add-ons for the RØDECaster, without new firmware.',
     st_running: 'running', st_starting: 'starting', st_backoff: 'restarting…', st_stopped: 'stopped',
@@ -125,8 +133,8 @@ const T = {
     unWord: 'remove', unWordHint: 'type “remove”', unTypeWord: 'Type “{w}” first.', unButton: 'Remove rcplug',
     unConfirm: 'Really remove rcplug and all plugin data from the device?', unDone: 'rcplug is being removed', unDoneText: 'In a few seconds rcplug and its plugins are gone from the device. This page no longer works.',
     procTitle: 'Processes', procDesc: 'What runs on the device: CPU as a share of one core over the last seconds, memory in use (RSS). Tags mark rcplug and its plugins, and RØDE\'s own programs.',
-    procByCPU: 'by CPU', procByMem: 'by memory', procName: 'Process', procMem: 'Memory', procThreads: 'Threads', procNone: 'Not available.',
-    procFoot: '{n} processes (without kernel threads) on {cores} cores, {mem} MB in use together. The first values for CPU appear after a few seconds.',
+    procByCPU: 'by CPU', procByMem: 'by RAM', procName: 'Process', procMem: 'RAM', procThreads: 'Threads', procNone: 'Not available.',
+    procFoot: '{n} processes (without kernel threads) on {cores} cores, {mem} MB of RAM in use together. The first values for CPU appear after a few seconds.',
     tapTitle: 'Audio taps', tapExperimental: 'experimental', tapSwitch: 'switched on',
     tapDesc: 'One bridge from the desk\'s audio graph (JACK) to the plugins that need sound, such as Sonar: plugins ask for inputs or outputs and get a stream. It adds one client to RØDE\'s audio graph, so it is off until you switch it on; it only runs while a plugin listens.',
     tapConfirm: 'Switch on the audio taps? Plugins can then hear the desk\'s inputs and outputs. The bridge adds one client to RØDE\'s audio graph while a plugin listens. Watch for dropouts on the first use.',
@@ -153,11 +161,16 @@ const T = {
     plugins: 'Plugins', system: 'System', rescan: 'Neu einlesen', rescanHint: 'Plugin-Ordner neu einlesen', skipped: 'Übersprungene Plugin-Ordner:',
     none: 'Noch keine Plugins installiert.', noneHint: 'Plugin-Ordner nach plugins/ kopieren und „Neu einlesen“ drücken.', open: 'Öffnen', newTab: 'neuer Tab ↗',
     stop: 'Stoppen', restart: 'Neu starten', start: 'Starten', log: 'Log', restarts: 'Neustarts: {n}', startpage: 'Startseite', audio: 'Audio',
+    perms: 'Berechtigungen:', 'perm_desk:write': 'ändert das Pult', perm_audio: 'hört das Pult', perm_network: 'Netzwerk', perm_device: 'Gerät',
+    'permHint_desk:write': 'Darf über die Konsole Mixer, Recorder und Pads ändern, ohne PIN und unabhängig von der Steuerungsstufe der Konsole; der Schreibschutz hält es auf.',
+    permHint_audio: 'Darf die Ein- und Ausgänge des Pults über die gemeinsamen Audio-Abgriffe hören (wenn sie unter System eingeschaltet sind).',
+    permHint_network: 'Spricht mit anderen Rechnern im Netzwerk oder im Internet.',
+    permHint_device: 'Nutzt die Hardware des Geräts oder Dateien außerhalb seines eigenen Verzeichnisses.',
     unknown: 'unbekannte plugin.json-Felder: {f}', notFound: 'Plugin nicht gefunden.', isState: 'Das Plugin ist gerade {state}', autoRestart: 'Es wird automatisch neu gestartet…',
     failed: 'Aktion fehlgeschlagen: {err}', emptyLog: '(leer)', noLog: '(kein Log)', footer: 'rcplug – Funktionen für den RØDECaster ohne neue Firmware.',
     st_running: 'läuft', st_starting: 'startet', st_backoff: 'Neustart…', st_stopped: 'gestoppt',
     sysTitle: 'System', sysDesc: 'Zustand des Geräts und des Plugin-Hosts.', hostname: 'Hostname', arch: 'Architektur', temp: 'CPU-Temperatur',
-    loadAvg: 'Last (1/5/15 min)', memory: 'Arbeitsspeicher', disk: 'Speicher (rcplug)', devUp: 'Gerät läuft seit', hostUp: 'rcplug läuft seit',
+    loadAvg: 'Last (1/5/15 min)', memory: 'Arbeitsspeicher', disk: 'Speicherplatz (rcplug)', devUp: 'Gerät läuft seit', hostUp: 'rcplug läuft seit',
     version: 'rcplug-Version', clock: 'Uhrzeit (Gerät)', memUsed: '{used} / {total} MB belegt', diskFree: '{free} MB frei von {total} MB',
     disclaimer: 'rcplug ist inoffizielle Software und steht in keiner Verbindung zu RØDE Microphones. RØDE und RØDECaster sind Marken ihres Inhabers. Nutzung auf eigene Gefahr.',
     diagTitle: 'Diagnose', diagText: 'Wenn etwas nicht funktioniert: dieses Paket herunterladen (Logs, Versionen, Gerätezustand; Passwörter und Schlüssel maskiert) und an einen Fehlerbericht hängen. Vor dem öffentlichen Teilen bitte durchsehen.',
@@ -171,9 +184,9 @@ const T = {
     unTitle: 'rcplug entfernen', unDesc: 'Hält rcplug und alle Plugins an und entfernt sie vom Gerät, mit allen Einstellungen und Plugin-Daten. Der RØDECaster selbst arbeitet weiter wie vorher. Zum erneuten Installieren brauchst du das Toolkit auf einem Computer.',
     unWord: 'entfernen', unWordHint: '„entfernen“ eintippen', unTypeWord: 'Bitte zuerst „{w}“ eintippen.', unButton: 'rcplug entfernen',
     unConfirm: 'rcplug und alle Plugin-Daten wirklich vom Gerät entfernen?', unDone: 'rcplug wird entfernt', unDoneText: 'In ein paar Sekunden sind rcplug und seine Plugins vom Gerät verschwunden. Diese Seite funktioniert dann nicht mehr.',
-    procTitle: 'Prozesse', procDesc: 'Was auf dem Gerät läuft: CPU als Anteil eines Kerns über die letzten Sekunden, belegter Speicher (RSS). Markiert sind rcplug und seine Plugins sowie RØDEs eigene Programme.',
-    procByCPU: 'nach CPU', procByMem: 'nach Speicher', procName: 'Prozess', procMem: 'Speicher', procThreads: 'Threads', procNone: 'Nicht verfügbar.',
-    procFoot: '{n} Prozesse (ohne Kernel-Threads) auf {cores} Kernen, zusammen {mem} MB belegt. Die ersten CPU-Werte erscheinen nach ein paar Sekunden.',
+    procTitle: 'Prozesse', procDesc: 'Was auf dem Gerät läuft: CPU als Anteil eines Kerns über die letzten Sekunden, belegter Arbeitsspeicher (RSS). Markiert sind rcplug und seine Plugins sowie RØDEs eigene Programme.',
+    procByCPU: 'nach CPU', procByMem: 'nach RAM', procName: 'Prozess', procMem: 'RAM', procThreads: 'Threads', procNone: 'Nicht verfügbar.',
+    procFoot: '{n} Prozesse (ohne Kernel-Threads) auf {cores} Kernen, zusammen {mem} MB Arbeitsspeicher belegt. Die ersten CPU-Werte erscheinen nach ein paar Sekunden.',
     tapTitle: 'Audio-Abgriffe', tapExperimental: 'experimentell', tapSwitch: 'eingeschaltet',
     tapDesc: 'Eine Brücke vom Audio-Graph des Pults (JACK) zu den Plugins, die Ton brauchen, etwa Sonar: Plugins fragen nach Ein- oder Ausgängen und bekommen einen Datenstrom. Sie fügt RØDEs Audio-Graph einen Client hinzu, ist deshalb aus, bis du sie einschaltest, und läuft nur, solange ein Plugin zuhört.',
     tapConfirm: 'Audio-Abgriffe einschalten? Plugins können dann Ein- und Ausgänge des Pults hören. Solange ein Plugin zuhört, hängt die Brücke einen Client an RØDEs Audio-Graph. Beim ersten Einsatz bitte auf Aussetzer achten.',
@@ -357,6 +370,14 @@ async function act(name, action, btn) {
 
 // ---- plugin management (rebuilt only when something changed, so focus,
 // open logs and scroll positions survive the periodic refresh)
+// What a plugin declares it does (plugin.json "permissions").
+function permsRow(p) {
+  const perms = p.permissions || [];
+  if (!perms.length) return '';
+  return `<p class="perms"><span class="muted">${esc(t('perms'))}</span> ${perms.map((x) =>
+    `<span class="tag perm${x === 'desk:write' ? ' strong' : ''}" title="${esc(t('permHint_' + x))}">${esc(t('perm_' + x))}</span>`).join(' ')}</p>`;
+}
+
 function renderPlugins() {
   frameFor = null;
   const sig = JSON.stringify([plugins, invalid, lang, upd && upd.targets, upd && upd.job && upd.job.state]);
@@ -370,9 +391,10 @@ function renderPlugins() {
     const st = p.state || 'stopped';
     const u = pluginUpdate(p.name);
     html += `<div class="card" data-name="${esc(p.name)}">
-      <div class="row"><h2>${esc(p.icon || '')} ${esc(tr(p, 'title'))}</h2><span class="tag">v${esc(p.version || '?')}</span>${u ? `<span class="tag update">${esc(t('updBadge', { v: u.latest }))}</span>` : ''}${p.needsAudio ? `<span class="tag">${esc(t('audio'))}</span>` : ''}${p.primary ? `<span class="tag">${esc(t('startpage'))}</span>` : ''}
+      <div class="row"><h2>${esc(p.icon || '')} ${esc(tr(p, 'title'))}</h2><span class="tag">v${esc(p.version || '?')}</span>${u ? `<span class="tag update">${esc(t('updBadge', { v: u.latest }))}</span>` : ''}${p.needsAudio && !(p.permissions || []).includes('audio') ? `<span class="tag">${esc(t('audio'))}</span>` : ''}${p.primary ? `<span class="tag">${esc(t('startpage'))}</span>` : ''}
         <span class="spacer"></span><span class="tag ${esc(st)}">${esc(t('st_' + st))}${p.pid ? ' · PID ' + esc(p.pid) : ''}</span></div>
       <p class="desc">${esc(tr(p, 'description'))}</p>
+      ${permsRow(p)}
       ${p.unknownFields ? `<p class="error">${esc(t('unknown', { f: p.unknownFields.join(', ') }))}</p>` : ''}
       <div class="row">
         ${p.hasUI ? `<a class="btn" href="#/p/${encodeURIComponent(p.name)}">${esc(t('open'))}</a><a class="btn" href="plugins/${encodeURIComponent(p.name)}/" target="_blank" rel="noopener">${esc(t('newTab'))}</a>` : ''}

@@ -166,8 +166,14 @@ func TestTapsShareOneBridge(t *testing.T) {
 
 func TestTapStreamOverHTTP(t *testing.T) {
 	root := t.TempDir()
+	writePlugin(t, root, "sonar", "#!/bin/sh\n", `{"exec":["./run.sh"],"permissions":["audio"]}`)
+	writePlugin(t, root, "quiet", "#!/bin/sh\n", `{"exec":["./run.sh"]}`)
 	m := NewManager(root, 19900)
 	m.Events = NewBus()
+	if _, err := m.Load(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(m.StopAll)
 	srv := NewServer(m, nil, "test")
 	srv.Events = m.Events
 	fb := newFakeBridge()
@@ -200,6 +206,9 @@ func TestTapStreamOverHTTP(t *testing.T) {
 	}
 	if !m.AudioTaps() {
 		t.Fatal("the switch was not kept")
+	}
+	if r := get(m.Events.Token("quiet")); r.StatusCode != 403 {
+		t.Fatalf("a plugin without the audio permission: %d", r.StatusCode)
 	}
 	resp := get(token)
 	defer resp.Body.Close()

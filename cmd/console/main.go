@@ -102,7 +102,7 @@ func main() {
 	}, desk.NewMirror())
 	opts := console.Options{
 		Client: client, DataDir: dataDir, AllowUntested: *untested, LegacyPIN: *legacyPIN, Version: version,
-		Panel: &hw.Panel{TTY: *tty}, PanelEnabled: *panel, Logf: log.Printf,
+		Panel: &hw.Panel{TTY: *tty}, PanelEnabled: *panel, Logf: log.Printf, Hosted: sdk.Name() != "",
 	}
 
 	if *meters != "off" {

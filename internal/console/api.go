@@ -33,13 +33,13 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/trigger", c.withPIN(c.handleTrigger))
 	mux.HandleFunc("POST /api/link", c.withPIN(c.handleLink))
 	mux.HandleFunc("POST /api/record", c.withPIN(c.handleRecord))
-	mux.HandleFunc("POST /api/control", c.withPIN(c.handleControl))
-	mux.HandleFunc("POST /api/settings", c.withPIN(c.handleSettings))
-	mux.HandleFunc("POST /api/reconnect", c.withPIN(c.handleReconnect))
-	mux.HandleFunc("POST /api/resync", c.withPIN(c.handleResync))
-	mux.HandleFunc("POST /api/pin", c.handlePIN)            // verifies the current PIN itself
-	mux.HandleFunc("POST /api/pin/reset", c.handlePinReset) // proven at the device, see pinreset.go
-	mux.HandleFunc("POST /api/presence", c.handlePresence)  // for rcplugd only, see pinreset.go
+	mux.HandleFunc("POST /api/control", c.forPeople(c.withPIN(c.handleControl)))
+	mux.HandleFunc("POST /api/settings", c.forPeople(c.withPIN(c.handleSettings)))
+	mux.HandleFunc("POST /api/reconnect", c.forPeople(c.withPIN(c.handleReconnect)))
+	mux.HandleFunc("POST /api/resync", c.forPeople(c.withPIN(c.handleResync)))
+	mux.HandleFunc("POST /api/pin", c.forPeople(c.handlePIN))            // verifies the current PIN itself
+	mux.HandleFunc("POST /api/pin/reset", c.forPeople(c.handlePinReset)) // proven at the device, see pinreset.go
+	mux.HandleFunc("POST /api/presence", c.handlePresence)               // for rcplugd only, see pinreset.go
 	// Everything else under api/ is an error in the API's own format.
 	notFound := func(w http.ResponseWriter, r *http.Request) {
 		sdk.WriteError(w, sdk.NewError(http.StatusNotFound, "not_found", "no such API endpoint (or wrong method): "+r.Method+" "+r.URL.Path))
@@ -50,6 +50,10 @@ func (c *Console) register(mux *http.ServeMux) {
 
 func (c *Console) withPIN(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if c.who(r).plugin != "" {
+			h(w, r) // plugins: their permission instead of the PIN (who.go)
+			return
+		}
 		if err := c.pin.check(r); err != nil {
 			c.auditAction(r, strings.TrimPrefix(r.URL.Path, "/api/"), "", err)
 			sdk.WriteError(w, err)
@@ -256,12 +260,18 @@ func remoteOf(r *http.Request) string {
 var errUntestedModel = sdk.NewError(http.StatusForbidden, "untested_model",
 	"control is not available for this model yet (start the console with --allow-untested-model to try it)")
 
-func (c *Console) write(remote string, epoch uint64, path []int, name string, value interface{}) (*rcproto.Change, error) {
+func (c *Console) write(by who, epoch uint64, path []int, name string, value interface{}) (*rcproto.Change, error) {
 	level, limit := c.Level() // outside the mirror lock taken by Write
+	remote := by.label()
+	if by.plugin != "" && limit == "" {
+		level = LevelBasic // a plugin's permission, whatever level the browser has set
+	}
 	nodeType := "?"
 	var ch *rcproto.Change
 	var err error
-	if limit == "untested_model" {
+	if by.plugin != "" && !by.can("desk:write") {
+		err = errNoDeskWrite(by.plugin)
+	} else if limit == "untested_model" {
 		err = errUntestedModel
 	} else if limit == "read_only" {
 		err = desk.ErrReadOnly
@@ -448,7 +458,7 @@ func (c *Console) handleSet(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	ch, err := c.write(remoteOf(r), req.Epoch, req.Path, req.Name, req.Value)
+	ch, err := c.write(c.who(r), req.Epoch, req.Path, req.Name, req.Value)
 	if err != nil {
 		sdk.WriteError(w, err)
 		return
@@ -469,7 +479,7 @@ func (c *Console) handlePress(w http.ResponseWriter, r *http.Request) {
 	if ms <= 0 || ms > 2000 {
 		ms = 150
 	}
-	remote := remoteOf(r)
+	remote := c.who(r)
 	down, err := c.write(remote, req.Epoch, req.Path, req.Name, true)
 	if err != nil {
 		sdk.WriteError(w, err)
@@ -508,7 +518,7 @@ func (c *Console) handleTrigger(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := c.pulse(remoteOf(r), req.Epoch, req.Path, req.Name); err != nil {
+	if err := c.pulse(c.who(r), req.Epoch, req.Path, req.Name); err != nil {
 		sdk.WriteError(w, err)
 		return
 	}
@@ -518,7 +528,7 @@ func (c *Console) handleTrigger(w http.ResponseWriter, r *http.Request) {
 // pulse sends a trigger press. JUCE only notifies listeners when a value
 // changes, so if the property still holds a press (the desk never acked the
 // previous one) a release is sent first.
-func (c *Console) pulse(remote string, epoch uint64, path []int, name string) error {
+func (c *Console) pulse(remote who, epoch uint64, path []int, name string) error {
 	pressed := false
 	c.mirror.View(func(s desk.Snapshot) {
 		if n := s.Root.At(path); n != nil {
@@ -568,7 +578,7 @@ func (c *Console) handleRecord(w http.ResponseWriter, r *http.Request) {
 		sdk.WriteError(w, desk.ErrNotSynced)
 		return
 	}
-	remote := remoteOf(r)
+	remote := c.who(r)
 	if int64(want) == reqState && recState != reqState && recState >= 0 && recState <= 2 {
 		if _, err := c.write(remote, req.Epoch, path, "requestRecordState", float64(recState)); err != nil {
 			sdk.WriteError(w, err)
@@ -599,7 +609,7 @@ func (c *Console) handleLink(w http.ResponseWriter, r *http.Request) {
 		sdk.WriteError(w, errBadRequest("unknown routing cell"))
 		return
 	}
-	remote := remoteOf(r)
+	remote := c.who(r)
 	var err error
 	if req.Link {
 		if _, err = c.write(remote, req.Epoch, path, "mixDisabled", false); err == nil {

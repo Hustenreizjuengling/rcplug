@@ -355,6 +355,10 @@ func (s *Server) handleTapStream(w http.ResponseWriter, r *http.Request) {
 		sdk.WriteError(w, sdk.NewError(http.StatusForbidden, "plugin_token", "only plugins get audio (X-Rcplug-Token, from RCPLUG_TOKEN)"))
 		return
 	}
+	if p := s.m.get(plugin); p == nil || !p.Manifest().has("audio") {
+		sdk.WriteError(w, sdk.NewError(http.StatusForbidden, "permission_audio", plugin+` does not declare the permission "audio" in its plugin.json`))
+		return
+	}
 	var ports []string
 	for _, p := range strings.Split(r.URL.Query().Get("ports"), ",") {
 		if p = strings.TrimSpace(p); p != "" {

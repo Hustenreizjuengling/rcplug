@@ -12,6 +12,7 @@ desk is described in [console-api.md](console-api.md).
 | [The manifest](#the-manifest-pluginjson) | Every field of `plugin.json` |
 | [Process](#process) | Start, environment, output, signals, restarts, priority |
 | [Operator settings](#operator-settings) | `config/<name>.json` |
+| [Permissions](#permissions) | What a plugin declares it does |
 | [HTTP](#http) | Port, proxy, headers, streaming, WebSockets, security |
 | [Dashboard](#dashboard) | Navigation, start page, language, embedding |
 | [Actions](#actions) | Entry points other UIs show |
@@ -78,7 +79,8 @@ warning on the dashboard and in the host's log; the plugin still loads.
 | `primary` | bool | `false` | Open this plugin as the dashboard's start page (the first enabled one wins) |
 | `order` | int | `0` | Position in the navigation and the plugin list, lower first; ties by id |
 | `icon` | string | | A short glyph or emoji for the navigation (at most 8 characters) |
-| `needsAudio` | bool | `false` | Shows an "audio" badge in the plugin list |
+| `needsAudio` | bool | `false` | Shows an "audio" badge in the plugin list (older form of the permission `audio`) |
+| `permissions` | string array | | What the plugin does beyond its own pages: `desk:write`, `audio`, `network`, `device`, see [Permissions](#permissions) |
 | `translations` | object | | Localised `title` and `description` per language code: `{"de": {"title": "…", "description": "…"}}` |
 | `actions` | array | | Entry points other UIs show, see [Actions](#actions). Needs `httpProxy`. |
 | `update` | object | | Where updates come from, see [Updates](#updates) |
@@ -87,7 +89,7 @@ warning on the dashboard and in the host's log; the plugin still loads.
 | `$schema` | string | | Ignored by the host |
 
 A manifest that cannot be read, has no `exec`, a non-loopback `httpProxy` or an
-invalid `actions`, `update` or `options` entry is skipped; the reason is listed on the
+invalid `actions`, `update`, `options` or `permissions` entry is skipped; the reason is listed on the
 dashboard.
 
 ## Process
@@ -120,7 +122,7 @@ The host's own environment, plus:
 | `RCPLUG_DATA_DIR` | `<root>/data/<name>/`, created before the start and kept across updates |
 | `RCPLUG_HOST_URL` | the host on loopback, e.g. `http://127.0.0.1:8080`. Other plugins are at `$RCPLUG_HOST_URL/plugins/<name>/`. |
 | `RCPLUG_VERSION` | the host's version |
-| `RCPLUG_TOKEN` | proves the plugin to the host when it publishes [events](#events); new at every start, never logged |
+| `RCPLUG_TOKEN` | proves the plugin to the host and, through it, to other plugins (header `X-Rcplug-Token`): for [events](#events), [audio](#audio) and [writes to the desk](#the-desk). New at every start, never logged. |
 
 `env` from the operator settings comes last and wins over everything above.
 
@@ -251,6 +253,35 @@ This is the place for anything only the operator may decide: PINs, tokens, webho
 URLs, options that change the desk. Everything a web page can change is open to
 everyone on the network. The flags of the built-in plugins are in
 [configuration.md](configuration.md).
+
+## Permissions
+
+A plugin declares in `plugin.json` what it does beyond its own pages; the dashboard
+shows it on the plugin's card, so users know before they start it.
+
+```json
+"permissions": ["desk:write", "audio"]
+```
+
+| Permission | Means | Held to it by |
+|---|---|---|
+| `desk:write` | Changes the desk through the console: mixer, recorder, pads | the console: writes from plugins without it answer 403 `permission_desk_write` |
+| `audio` | Hears the desk's inputs and outputs through the [shared audio taps](#audio) | the host: `api/audio/stream` answers 403 without it |
+| `network` | Talks to other machines on the network or the internet | shown only |
+| `device` | Uses the device's hardware, or files outside its own directories | shown only |
+
+How the host knows who asks: every plugin gets a token (`$RCPLUG_TOKEN`). When a
+plugin calls another plugin through the host (`$RCPLUG_HOST_URL/plugins/<name>/`) with
+the token in `X-Rcplug-Token`, the host passes the call on with `X-Rcplug-Plugin: <its
+name>` and `X-Rcplug-Permissions: <its permissions, comma-separated>`, and drops the
+token. A call from the device without a token arrives as `X-Rcplug-Plugin: unknown`;
+calls from the network and from a browser carry neither header, and whatever a client
+sent in them is dropped. A plugin that offers something to other plugins can check
+these headers the same way the console does.
+
+Plugins run as root on the device. Permissions guard against mistakes and tell users
+what a plugin is for; they do not contain a plugin that means harm. Install plugins
+only from sources you trust.
 
 ## HTTP
 
@@ -430,7 +461,7 @@ The dashboard's API, open to plugins (`$RCPLUG_HOST_URL`) and scripts. POSTs nee
 
 | Request | Effect |
 |---|---|
-| `GET /api/plugins` | `{"plugins": [...], "invalid": [...]}`: per plugin `name`, `title`, `description`, `version`, `hasUI`, `needsAudio`, `enabled`, `state`, `running`, `pid`, `restarts`, `lastErr`, `port`, `primary`, `order`, `icon`, `unknownFields`, `translations`, `actions` |
+| `GET /api/plugins` | `{"plugins": [...], "invalid": [...]}`: per plugin `name`, `title`, `description`, `version`, `hasUI`, `needsAudio`, `permissions`, `enabled`, `state`, `running`, `pid`, `restarts`, `lastErr`, `port`, `primary`, `order`, `icon`, `unknownFields`, `translations`, `actions` |
 | `GET /api/plugins/<name>/logs` | `{"lines": [...]}`, the last 500 lines |
 | `POST /api/plugins/<name>/enable`, `/disable`, `/restart` | Start and remember, stop and remember, restart |
 | `POST /api/reload` | Rescan the plugins directory |
@@ -520,8 +551,9 @@ defer r.Close()
 - The taps are **off** until a user switches them on (dashboard → System → *Audio
   taps*), because the bridge adds a client to RØDE's audio graph. Without that,
   `api/audio/stream` answers 403 `audio_taps_off`.
-- Only plugins get audio (`X-Rcplug-Token: $RCPLUG_TOKEN`); a plugin that sends it on
-  to the network (listen in a browser) does so itself.
+- Only plugins with the permission `audio` get audio (`X-Rcplug-Token: $RCPLUG_TOKEN`,
+  which `sdk.AudioTap` sends); a plugin that sends it on to the network (listen in a
+  browser) does so itself.
 - Read without pause: a stream that falls a second behind is ended (open it again).
 - `GET /api/audio` shows the switch, whether the bridge runs, the channels and the
   streams in use, and the dropouts the bridge reported (`problems`), with the ports
@@ -538,9 +570,13 @@ few clients, and its own screen is one of them. They use the console plugin at
 - `GET api/tree` and `GET api/events`: the full state and its live changes;
 - `POST api/set`, `api/press`, `api/record`, …: changes.
 
-Writes are refused unless the user switched the console from *Read only* to *Control*
-(or *Expert*), and they need the PIN if one is set (header `X-Rcplug-Pin`; pass it in
-through the operator settings). Say in your plugin's description what it changes.
+A plugin that changes the desk declares `"permissions": ["desk:write"]` and sends its
+token (`X-Rcplug-Token: $RCPLUG_TOKEN`; the SDK's client does). The console then takes
+its writes at the *Control* level's rules, without the PIN and whatever level the
+browsers have; write protection stops it like everyone else, and plugins never change
+the console's own settings (control level, PIN, panel, full control). Without the
+permission a write answers 403 `permission_desk_write`, also for requests without a
+token from the device. Say in your plugin's description what it changes.
 Everything else is in [console-api.md](console-api.md); recipes are in the
 [cookbook](cookbook.md#the-desk).
 
@@ -586,8 +622,9 @@ To work on the SDK and a plugin together, use a workspace:
 ### Package `sdk/console`
 
 `capi.New(hostURL)` (`""` = `sdk.HostURL()`) returns a client for the console behind
-the host; set `Base` to talk to a console running alone (`http://127.0.0.1:8082/`) and
-`PIN` for writes.
+the host; set `Base` to talk to a console running alone (`http://127.0.0.1:8082/`). It
+sends the plugin's token with every request; `PIN` is only for programs that are not
+plugins.
 
 | Method | Request |
 |---|---|
@@ -630,5 +667,6 @@ releases: `Parse`, `Sign`, `Verify`, `Describe`, `GenerateKey`, `ParseVersion`,
 - [ ] Nothing polls faster than needed; everything that grows is bounded.
 - [ ] Errors of the console (not running yet, desk offline, control off) are shown,
       not fatal.
-- [ ] The description says what the plugin changes on the desk, if anything.
+- [ ] The description says what the plugin changes on the desk, if anything, and
+      `permissions` lists what it does.
 - [ ] `version` follows `X.Y.Z`; with `update`, releases are signed.

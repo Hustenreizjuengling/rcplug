@@ -343,10 +343,15 @@ and press record on the *Recorder* tab, or from a terminal:
 
 ```bash
 B=http://127.0.0.1:8080/plugins/console
-curl -s -X POST $B/api/control -H 'X-Rcplug: 1' -d '{"level":"basic"}'
+P=(-H 'X-Rcplug: 1' -H 'X-Forwarded-For: 127.0.0.1')
+curl -s -X POST $B/api/control "${P[@]}" -d '{"level":"basic"}'
 E=$(curl -s $B/api/status | sed -n 's/.*"epoch":\([0-9]*\).*/\1/p')
-curl -s -X POST $B/api/record -H 'X-Rcplug: 1' -d "{\"epoch\":$E,\"value\":2}"
+curl -s -X POST $B/api/record "${P[@]}" -d "{\"epoch\":$E,\"value\":2}"
 ```
+
+A program on the same machine as the host counts as a plugin, and one without a
+plugin's token may not change the desk (`permission_desk_write`); `X-Forwarded-For`
+makes `curl` a person at the control level, like a browser.
 
 Where to look when something does not work:
 

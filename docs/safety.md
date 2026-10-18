@@ -69,6 +69,20 @@ same for good, and the page cannot switch it off. Models without a verified prof
 everything except the Duo) are read-only unless the console is started with
 `--allow-untested-model`.
 
+### Plugins
+
+A plugin changes the desk only if its `plugin.json` declares the permission
+`desk:write`, which the dashboard shows on its card. Such a plugin writes at the
+*Control* level's rules, without the PIN and whatever level the browsers have:
+starting it is the user's decision. Write protection stops it like everyone else, and
+no plugin changes the console's own settings (control level, PIN, write protection,
+device buttons, full control). The host tells the console which plugin asks (by the
+plugin's token, see [plugin-api.md](plugin-api.md#permissions)); a request from the
+device without a token is refused. The audit log names the plugin.
+
+Plugins run as root on the device, so permissions guard against mistakes and show what
+a plugin is for; they do not contain a plugin that means harm.
+
 ### Always refused
 
 At every level, including *Expert*:

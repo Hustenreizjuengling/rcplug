@@ -4,7 +4,26 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.6.12 - Unreleased
+## 0.7.0 - Unreleased
+
+### Changed (breaking for plugins)
+- **Plugin permissions.** A plugin declares in `plugin.json` what it does beyond its
+  own pages: `"permissions": ["desk:write", "audio", "network", "device"]`. The
+  dashboard shows them on the plugin's card. The console takes writes from a plugin
+  only with `desk:write` (and the plugin's token, which the SDK's console client now
+  sends), at the *Control* level's rules without the PIN, whatever level the browsers
+  have; write protection still stops it, and plugins can no longer change the
+  console's settings, control level or PIN. The shared audio taps stream only to
+  plugins with `audio`. **Plugins that write to the desk or tap audio need the
+  permission in their manifest**; a write from the device without a token answers 403
+  `permission_desk_write`. The host tells plugins who calls them (`X-Rcplug-Plugin`,
+  `X-Rcplug-Permissions`). See docs/plugin-api.md#permissions.
+
+### Fixed
+- Dashboard → System → Processes: the memory column says RAM (German:
+  Arbeitsspeicher), and the free space of rcplug's directory is called storage space.
+- docs/console-api.md: error codes of the removed screen endpoints are gone; the codes
+  for write protection, full control and the PIN reset are listed.
 
 ### Added
 - **Remove rcplug** from the dashboard (System page, at the bottom): stops rcplug and

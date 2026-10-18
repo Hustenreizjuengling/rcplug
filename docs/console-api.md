@@ -146,9 +146,14 @@ time.
 Every write:
 
 - is a `POST` with `Content-Type: application/json` and the header `X-Rcplug: 1`,
-- carries `X-Rcplug-Pin: <pin>` if a PIN is set (a plugin that writes needs the PIN
-  from its user, e.g. through an environment variable in its `config/<name>.json`, and
-  sets it as `Client.PIN`),
+- from a browser: carries `X-Rcplug-Pin: <pin>` if a PIN is set;
+- from a plugin: carries its token, `X-Rcplug-Token: $RCPLUG_TOKEN` (the SDK's client
+  sends it), and the plugin declares `"permissions": ["desk:write"]` in its
+  `plugin.json`. It then writes at the *Control* level's rules without the PIN, whatever
+  level the browsers have; write protection stops it, and `api/control`,
+  `api/settings`, `api/pin`, `api/pin/reset`, `api/reconnect` and `api/resync` are for
+  people only (`plugin_not_allowed`). See
+  [plugin-api.md](plugin-api.md#permissions),
 - carries the `epoch` the path was computed against,
 - is checked against the control level and the write policy (see
   [safety.md](safety.md)) and recorded in the audit log.
@@ -220,8 +225,8 @@ path := append(append([]int{}, ch.Parent...), ch.First)
 
 err = c.Set(ctx, tree.Epoch, path, "channelOutputMute", true)
 var apiErr *capi.Error
-if errors.As(err, &apiErr) && apiErr.Code == "control_off" {
-	log.Print("the user has not enabled control")
+if errors.As(err, &apiErr) && apiErr.Code == "permission_desk_write" {
+	log.Print(`plugin.json lacks "permissions": ["desk:write"]`)
 }
 ```
 
@@ -240,12 +245,15 @@ if errors.As(err, &apiErr) && apiErr.Code == "control_off" {
 | `pin_required` | 401 | A PIN is set and was missing or wrong |
 | `control_off` | 403 | The control level is `off` |
 | `denied` | 403 | The property is not writable at this level, or never |
-| `read_only` | 403 | The console runs with `--read-only` |
+| `read_only` | 403 | Write protection is on, or the console runs with `--read-only` |
+| `permission_desk_write` | 403 | A plugin without the permission `desk:write`, or a request from the device without a plugin's token |
+| `plugin_not_allowed` | 403 | Plugins cannot change the console's settings, control level or PIN |
 | `untested_model` | 403 | The model has no verified profile; control needs `--allow-untested-model` |
 | `expert_required` | 403 | Needs the expert level |
-| `panel_disabled`, `screen_disabled`, `touch_disabled` | 403 | Feature not switched on |
 | `csrf` | 403 | The `X-Rcplug` header is missing |
-| `screen_unavailable` | 404, 409 | No screen source found |
+| `read_only_forced` | 409 | Write protection cannot be switched off: the console was started with `--read-only` |
+| `full_control_unavailable` | 409 | Full control works only on the device |
+| `no_pin` | 409 | A PIN reset without a PIN set |
 | `stale_epoch` | 409 | The tree changed since you read the path. Reload and retry. |
 | `pin_locked` | 429 | Too many wrong PINs; wait a minute |
 | `rate_limited` | 429 | Try again in a few seconds |

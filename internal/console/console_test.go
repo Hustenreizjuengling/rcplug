@@ -1104,3 +1104,54 @@ func TestDeskEvents(t *testing.T) {
 		t.Errorf("unexpected events %v", fb.events[n:])
 	}
 }
+
+func TestPluginsNeedDeskWrite(t *testing.T) {
+	r := newRig(t, rcsim.Options{}, func(o *Options) { o.Hosted = true })
+	l, epoch := r.snap()
+	ch := l.Path("CHANNEL", 6)
+	body := map[string]interface{}{"epoch": epoch, "path": ch, "name": "channelOutputMute", "value": true}
+	asPlugin := func(perms string) []string {
+		return []string{"X-Forwarded-For", "127.0.0.1", "X-Rcplug-Plugin", "scenes", "X-Rcplug-Permissions", perms}
+	}
+	// The browser's level is "off": a plugin with desk:write still writes.
+	if res := r.post(t, "/api/set", body, asPlugin("audio")...); res.code != 403 || res.body["code"] != "permission_desk_write" {
+		t.Fatalf("without desk:write: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/set", body, asPlugin("audio,desk:write")...); res.code != 200 {
+		t.Fatalf("with desk:write: %d %s", res.code, res.raw)
+	}
+	if a := r.do(t, "GET", "/api/audit", nil).raw; !strings.Contains(string(a), "plugin scenes") {
+		t.Errorf("audit does not name the plugin: %s", a)
+	}
+	// Straight to the console's port, past rcplugd: an unknown plugin.
+	if res := r.post(t, "/api/set", body); res.code != 403 || res.body["code"] != "permission_desk_write" {
+		t.Fatalf("past rcplugd: %d %s", res.code, res.raw)
+	}
+	// A browser on the device itself is a person.
+	if res := r.post(t, "/api/set", body, "Sec-Fetch-Mode", "cors"); res.code != 403 || res.body["code"] == "permission_desk_write" {
+		t.Fatalf("a browser on the device: %d %s", res.code, res.raw)
+	}
+	// People from the network: the level applies (off here).
+	if res := r.post(t, "/api/set", body, "X-Forwarded-For", "192.168.1.30"); res.code != 403 || res.body["code"] == "permission_desk_write" {
+		t.Fatalf("a person at level off: %d %s", res.code, res.raw)
+	}
+	// Plugins never change the console's settings.
+	for _, p := range []string{"/api/control", "/api/settings", "/api/pin", "/api/pin/reset"} {
+		if res := r.post(t, p, map[string]string{"level": "expert"}, asPlugin("desk:write")...); res.code != 403 || res.body["code"] != "plugin_not_allowed" {
+			t.Errorf("%s by a plugin: %d %s", p, res.code, res.raw)
+		}
+	}
+	// With a PIN set, the plugin needs none; write protection stops it.
+	if res := r.post(t, "/api/pin", map[string]string{"new": "4711"}, "X-Forwarded-For", "192.168.1.30"); res.code != 200 {
+		t.Fatalf("set PIN: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/set", body, asPlugin("desk:write")...); res.code != 200 {
+		t.Fatalf("plugin with a PIN set: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/settings", map[string]bool{"readOnly": true}, "X-Forwarded-For", "192.168.1.30", "X-Rcplug-Pin", "4711"); res.code != 200 {
+		t.Fatalf("write protection: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/set", body, asPlugin("desk:write")...); res.code != 403 || res.body["code"] != "read_only" {
+		t.Fatalf("plugin under write protection: %d %s", res.code, res.raw)
+	}
+}

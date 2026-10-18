@@ -113,6 +113,8 @@ type Status struct {
 	Actions []Action `json:"actions,omitempty"`
 	// Options are the settings users change in the dashboard.
 	Options []Option `json:"options,omitempty"`
+	// Permissions are what the plugin declares it does (permissions.go).
+	Permissions []string `json:"permissions,omitempty"`
 }
 
 func (p *Plugin) status() Status {
@@ -128,7 +130,7 @@ func (p *Plugin) status() Status {
 		HasUI: m.HTTPProxy != "", NeedsAudio: m.NeedsAudio, Enabled: p.enabled, State: st,
 		Running: st == StateRunning, PID: p.pid, Restarts: p.restarts, LastErr: p.lastErr,
 		Port: p.port, Primary: m.Primary, Order: m.Order, Icon: m.Icon, Unknown: m.Unknown,
-		Translations: m.Translations, Actions: m.Actions, Options: m.Options,
+		Translations: m.Translations, Actions: m.Actions, Options: m.Options, Permissions: m.Permissions,
 	}
 }
 

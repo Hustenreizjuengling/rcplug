@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -163,5 +165,51 @@ func TestSlowSubscriberIsDropped(t *testing.T) {
 	case <-sub.lost:
 	default:
 		t.Fatal("a subscriber that does not read was kept")
+	}
+}
+
+func TestProxyNamesThePlugin(t *testing.T) {
+	root := t.TempDir()
+	writePlugin(t, root, "scenes", "#!/bin/sh\n", `{"exec":["./run.sh"],"permissions":["desk:write","network"]}`)
+	m := NewManager(root, 19650)
+	m.Events = NewBus()
+	if _, err := m.Load(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(m.StopAll)
+	srv := NewServer(m, nil, "test")
+	srv.Events = m.Events
+	token := m.Events.Token("scenes")
+	run := func(remote string, hdr map[string]string) http.Header {
+		in := httptest.NewRequest("GET", "http://127.0.0.1/plugins/console/api/status", nil)
+		in.RemoteAddr = remote
+		for k, v := range hdr {
+			in.Header.Set(k, v)
+		}
+		pr := &httputil.ProxyRequest{In: in, Out: in.Clone(in.Context())}
+		srv.identify(pr)
+		return pr.Out.Header
+	}
+	h := run("127.0.0.1:40000", map[string]string{"X-Rcplug-Token": token})
+	if h.Get("X-Rcplug-Plugin") != "scenes" || h.Get("X-Rcplug-Permissions") != "desk:write,network" || h.Get("X-Rcplug-Token") != "" {
+		t.Fatalf("a plugin: %v", h)
+	}
+	h = run("127.0.0.1:40000", map[string]string{"X-Rcplug-Token": "wrong"})
+	if h.Get("X-Rcplug-Plugin") != "unknown" || h.Get("X-Rcplug-Permissions") != "" {
+		t.Fatalf("a wrong token: %v", h)
+	}
+	h = run("127.0.0.1:40000", map[string]string{"Sec-Fetch-Mode": "cors"})
+	if h.Get("X-Rcplug-Plugin") != "" {
+		t.Fatalf("a browser on the device: %v", h)
+	}
+	h = run("192.168.1.30:50000", map[string]string{"X-Rcplug-Plugin": "scenes", "X-Rcplug-Permissions": "desk:write", "X-Rcplug-Token": token})
+	if h.Get("X-Rcplug-Plugin") != "" || h.Get("X-Rcplug-Permissions") != "" || h.Get("X-Rcplug-Token") != "" {
+		t.Fatalf("forged by the network: %v", h)
+	}
+	for _, bad := range []string{`["desk"]`, `["audio","audio"]`} {
+		writePlugin(t, root, "bad", "#!/bin/sh\n", `{"exec":["./run.sh"],"permissions":`+bad+`}`)
+		if _, err := LoadManifest(filepath.Join(root, "plugins", "bad")); err == nil {
+			t.Errorf("permissions %s accepted", bad)
+		}
 	}
 }

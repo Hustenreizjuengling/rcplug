@@ -36,6 +36,9 @@ type Options struct {
 	// in shared memory (hw.Meters), which never travel over the control
 	// port; nil = not available.
 	Meters MeterSource
+	// Hosted: the console runs under rcplugd, which names the plugins that
+	// call it (who.go); requests straight to its port come from the device.
+	Hosted bool
 	// Publish puts desk events on the host's bus (nil: sdk.Publish).
 	Publish func(ctx context.Context, typ string, data interface{}) error
 	// AllowUntested offers control on models without a verified profile.

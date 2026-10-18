@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -63,6 +64,11 @@ func (c *Client) do(ctx context.Context, method, path string, body, out interfac
 		if c.PIN != "" {
 			req.Header.Set("X-Rcplug-Pin", c.PIN)
 		}
+	}
+	// Under rcplugd the plugin shows who it is; the console then holds it to
+	// the permissions in its plugin.json ("desk:write") instead of the PIN.
+	if t := os.Getenv("RCPLUG_TOKEN"); t != "" {
+		req.Header.Set("X-Rcplug-Token", t)
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {

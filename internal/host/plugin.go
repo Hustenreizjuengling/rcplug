@@ -55,6 +55,9 @@ type Manifest struct {
 	Update *UpdateSource `json:"update,omitempty"`
 	// Options are settings users change in the dashboard (see options.go).
 	Options []Option `json:"options,omitempty"`
+	// Permissions declare what the plugin does beyond its own pages (see
+	// permissions.go): desk:write, audio, network, device.
+	Permissions []string `json:"permissions,omitempty"`
 
 	// Unknown lists fields of plugin.json this host does not understand
 	// (typos, or a manifest written for a newer host).
@@ -189,6 +192,9 @@ func LoadManifest(dir string) (*Manifest, error) {
 	if err := validateOptions(&m); err != nil {
 		return nil, fmt.Errorf("plugin %q: %w", m.Name, err)
 	}
+	if err := validatePermissions(&m); err != nil {
+		return nil, fmt.Errorf("plugin %q: %w", m.Name, err)
+	}
 	return &m, nil
 }
 
@@ -210,7 +216,7 @@ func loopbackTarget(s string) bool {
 var validName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 var knownFields = map[string]bool{"$schema": true, "name": true, "title": true, "description": true, "version": true,
-	"exec": true, "httpProxy": true, "autostart": true, "needsAudio": true, "primary": true, "order": true, "icon": true, "translations": true, "actions": true, "update": true, "options": true}
+	"exec": true, "httpProxy": true, "autostart": true, "needsAudio": true, "primary": true, "order": true, "icon": true, "translations": true, "actions": true, "update": true, "options": true, "permissions": true}
 
 func unknownFields(raw []byte) []string {
 	var all map[string]json.RawMessage

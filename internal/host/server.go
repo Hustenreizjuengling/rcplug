@@ -443,6 +443,7 @@ func (s *Server) proxyFor(p *Plugin) (*httputil.ReverseProxy, error) {
 				pr.Out.URL.RawPath = ""
 			}
 			pr.Out.Header.Set("X-Forwarded-Prefix", prefix)
+			s.identify(pr) // who asks, for the plugin's permission checks
 		},
 		// Flush immediately so SSE/streaming responses from plugins work.
 		FlushInterval: -1,

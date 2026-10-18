@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"io"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -80,8 +82,16 @@ func (b *toneBridge) Stop()                        { b.pw.Close() }
 func (b *toneBridge) Problems() int                { return 0 }
 
 func TestAudioTap(t *testing.T) {
-	m := host.NewManager(t.TempDir(), 19750)
+	root := t.TempDir()
+	dir := filepath.Join(root, "plugins", "meter")
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "plugin.json"), []byte(`{"exec":["true"],"permissions":["audio"]}`), 0o644)
+	m := host.NewManager(root, 19750)
 	m.Events = host.NewBus()
+	if _, err := m.Load(); err != nil {
+		t.Fatal(err)
+	}
+	defer m.StopAll()
 	m.SetAudioTaps(true)
 	srv := host.NewServer(m, nil, "test")
 	srv.Events = m.Events
