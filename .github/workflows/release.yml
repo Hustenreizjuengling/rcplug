@@ -96,6 +96,9 @@ jobs:
     needs: release
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -106,3 +109,11 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -qam "Start $(cat VERSION)"
           git push origin HEAD:main
+      # Commits pushed with the workflow's token start no workflows, so main
+      # would show no checks at all; starting them by hand is allowed.
+      - name: Check and build the new main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run ci.yml --ref main
+          gh workflow run dev-build.yml --ref main
