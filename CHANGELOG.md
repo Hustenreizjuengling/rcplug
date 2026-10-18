@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.6.11 - Unreleased
+## 0.6.11 - 2026-10-18
 
 ### Added
 - **Shared audio taps** (experimental, off by default; dashboard → System → *Audio
