@@ -23,8 +23,33 @@ everything below.
 | Desk state | `rc_audio_mixer` serves the state tree on **127.0.0.1:2345** to **one client at a time**; the touch-screen GUI `rc_gui_juce` connects at boot and holds it, so nobody else gets in (seen on a real Duo, see below and [protocol.md](protocol.md)) | console |
 | Front panel | `rc_audio_mixer` talks to the fader/button MCU on `/dev/ttyAML3`, 115200 baud, 3-byte MIDI-style control-change messages (`0xBn`, control number, value), both ways | experimental panel emulation (its message table matches the mixer's; works on a real Duo, see below) |
 | Display | `rc_gui_juce` renders in software into a DRM/KMS dumb buffer (XRGB8888) on `/dev/dri/card0`; it does not use `/dev/fb0` (only the boot splash does) | screen mirror (prefers DRM) |
-| Audio | one ALSA card; `jackd` (JACK2 1.9.20) holds its capture (`hw:0,3`) and playback (`hw:0,0`) device; the mixer is a JACK client, and the desk's inputs and outputs are JACK ports. JACK tools, `alsa_out`, `arecord` and the `snd-aloop` module are in the image | [Sonar](https://github.com/Hustenreizjuengling/rcplug-plugins/tree/main/sonar)'s opt-in JACK source |
+| Audio | one ALSA card; `jackd` (JACK2 1.9.20) holds its capture (`hw:0,3`) and playback (`hw:0,0`) device; the mixer is a JACK client, and the desk's inputs and outputs are JACK ports (see [The JACK graph](#the-jack-graph)). JACK tools, `alsa_out`, `arecord` and the `snd-aloop` module are in the image | the shared audio taps ([plugin-api.md](plugin-api.md#audio)) |
 | Ports | the mixer listens on 127.0.0.1:2345 and 127.0.0.1:2346 (internal) only until their one client (the screen, the call engine) has connected; the call engine `callme-t` on SIP 5060, RTP 15004–15515 and its own web ports; nothing uses 8080 | dashboard on :8080 |
+
+## The JACK graph
+
+How a Duo with firmware 1.7.6 wires its audio (from `jack_lsp -c -p`, which Sonar adds
+to the diagnostics bundle while it runs). The mixer is the JACK client `JUCEJack` with
+inputs `in_1` … `in_38` and outputs `out_1` … `out_46`:
+
+| Ports | Connected to | What it is |
+|---|---|---|
+| `system:capture_1` … `_4` | `JUCEJack:in_1` … `_4` | the device's inputs (the microphone inputs) |
+| `usb1in:capture_1`, `_2` | `in_7`, `in_8` | USB 1 from the computer |
+| `usb2in:capture_1`, `_2` | `in_9`, `in_10` | USB 2 |
+| `usb1-chat-in:capture_1`, `_2` | `in_11`, `in_12` | the chat channel |
+| `sip-audio-in:capture_1` … `_6` | `in_29` … `in_34` | the three calls |
+| `RodeRfSPI:TX1`, `TX2` | `in_35`, `in_36` | RØDE wireless |
+| `JUCEJack:out_1` … `_8` | `system:playback_1` … `_8` | the headphone and speaker outputs |
+| `JUCEJack:out_15`, `_16` | `usb1out:playback_1`, `_2` | to the computer over USB 1 |
+| `JUCEJack:out_17`, `_18` | `usb1-chat-out` | the chat to the computer |
+| `JUCEJack:out_19`, `_20` | `usb2out` | USB 2 to the computer |
+| `JUCEJack:out_21` … `_26`, `_45`, `_46` | `sip-audio-out` | the calls |
+
+The other mixer outputs (`out_9` … `_14`, `_27` … `_44`) are not connected; which
+buses they carry is not known yet. The shared audio taps can listen to any output port
+above; with rcplug 0.7.4 their bridge (two channels) costs about 1 % of the device
+(0.7.2, with eight channels: 13 %).
 
 ## Firmware updates and flashing
 
@@ -51,9 +76,11 @@ flashing from Windows (below). What is still open:
    to its interpretation.
 3. **Gain ranges.** The real ranges of the input gains are not known; the *Control*
    level only lets them move in small steps until they are.
-4. **Sonar's JACK bridge.** CPU load and dropouts when `alsa_out` joins RØDE's audio
-   graph, and which JACK port carries which input of the desk
-   ([Sonar](https://github.com/Hustenreizjuengling/rcplug-plugins/blob/main/sonar/README.md)).
+4. **The audio taps' bridge.** *Confirmed on a real Duo (0.7.2–0.7.4):* it works,
+   Sonar hears the desk through it, and since 0.7.4 it costs about 1 % of the device
+   without overruns; which port carries which input is in
+   [The JACK graph](#the-jack-graph). Still open: which buses the unconnected mixer
+   outputs carry.
 5. **USB audio during an rcplug update.** During updates the computer's playback
    through the Duo went silent; once (0.6.1 → 0.6.4) the computer lost the Duo as a
    sound device until it was unplugged and plugged in again, while the desk itself

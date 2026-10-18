@@ -32,6 +32,11 @@ show. Ideas and comments are welcome as issues.
 - The meters and the hardware fader positions.
 - Mute and listen through the device's buttons, and a physical fader set from the
   browser (the real fader takes over again as soon as it is moved).
+- The shared audio taps with Sonar: since 0.7.4 about 1 % of the device, no overruns
+  (0.7.2: 13 %); the desk's JACK ports are in
+  [device-notes.md](device-notes.md#the-jack-graph).
+- The processes with CPU and RAM that add up to the device's totals, and the minute
+  history in the diagnostics bundle.
 
 ## Now: the rest of the first run on hardware
 
@@ -46,8 +51,8 @@ show. Ideas and comments are welcome as issues.
    - the real gain ranges;
    - the meaning of a few integer settings (the console's change log, 0.7.3, shows
      them when a setting is changed on the device's screen);
-   - the CPU load of the audio taps since 0.7.4 (2 channels, cheapest resampling; with
-     8 channels it was 13 % of the device in 0.7.2).
+   - which buses the mixer's unconnected JACK outputs carry
+     ([device-notes.md](device-notes.md#the-jack-graph)).
 
 ## Done: the core (0.6.8 – 0.6.11)
 
