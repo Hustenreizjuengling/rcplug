@@ -56,7 +56,7 @@ fuzz: ## fuzz the protocol decoder for 30 s
 	$(GO) test -run '^$$' -fuzz FuzzDecodeChange -fuzztime 30s ./internal/rcproto
 
 web-test: ## unit tests of the web UIs (needs Node 18+)
-	node --test 'tools/webtest/*.test.mjs'
+	node --test tools/webtest/*.test.mjs
 
 # ---- binaries: $(DIST)/<os>-<arch>/
 build: build-arm64 build-host ## build all binaries for the device and this machine
