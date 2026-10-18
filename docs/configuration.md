@@ -53,6 +53,7 @@ saved as `config/console.json`, then restart the console.
 | `--fps` | `2` | Maximum screen mirror frames per second |
 | `--panel` | off | Switches the experimental front-panel emulation on for good. Without it, users switch it on and off on the console's *Display* page; either way it works only at the expert level. |
 | `--tty` | `/dev/ttyAML3` | Serial line of the front panel |
+| `--meters` | `auto` | Reads the level meters and the hardware faders' positions from the mixer's shared memory (read-only), where the Duo keeps them instead of sending them; `off` switches that off. |
 | `--touch` | `auto` | Touchscreen event device for operating the screen from the mirror: `auto` (found by its axes), `off`, or `/dev/input/eventN`. Users still have to switch it on. |
 | `--sim` | off | Start a built-in simulated Duo and connect to it |
 | `--addr` | `127.0.0.1:8082` | Listen address when run standalone (the host passes its own) |

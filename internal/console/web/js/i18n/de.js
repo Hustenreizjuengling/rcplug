@@ -60,7 +60,7 @@ export default {
   'pc.groupChannel': 'Kanal {n}', 'pc.groupNavigation': 'Navigation', 'pc.groupPads': 'SMART Pads',
 
   'fader.physical': 'Fader {n}', 'fader.virtual': 'Virtuell {n}', 'output.n': 'Bus {n}',
-  'fader.dragHint': 'ziehen oder Pfeiltasten', 'fader.panelHint': 'Ziehen setzt die Stellung über die Gerätetasten – bis der echte Fader bewegt wird.', 'fader.physicalHint': 'physischer Fader – nur Anzeige', 'meter.side': 'Pegel {side}',
+  'fader.dragHint': 'ziehen oder Pfeiltasten', 'fader.panelHint': 'Ziehen setzt die Stellung über die Gerätetasten – bis der echte Fader bewegt wird.', 'fader.physicalHint': 'physischer Fader – nur Anzeige', 'meter.side': 'Pegel {side}', 'meter.reduction': 'Pegelreduktion (Kompressor)', 'meter.reductionDb': 'Pegelreduktion {db} dB',
 
   'src.combo1': 'Mic 1', 'src.combo2': 'Mic 2', 'src.combo3': 'Mic 3', 'src.combo4': 'Mic 4', 'src.virtuala': 'Virtuell A', 'src.virtualb': 'Virtuell B',
   'out.headphone1': 'Kopfhörer 1', 'out.headphone2': 'Kopfhörer 2', 'out.headphone3': 'Kopfhörer 3', 'out.headphone4': 'Kopfhörer 4',
@@ -72,7 +72,7 @@ export default {
   'mon.title': 'Monitor / Lautsprecher', 'mon.level': 'Lautstärke', 'mon.autoMute': 'Auto-Mute', 'mon.emergency': 'Not-Stumm (alles)',
   'mon.emergencyConfirm': 'Not-Stummschaltung umschalten? Das betrifft alle Ausgänge.',
 
-  'mixer.device': 'Gerät & Show', 'mixer.show': 'Show', 'mixer.quick': 'Schnellzugriff', 'mixer.channels': 'Kanäle', 'mixer.outputLevels': 'Ausgangspegel',
+  'mixer.device': 'Gerät & Show', 'mixer.show': 'Show', 'mixer.quick': 'Schnellzugriff', 'mixer.channels': 'Kanäle', 'mixer.levels': 'Pegel', 'mixer.master': 'Master', 'mixer.focusIn': 'Gewählter Kanal: Eingang', 'mixer.focusOut': 'Gewählter Kanal: Ausgang', 'mixer.focusReduction': 'Gewählter Kanal: Pegelreduktion', 'mixer.focusNote': 'Der gewählte Kanal ist der, der gerade auf dem Bildschirm des Geräts geöffnet ist.',
   'mixer.physical': 'physisch', 'mixer.virtual': 'virtuell', 'mixer.source': 'Quelle', 'mixer.noSource': '— keine —', 'mixer.empty': 'leer',
   'mixer.sourceConfirm': 'Quelle dieses Kanals ändern?', 'mixer.faderHint': 'Faderposition (0–{max}) und ungefährer Pegel relativ zur 0-dB-Rastung',
   'mixer.physicalNote': 'Die physischen Fader sind nicht motorisiert: Sie werden am Gerät bewegt, virtuelle Fader aus der Ferne. Die Stufe Experte kann auch einen physischen Fader setzen, doch der echte übernimmt wieder, sobald er berührt wird.',

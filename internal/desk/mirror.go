@@ -205,6 +205,39 @@ func (m *Mirror) commit(epoch uint64, build func(s Snapshot) (*rcproto.Change, e
 	return ch, m.applyLocked(ch)
 }
 
+// Overlay applies readings that do not come over the control port (the
+// meters and fader positions the mixer keeps in shared memory, see package
+// hw). fn builds property changes from the current tree under the mirror
+// lock, so its paths cannot go stale in between; values that did not change
+// are skipped. It does nothing before the first full sync.
+func (m *Mirror) Overlay(fn func(s Snapshot) []rcproto.Change) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.root == nil {
+		return
+	}
+	for _, c := range fn(Snapshot{Root: m.root, Layout: m.layout, Epoch: m.epoch, Seq: m.seq, Stale: m.stale}) {
+		if c.Type != rcproto.PropertyChanged {
+			continue
+		}
+		n := m.root.At(c.Path)
+		if n == nil {
+			continue
+		}
+		if old, ok := n.Get(c.Name); ok && old.Equal(c.Value) {
+			continue
+		}
+		_ = m.applyLocked(&c)
+	}
+}
+
+// Subscribed reports whether a live client is connected.
+func (m *Mirror) Subscribed() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.subs) > 0
+}
+
 // Rate returns property changes per second (averaged over the last second).
 func (m *Mirror) Rate() float64 {
 	m.mu.Lock()

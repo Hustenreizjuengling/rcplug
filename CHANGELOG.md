@@ -6,6 +6,20 @@ may break compatibility).
 
 ## 0.6.3 - Unreleased
 
+### Added
+- **Meters on the device.** The Duo's mixer never sends its level meters over the
+  control port; it keeps them, with the hardware faders' positions, in shared memory
+  that its screen reads. The console now reads that memory too (read-only, 20 times a
+  second while someone watches) and shows every channel's level, its gain reduction,
+  the master and the channel open on the device's screen. Physical faders moved by
+  hand show at their real position. `--meters auto|off`.
+
+### Changed
+- The mixer page shows the master and the channel open on the device's screen
+  instead of thirteen "output" meters: the meter order assumed before was wrong.
+  The layout's `outputMeters` is replaced by `masterMeter`, `focusMeters` and
+  `reductionMeters`; the simulator follows the real order.
+
 ## 0.6.2 - 2026-10-18
 
 ### Added

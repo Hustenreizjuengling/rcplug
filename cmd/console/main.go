@@ -46,6 +46,7 @@ func main() {
 		fps       = flag.Float64("fps", 2, "max screen mirror frames per second")
 		panel     = flag.Bool("panel", false, "EXPERIMENTAL: allow emulating front-panel buttons via TIOCSTI (expert level only)")
 		touchDev  = flag.String("touch", "auto", "touchscreen event device for operating the device's screen from the mirror: auto | off | /dev/input/eventN (users must still switch it on)")
+		meters    = flag.String("meters", "auto", "level meters and hardware fader positions from the mixer's shared memory (read-only): auto | off")
 		tty       = flag.String("tty", "/dev/ttyAML3", "front-panel serial tty")
 		sim       = flag.Bool("sim", false, "start a built-in simulated desk and connect to it (demo without hardware)")
 		legacyPIN = flag.String("pin", os.Getenv("RCPLUG_CONSOLE_PIN"), "deprecated: taken over once as the console PIN if none is set; set the PIN in the UI instead")
@@ -58,6 +59,7 @@ func main() {
 	}
 	for _, f := range []struct{ name, value, allowed string }{
 		{"screen", *screenSrc, "auto fb drm off"}, {"handshake", *handshake, "auto always never"},
+		{"meters", *meters, "auto off"},
 	} {
 		if !strings.Contains(" "+f.allowed+" ", " "+f.value+" ") {
 			fmt.Fprintf(os.Stderr, "console: --%s must be one of %s, not %q\n", f.name, strings.ReplaceAll(f.allowed, " ", ", "), f.value)
@@ -108,6 +110,11 @@ func main() {
 			dev = ""
 		}
 		opts.Touch = &hw.Touch{Device: dev}
+	}
+	if *meters != "off" {
+		m := &hw.Meters{}
+		defer m.Close()
+		opts.Meters = m
 	}
 	if *screenSrc != "off" {
 		opts.Screen = &hw.Screen{FB: *fbDev, DRM: *drmDev, Mode: *screenSrc, MaxFPS: *fps}

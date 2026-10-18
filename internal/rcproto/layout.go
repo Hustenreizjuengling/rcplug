@@ -74,10 +74,15 @@ type Layout struct {
 	VirtualFaders  int `json:"virtualFaders"`  // on-screen strips
 	PadsPerBank    int `json:"padsPerBank"`
 	PadBanks       int `json:"padBanks"`
-	// StripMeters / OutputMeters: METER ordinal ranges when the meter count
-	// matches strips+outputs (9+13 on the Duo). Zero counts when unknown.
-	StripMeters  Run `json:"stripMeters"`
-	OutputMeters Run `json:"outputMeters"`
+	// Meter runs, found when the METER run has the layout of the mixer's
+	// meter memory (see hw.MeterReading): one per strip, the master, three
+	// for the channel open on the device's screen (input, output, gain
+	// reduction) and a gain reduction per strip (1.0 = none), 22 on the Duo.
+	// Zero counts when unknown.
+	StripMeters     Run `json:"stripMeters"`
+	MasterMeter     Run `json:"masterMeter"`
+	FocusMeters     Run `json:"focusMeters"`
+	ReductionMeters Run `json:"reductionMeters"`
 }
 
 // DiscoverLayout walks the root (depth 1) and the children of each root node
@@ -130,9 +135,11 @@ func DiscoverLayout(root *Node) *Layout {
 	if mix := l.Runs["MIX"].Count; mix > 0 && mix%MixPerSource == 0 {
 		l.SourceCount = mix / MixPerSource
 	}
-	if m, ok := l.Runs["METER"]; ok && faders > 0 && m.Count == faders+MixPerSource {
+	if m, ok := l.Runs["METER"]; ok && faders > 0 && m.Count == 2*faders+4 {
 		l.StripMeters = Run{Parent: m.Parent, First: m.First, Count: faders}
-		l.OutputMeters = Run{Parent: m.Parent, First: m.First + faders, Count: MixPerSource}
+		l.MasterMeter = Run{Parent: m.Parent, First: m.First + faders, Count: 1}
+		l.FocusMeters = Run{Parent: m.Parent, First: m.First + faders + 1, Count: 3}
+		l.ReductionMeters = Run{Parent: m.Parent, First: m.First + faders + 4, Count: faders}
 	}
 	return l
 }

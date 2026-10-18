@@ -143,8 +143,11 @@ func TestDuoLayout(t *testing.T) {
 	if l.SourceCount != 19 || l.PhysicalFaders != 4 || l.VirtualFaders != 5 || l.PadsPerBank != 6 {
 		t.Errorf("sources=%d phys=%d virt=%d pads/bank=%d", l.SourceCount, l.PhysicalFaders, l.VirtualFaders, l.PadsPerBank)
 	}
-	if l.StripMeters.Count != 9 || l.OutputMeters.Count != 13 {
-		t.Errorf("meters strip=%d out=%d", l.StripMeters.Count, l.OutputMeters.Count)
+	if l.StripMeters.Count != 9 || l.MasterMeter.Count != 1 || l.FocusMeters.Count != 3 || l.ReductionMeters.Count != 9 {
+		t.Errorf("meters strip=%d master=%d focus=%d reduction=%d", l.StripMeters.Count, l.MasterMeter.Count, l.FocusMeters.Count, l.ReductionMeters.Count)
+	}
+	if p := l.ReductionMeters.Path(8); root.At(p) == nil || root.At(p).Type != "METER" || l.ReductionMeters.Path(8)[1] != l.Runs["METER"].First+21 {
+		t.Errorf("last gain reduction meter at %v", p)
 	}
 	// CHANNEL is a root run; FADER sits under PHYSICALINTERFACE.
 	if p := l.Path("CHANNEL", 0); len(p) != 1 || root.At(p).Type != "CHANNEL" {

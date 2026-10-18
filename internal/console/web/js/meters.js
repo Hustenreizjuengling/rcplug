@@ -52,3 +52,36 @@ export function hMeter(scope, path, text) {
   scope.bind(path, 'meterLevelR', upd);
   return h('div', { class: 'hmeter' }, h('span', null, text), h('div', { class: 'hbar', role: 'meter', 'aria-label': text }, bar));
 }
+
+// reductionDb turns a compressor's gain (1.0 = no reduction) into dB of
+// reduction.
+export function reductionDb(v) {
+  if (typeof v !== 'number' || !isFinite(v) || v <= 0 || v >= 1) return 0;
+  return -20 * Math.log10(v);
+}
+
+// grMeter shows a strip's gain reduction growing down from the top, over
+// 0..20 dB.
+export function grMeter(scope, path) {
+  const lv = h('div', { class: 'lv' });
+  const el = h('div', { class: 'meter gr', role: 'meter', 'aria-label': t('meter.reduction'), 'aria-valuemin': 0, 'aria-valuemax': 20 }, lv);
+  scope.bind(path, 'meterLevelL', (v) => schedule(lv, (e) => {
+    const db = reductionDb(v);
+    e.style.transform = `scaleY(${Math.min(1, db / 20).toFixed(3)})`;
+    el.setAttribute('aria-valuenow', db.toFixed(1));
+    el.title = t('meter.reductionDb', { db: db.toFixed(1) });
+  }));
+  return el;
+}
+
+// hReduction is grMeter as a labelled bar.
+export function hReduction(scope, path, text) {
+  const bar = h('i');
+  const out = h('span', { class: 'grdb' });
+  scope.bind(path, 'meterLevelL', (v) => schedule(bar, (e) => {
+    const db = reductionDb(v);
+    e.style.transform = `scaleX(${Math.min(1, db / 20).toFixed(3)})`;
+    out.textContent = db >= 0.1 ? `−${db.toFixed(1)} dB` : '';
+  }));
+  return h('div', { class: 'hmeter' }, h('span', null, text, ' ', out), h('div', { class: 'hbar gr', role: 'meter', 'aria-label': text }, bar));
+}

@@ -38,6 +38,10 @@ type Options struct {
 	// Touch taps the device's touchscreen (hw.Touch), for clicks on the
 	// screen mirror; nil = not available.
 	Touch TouchScreen
+	// Meters reads the levels and hardware fader positions the mixer keeps
+	// in shared memory (hw.Meters), which never travel over the control
+	// port; nil = not available.
+	Meters MeterSource
 	// AllowUntested offers control on models without a verified profile.
 	AllowUntested bool
 	// LegacyPIN is a PIN from the old --pin flag or RCPLUG_CONSOLE_PIN. It is
@@ -73,6 +77,7 @@ type Console struct {
 	lastTouch     time.Time
 	clientsAt     time.Time
 	clientsDoc    interface{}
+	meters        meterState
 }
 
 // New creates the console and loads persisted settings.
@@ -146,6 +151,7 @@ func (c *Console) Level() (Level, string) {
 
 // Run broadcasts coalesced changes to live clients until ctx ends.
 func (c *Console) Run(ctx context.Context) {
+	go c.runMeters(ctx)
 	t := time.NewTicker(60 * time.Millisecond)
 	defer t.Stop()
 	for {
@@ -213,6 +219,7 @@ func (c *Console) statusDoc() map[string]interface{} {
 		"screen":       screen,
 		"panel":        panel,
 		"passive":      c.client.Passive(),
+		"meters":       c.metersLive(),
 		"version":      c.opts.Version,
 	}
 	c.mirror.View(func(s desk.Snapshot) {

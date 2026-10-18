@@ -857,6 +857,7 @@ func (c *Console) handleHW(w http.ResponseWriter, r *http.Request) {
 		tc["available"], tc["device"], tc["name"] = true, info.Device, info.Name
 	}
 	doc["touch"] = tc
+	doc["meters"] = map[string]interface{}{"available": c.opts.Meters != nil, "live": c.metersLive()}
 	sdk.WriteJSON(w, http.StatusOK, doc)
 }
 

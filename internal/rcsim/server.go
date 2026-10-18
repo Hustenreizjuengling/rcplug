@@ -6,7 +6,6 @@ import (
 	"math"
 	"math/rand"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -447,19 +446,20 @@ func (s *Server) tickLoop() {
 }
 
 // metersLocked produces plausible speech-like meter activity on strips that
-// have a source assigned and are not muted, and sums them into the outputs.
+// have a source assigned and are not muted, sums them into the master and
+// shows some gain reduction on loud strips, in the order of the desk's meter
+// memory (strips, master, the channel open on the screen, gain reductions).
 func (s *Server) metersLocked() {
-	strips := s.layout.StripMeters
-	outs := s.layout.OutputMeters
+	l := s.layout
 	var sum float64
-	for i := 0; i < strips.Count; i++ {
-		ch := s.layout.Node(s.root, "CHANNEL", i)
+	for i := 0; i < l.StripMeters.Count; i++ {
+		ch := l.Node(s.root, "CHANNEL", i)
 		target := 0.0
 		if ch != nil {
 			src, _ := ch.Get("channelInputSource")
 			mute, _ := ch.Get("channelOutputMute")
 			if src.I >= 0 && !mute.Truth() {
-				f := s.layout.Node(s.root, "FADER", i)
+				f := l.Node(s.root, "FADER", i)
 				lv, _ := f.Get("faderLevel")
 				target = (0.25 + 0.6*s.rng.Float64()) * math.Min(1, float64(lv.I)/rcproto.UnityFader)
 				if s.rng.Float64() < 0.15 {
@@ -469,14 +469,32 @@ func (s *Server) metersLocked() {
 		}
 		s.meters[i] = 0.6*s.meters[i] + 0.4*target
 		sum += s.meters[i]
-		s.meterPairLocked(strips.Path(i), s.meters[i])
+		s.meterPairLocked(l.StripMeters.Path(i), s.meters[i])
+		s.meterMonoLocked(l.ReductionMeters.Path(i), reduction(s.meters[i]))
 	}
-	for o := 0; o < outs.Count; o++ {
-		v := math.Min(1, sum/3*(0.9+0.1*s.rng.Float64()))
-		if strings.HasPrefix(rcproto.Outputs[o].ID, "callme") {
-			v = 0
-		}
-		s.meterPairLocked(outs.Path(o), v)
+	s.meterPairLocked(l.MasterMeter.Path(0), math.Min(1, sum/3*(0.9+0.1*s.rng.Float64())))
+	// The simulated screen has the first channel open.
+	if l.FocusMeters.Count == 3 && l.StripMeters.Count > 0 {
+		s.meterPairLocked(l.FocusMeters.Path(0), math.Min(1, s.meters[0]*1.4))
+		s.meterPairLocked(l.FocusMeters.Path(1), s.meters[0])
+		s.meterMonoLocked(l.FocusMeters.Path(2), reduction(s.meters[0]))
+	}
+}
+
+// reduction is a compressor's gain (1.0 = no reduction) for a level.
+func reduction(v float64) float64 {
+	if v <= 0.5 {
+		return 1
+	}
+	return 1 - (v-0.5)*0.8
+}
+
+func (s *Server) meterMonoLocked(path []int, v float64) {
+	if path == nil {
+		return
+	}
+	for _, name := range []string{"meterLevelL", "meterLevelR", "meterPeakL", "meterPeakR"} {
+		s.setLocked(path, name, rcproto.Double(v))
 	}
 }
 

@@ -40,6 +40,7 @@ Responses are JSON, except the screen images. Errors look like `{"error": "human
 | `connection.state` | `waiting` (boot grace; or, reading along, waiting for a full sync: `code` `tap_waiting` or `tap_lost`), `connecting`, `syncing`, `live` (`code` `resumed`: going on with the state kept at its last stop; changes made in between may be missing), `backoff` (retrying; `tap_failed` if reading along is impossible, e.g. without root), `conflict` (the GUI guard stepped back, see [safety.md](safety.md)), `stopped` |
 | `connection.mode` | `tap` (reading along with the device's screen) or `connect` |
 | `passive` | `true` while reading along: the tree cannot be written (`meta.control.writable` is empty), the front panel can |
+| `meters` | `true` while the console reads the meters and hardware fader positions from the mixer's shared memory (on the device; elsewhere meters arrive as tree changes) |
 | `control` | The current control level: `off`, `basic` or `expert` |
 | `controlLimit` | Why control is limited even if a level is set: `read_only` (started with `--read-only`), `untested_model` (no verified profile), or empty |
 | `epoch` | Changes whenever the tree's structure changes (it starts at a random value; the examples here use 1). Writes must carry it. |
@@ -133,7 +134,7 @@ time.
 | `GET api/clients` | `{"port", "clients": [...]}`: connections to the desk's control port with the process behind each (`pid`, `comm`), e.g. the device's GUI and the console |
 | `GET api/audit` | `{"writes": [...]}`: the last 300 writes and changes to the console itself (node `console`: control level, screen mirror, PIN without its value, reconnect, panel), with time, node type, path, property, value, client address and, for refused ones, the error code |
 | `GET api/diagnostics` | A zip with the console's connection statistics, status, clients, audit log, summary, layout and a sanitized copy of the tree; the host adds it to its diagnostics bundle |
-| `GET api/hw` | Screen mirror, front-panel and touchscreen status (`touch`: `available`, `enabled`, `flip`, `device`, `name`) |
+| `GET api/hw` | Screen mirror, front-panel and touchscreen status (`touch`: `available`, `enabled`, `flip`, `device`, `name`) and the meter memory (`meters`: `available`, `live`) |
 | `GET api/screen.jpg`, `api/screen.png`, `api/screen.mjpg` | The device's screen, if the user switched the mirror on |
 
 ## Writing

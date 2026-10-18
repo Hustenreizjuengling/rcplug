@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -865,5 +866,86 @@ func TestAuditListsConsoleActions(t *testing.T) {
 		if !strings.Contains(string(res.raw), want) {
 			t.Errorf("audit lacks %s: %s", want, res.raw)
 		}
+	}
+}
+
+type fakeMeters struct {
+	mu sync.Mutex
+	r  hw.MeterReading
+}
+
+func (f *fakeMeters) Read(r *hw.MeterReading) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	*r = f.r
+	return nil
+}
+
+func (f *fakeMeters) set(fn func(r *hw.MeterReading)) {
+	f.mu.Lock()
+	fn(&f.r)
+	f.mu.Unlock()
+}
+
+func TestMetersFromTheMixersMemory(t *testing.T) {
+	fm := &fakeMeters{}
+	r := newRig(t, rcsim.Options{}, func(o *Options) { o.Meters = fm })
+	m := r.client.Mirror()
+	sub, err := m.Subscribe() // a watching browser: read fast
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Unsubscribe(sub)
+	l, _ := r.snap()
+	run := l.Runs["METER"]
+	get := func(p []int, name string) (v rcproto.Value) {
+		m.View(func(s desk.Snapshot) { v, _ = s.Root.At(p).Get(name) })
+		return
+	}
+	fader0, fader5 := l.Path("FADER", 0), l.Path("FADER", 5)
+	virtual := get(fader5, "faderLevel")
+	fm.set(func(mr *hw.MeterReading) {
+		mr.Meters[0] = hw.Meter{Stereo: true, PeakL: 0.75, LevelL: 0.5, PeakR: 0.3, LevelR: 0.25}
+		mr.Meters[21] = hw.Meter{Stereo: false, PeakL: 0.5, LevelL: 0.123456}
+		mr.Faders[0], mr.Faders[5] = 100, 3
+	})
+	eventually(t, func() bool { return get(run.Path(0), "meterLevelL").Num() == 0.5 })
+	if v := get(run.Path(0), "meterPeakR").Num(); v != 0.3 {
+		t.Errorf("peak R %v", v)
+	}
+	if l, r := get(run.Path(21), "meterLevelL").Num(), get(run.Path(21), "meterLevelR").Num(); l != 0.1235 || r != l {
+		t.Errorf("mono meter: L %v R %v (rounded, both sides alike)", l, r)
+	}
+	if v := get(fader0, "faderLevel").I; v != 100 {
+		t.Errorf("physical fader %d, want the position from the meter memory", v)
+	}
+	if v := get(fader5, "faderLevel"); !v.Equal(virtual) {
+		t.Errorf("an on-screen fader was changed: %v", v)
+	}
+	if res := r.do(t, "GET", "/api/status", nil); res.body["meters"] != true {
+		t.Errorf("status meters %v", res.body["meters"])
+	}
+
+	if !get(run.Path(0), "meterStereo").Truth() {
+		t.Error("the stereo flag comes from the meter memory too")
+	}
+}
+
+func TestMetersNeedOneNodePerRecord(t *testing.T) {
+	root, err := rcsim.DuoTree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := rcproto.DiscoverLayout(root)
+	var r hw.MeterReading
+	if ch, ok := meterChanges(desk.Snapshot{Root: root, Layout: l}, &r); !ok || len(ch) != 5*hw.MeterRecords+l.PhysicalFaders {
+		t.Fatalf("Duo tree: %d changes, %v", len(ch), ok)
+	}
+	run := l.Runs["METER"]
+	pi := root.At(run.Parent)
+	last := run.First + run.Count - 1
+	pi.Children = append(pi.Children[:last], pi.Children[last+1:]...)
+	if _, ok := meterChanges(desk.Snapshot{Root: root, Layout: rcproto.DiscoverLayout(root)}, &r); ok {
+		t.Error("applied to a tree with another meter count")
 	}
 }

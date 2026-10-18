@@ -40,30 +40,28 @@ mixer's address, the screen source, the install location, port 8080 and the audi
 path; the first test on a real Duo answered the number of clients on port 2345 and
 flashing from Windows (below). What is still open:
 
-1. **Meter mapping.** `METER` 0–8 are the channel strips and 9–21 the outputs (derived
-   from their count). The meters are separate `meterLevelL`/`meterLevelR` and
-   `meterPeakL`/`meterPeakR` properties.
-2. **Meter scale.** The mixer stores them as numbers without a unit; linear 0–1 or
-   dB, the UI detects either.
-3. **Integer meanings** of input type, microphone type and pad type. They are C++
+1. **Meters** (0.6.3). The mixer keeps them in shared memory, not on the control port
+   ([protocol.md](protocol.md#meters-and-fader-positions)); their order (strips,
+   master, the channel open on the screen, gain reductions), the linear scale and
+   which value is the peak come from analysing the firmware. To confirm on the device:
+   that the strips' meters move with their inputs, that the master follows the mix,
+   and that a physical fader moved by hand shows at the same strip in the console.
+2. **Integer meanings** of input type, microphone type and pad type. They are C++
    enums in the firmware, not readable tables; the UI always shows the raw value next
    to its interpretation.
-4. **Gain ranges.** The real ranges of the input gains are not known; the *Control*
+3. **Gain ranges.** The real ranges of the input gains are not known; the *Control*
    level only lets them move in small steps until they are.
-5. **Sonar's JACK bridge.** CPU load and dropouts when `alsa_out` joins RØDE's audio
+4. **Sonar's JACK bridge.** CPU load and dropouts when `alsa_out` joins RØDE's audio
    graph, and which JACK port carries which input of the desk
    ([Sonar](https://github.com/Hustenreizjuengling/rcplug-plugins/blob/main/sonar/README.md)).
-6. **Meters.** The mixer does not send meter values over the screen's connection
-   ([protocol.md](protocol.md#what-a-running-duo-sends)); where the screen gets them
-   is not known yet, so the console shows no meters on the device.
-7. **USB audio during an rcplug update.** During each update so far the computer's
+5. **USB audio during an rcplug update.** During each update so far the computer's
    playback through the Duo went silent until another output was chosen and the Duo
    again. The kernel log shows the Duo's USB device set up anew about half a minute
    after each update (`dwc2 … new device is high-speed`), most likely when the
    computer selected it again, so the silence starts earlier. The device has about
    120 MB of memory to spare; since 0.6.2 the update log records each step with the
    free memory, and the diagnostics include RØDE's own logs, to find the cause.
-8. **Operating the screen** (0.6.2, experimental). RØDE's screen app reads its
+6. **Operating the screen** (0.6.2, experimental). RØDE's screen app reads its
    touchscreen from `/dev/input/event0`/`event1` (evdev, no libinput); which one is the
    touchscreen, its axis ranges and orientation are in the diagnostics
    (`system/input-devices.txt`). Whether taps land where clicked is to be confirmed

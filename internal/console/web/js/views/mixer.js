@@ -1,12 +1,12 @@
-// Mixer: recorder, monitor, device info, the channel strips and output meters.
+// Mixer: recorder, monitor, device info, the channel strips and the level meters.
 import { h } from '../dom.js';
 import { t } from '../i18n.js';
 import { store, single, famPath, val, runPath, mixPath } from '../store.js';
 import { canWrite } from '../policy.js';
 import { toggle, slider, vfader, selectCtl, chip, kv, card } from '../controls.js';
-import { hMeter, vMeter } from '../meters.js';
+import { hMeter, vMeter, grMeter, hReduction } from '../meters.js';
 import { openDrawer } from '../dialogs.js';
-import { PROC, faders, faderLabel, faderDb, sourceLabel, sourceColour, sources, stripSource, unityFader, outputLabel, mixLevel } from '../device.js';
+import { PROC, faders, faderLabel, faderDb, sourceLabel, sourceColour, sources, stripSource, unityFader, mixLevel } from '../device.js';
 import { recorderCard, monitorCard, inputCard, routingRow } from './parts.js';
 import { actionButtons } from '../plugins.js';
 
@@ -66,6 +66,8 @@ function strip(scope, i) {
     fz.append(vMeter(scope, mp, 'L'));
     if (val(mp, 'meterStereo') !== false) fz.append(vMeter(scope, mp, 'R'));
   }
+  const gp = runPath(store.L.reductionMeters, i);
+  if (gp) fz.append(grMeter(scope, gp));
   const fmax = Number(val(fd, 'faderMax')) || 127;
   const fs = vfader(scope, fd, 'faderLevel', { min: Number(val(fd, 'faderMin')) || 0, max: fmax, unity: unityFader(), label: name, fmt: (v) => `${v} · ≈${faderDb(v)} dB`, follow: physical ? sourceLevel(src, fmax) : null, hint: physical && store.meta.passive ? t('fader.panelHint') : null });
   fz.append(fs.el);
@@ -119,11 +121,15 @@ export const mixer = {
     const strips = h('div', { class: 'strips' });
     for (let i = 0; i < faders().length; i++) strips.append(strip(scope, i));
     out.push(h('h2', { class: 'section-title' }, t('mixer.channels')), strips);
-    const om = store.L.outputMeters;
-    if (om.count) {
-      const box = h('div', { class: 'outmeters' });
-      for (let o = 0; o < om.count; o++) box.append(hMeter(scope, runPath(om, o), outputLabel(o)));
-      out.push(h('h2', { class: 'section-title' }, t('mixer.outputLevels')), h('div', { class: 'card' }, box));
+    const mm = store.L.masterMeter, fm = store.L.focusMeters;
+    if (mm && mm.count) {
+      const box = h('div', { class: 'outmeters' }, hMeter(scope, runPath(mm, 0), t('mixer.master')));
+      const card = h('div', { class: 'card' }, box);
+      if (fm && fm.count === 3) {
+        box.append(hMeter(scope, runPath(fm, 0), t('mixer.focusIn')), hMeter(scope, runPath(fm, 1), t('mixer.focusOut')), hReduction(scope, runPath(fm, 2), t('mixer.focusReduction')));
+        card.append(h('p', { class: 'muted small' }, t('mixer.focusNote')));
+      }
+      out.push(h('h2', { class: 'section-title' }, t('mixer.levels')), card);
     }
     if (store.L.physicalFaders) out.push(h('p', { class: 'muted small' }, t('mixer.physicalNote')));
     return out;

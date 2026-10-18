@@ -22,7 +22,8 @@ and the plugins ([device-notes.md](device-notes.md#first-test-on-a-real-duo)).
    wheel), whose effect the mirror then shows: **works since 0.5.1/0.5.2** on the
    *Display* page, together with the screen mirror; (c) later and experimental, a
    relay that holds the mixer's slot for the screen, for settings without a button.
-2. **The rest of the first run on hardware**: meter mapping and scale, gain ranges,
+2. **The rest of the first run on hardware**: the meters from the mixer's memory
+   (**implemented in 0.6.3**, to be confirmed on hardware), gain ranges,
    CPU load of the JACK bridge
    ([device-notes.md](device-notes.md#assumptions-to-confirm-on-hardware)).
 3. **First in-app update on hardware** (0.5.0 → 0.5.1): HTTPS with the firmware's CA

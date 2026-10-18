@@ -206,6 +206,10 @@ trust. Do not expose port 8080 to the internet.
   the mirror turns such a picture by 90° (the orientation can be changed on the
   *Display* page). It only reads, never draws. A user must switch it on (*Display* tab), since the
   screen can show private information.
+- **Meters** come from the shared memory in which the mixer keeps them for its screen
+  ([protocol.md](protocol.md#meters-and-fader-positions)). The console attaches it
+  read-only, like the screen app, and only copies it; it is on by default because it
+  cannot change anything, and `--meters off` switches it off.
 
 ## Updates
 

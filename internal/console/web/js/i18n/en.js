@@ -60,7 +60,7 @@ export default {
   'pc.groupChannel': 'Channel {n}', 'pc.groupNavigation': 'Navigation', 'pc.groupPads': 'SMART Pads',
 
   'fader.physical': 'Fader {n}', 'fader.virtual': 'Virtual {n}', 'output.n': 'Bus {n}',
-  'fader.dragHint': 'drag or use the arrow keys', 'fader.panelHint': 'Dragging sets the position through the device buttons – until the real fader is moved.', 'fader.physicalHint': 'physical fader – display only', 'meter.side': 'Level {side}',
+  'fader.dragHint': 'drag or use the arrow keys', 'fader.panelHint': 'Dragging sets the position through the device buttons – until the real fader is moved.', 'fader.physicalHint': 'physical fader – display only', 'meter.side': 'Level {side}', 'meter.reduction': 'Gain reduction', 'meter.reductionDb': 'Gain reduction {db} dB',
 
   'rec.title': 'Recording', 'rec.none': 'no recorder in the device state', 'rec.record': 'Record', 'rec.recordHint': 'Start recording',
   'rec.pause': 'Pause', 'rec.stop': 'Stop', 'rec.marker': 'Marker', 'rec.markerHint': 'Drop a chapter marker',
@@ -68,7 +68,7 @@ export default {
   'mon.title': 'Monitor / speakers', 'mon.level': 'Level', 'mon.autoMute': 'Auto-mute', 'mon.emergency': 'Emergency mute (all)',
   'mon.emergencyConfirm': 'Toggle the emergency mute? It affects all outputs.',
 
-  'mixer.device': 'Device & show', 'mixer.show': 'Show', 'mixer.quick': 'Quick access', 'mixer.channels': 'Channels', 'mixer.outputLevels': 'Output levels',
+  'mixer.device': 'Device & show', 'mixer.show': 'Show', 'mixer.quick': 'Quick access', 'mixer.channels': 'Channels', 'mixer.levels': 'Levels', 'mixer.master': 'Master', 'mixer.focusIn': 'Selected channel: input', 'mixer.focusOut': 'Selected channel: output', 'mixer.focusReduction': 'Selected channel: gain reduction', 'mixer.focusNote': 'The selected channel is the one open on the device\'s screen.',
   'mixer.physical': 'physical', 'mixer.virtual': 'virtual', 'mixer.source': 'Source', 'mixer.noSource': '— none —', 'mixer.empty': 'empty',
   'mixer.sourceConfirm': 'Change the source of this channel?', 'mixer.faderHint': 'Fader position (0–{max}) and approximate level relative to the 0 dB detent',
   'mixer.physicalNote': 'The physical faders are not motorised: they are moved on the device, virtual faders remotely. The Expert level can set a physical fader too, but the real one takes over again as soon as it is touched.',

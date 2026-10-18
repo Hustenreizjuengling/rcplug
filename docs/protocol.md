@@ -41,13 +41,15 @@ Read along on a Duo with firmware 1.7.6 (the screen's connection):
 - A **physical fader** moving: only `MIX.mixLevelWithAnchor` of the 13 mixes of the
   channel's source, `"anchor|level"` with level = position / 127 (`0.708661` = 90 =
   unity). The `FADER` node's `faderLevel` is *not* updated; it keeps the value of the
-  last full sync. The console shows physical faders from the mix level.
+  last full sync. The mixer keeps the position in its meter memory
+  ([below](#meters-and-fader-positions)), from which the console takes it.
 - **Mute** pressed on the device: `mutePressed` true/false on a node under
   `PHYSICALINTERFACE`, then `CHANNEL.channelOutputMute` and `mixMute` of the
   source's mixes.
 - From the screen to the mixer: what the user does there, e.g. `screenTouched`.
 - **No meter values**: the `METER` nodes stay at 0 and no level changes pass this
-  connection; the screen gets its meters another way (not yet known).
+  connection; the screen reads its meters from shared memory
+  ([below](#meters-and-fader-positions)).
 - A message's 8-byte header and its body usually arrive as two TCP segments.
 
 ## Reading along
@@ -157,6 +159,37 @@ These points matter for any client that writes:
 - **Keep reading.** A client that stops reading may stall the desk. The console reads
   in its own loop that never blocks and buffers changes for slow browsers.
 
+## Meters and fader positions
+
+The mixer publishes its level meters and the hardware faders' positions in a System V
+shared memory segment, key `0x4D173451`, 712 bytes, that the screen app attaches
+read-only and reads every 50 ms. Found by analysing the 1.7.6 binaries
+(`rc_audio_mixer` creates it, `rc_gui_juce` attaches it with `SHM_RDONLY`); the
+segment is also visible as `/SYSV4d173451` in the mixer's `/proc/<pid>/maps`.
+
+| Offset | Content |
+|---|---|
+| `0x000` | 9 fader records of 12 bytes; the `int32` at +8 is the position 0–127, written when the front panel reports a move |
+| `0x06C` | 22 meter records of 20 bytes: `u8` stereo, 3 bytes padding, `float32` peak L, peak R, level L, level R; linear, 1.0 = 0 dBFS |
+| `0x224` | Counters the mixer keeps for itself |
+
+The meter records are, in order: the 9 channel strips (0–8), the master (9), the
+input, output and gain reduction of the channel open on the device's screen (10–12),
+and each strip's gain reduction (13–21; 1.0 = no reduction). Records 0–11 are stereo,
+12–21 mono, exactly like the tree's 22 `METER` nodes and their `meterStereo` flags, so
+record *k* belongs to `METER` *k*. Nothing locks the segment; the screen app does not
+either.
+
+The console attaches the segment read-only (`--meters auto`), reads it 20 times a
+second while a browser is watching and once a second otherwise, and writes the
+readings into the tree as if the mixer had sent them: each `METER` node's peaks,
+levels and stereo flag (a mono meter's reading on both sides, rounded to four
+decimals) and the physical `FADER` nodes' `faderLevel`. It applies nothing unless the
+tree has one `METER` node per record, finds a restarted mixer's new segment within
+seconds, and never writes to the segment (an attachment with `SHM_RDONLY` cannot).
+Implemented in [`internal/hw/meters.go`](../internal/hw/meters.go) and
+[`internal/console/meters.go`](../internal/console/meters.go).
+
 ## The Duo's tree
 
 Firmware 1.7.4, from the capture in `internal/rcsim/fixture`. The root has 702
@@ -166,7 +199,7 @@ children. The most important families:
 |---|---|---|
 | `CHANNEL` | 10 | Channel strip *i* belongs to fader *i*. Duo: 0–3 physical, 4–8 virtual. |
 | `PHYSICALINTERFACE` → `FADER` | 9 | `faderLevel` 0–127, unity at about 90 |
-| `PHYSICALINTERFACE` → `METER` | 22 | Assumed: 0–8 channel strips, 9–21 outputs |
+| `PHYSICALINTERFACE` → `METER` | 22 | 0–8 channel strips, 9 master, 10–12 the channel open on the screen (input, output, gain reduction), 13–21 gain reduction per strip ([meters](#meters-and-fader-positions)) |
 | `MIX` | 247 | 19 sources × 13 outputs, source-major |
 | `INPUTSOURCE` | 19 | Gain, phantom power, input type per source |
 | `HEADPHONE` | 4 | |
