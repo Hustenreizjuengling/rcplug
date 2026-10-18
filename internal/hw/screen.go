@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
@@ -24,17 +25,20 @@ type Screen struct {
 
 	grab func() (image.Image, string, string, error) // test hook replacing capture
 
-	mu      sync.Mutex
-	fixed   bool // rotate is set; otherwise a portrait buffer is turned to landscape
-	rotate  int  // degrees clockwise when fixed
-	turned  int  // the turn applied to the cached frame
-	at      time.Time
-	img     image.Image
-	jpg     []byte
-	err     error
-	source  string // "fb" | "drm" of the last capture
-	detail  string
-	streams int
+	mu              sync.Mutex
+	fbBufs, drmBufs frameBufs   // reused capture buffers, one set per source
+	rotBuf          *image.RGBA // reused for the turned picture
+	idle            *time.Timer // frees the buffers when nobody watches
+	fixed           bool        // rotate is set; otherwise a portrait buffer is turned to landscape
+	rotate          int         // degrees clockwise when fixed
+	turned          int         // the turn applied to the cached frame
+	at              time.Time
+	img             image.Image
+	jpg             []byte
+	err             error
+	source          string // "fb" | "drm" of the last capture
+	detail          string
+	streams         int
 }
 
 // ScreenStatus describes the mirror for the UI.
@@ -108,26 +112,45 @@ func (s *Screen) frameLocked() (image.Image, error) {
 	if err == nil {
 		b := img.Bounds()
 		s.turned = s.rotation(b.Dx(), b.Dy())
-		img = rotate(img, s.turned)
+		img = rotateInto(img, s.turned, &s.rotBuf)
 	}
 	s.at, s.img, s.err, s.jpg = time.Now(), img, err, nil
+	s.armIdleLocked()
 	if err == nil {
 		s.source, s.detail = src, detail
 	}
 	return img, err
 }
 
+// screenIdle: without a request for this long the mirror frees its frames
+// and buffers and returns the memory to the system.
+var screenIdle = 30 * time.Second
+
+func (s *Screen) armIdleLocked() {
+	if s.idle != nil {
+		s.idle.Reset(screenIdle)
+		return
+	}
+	s.idle = time.AfterFunc(screenIdle, func() {
+		s.mu.Lock()
+		s.img, s.jpg, s.at = nil, nil, time.Time{}
+		s.fbBufs, s.drmBufs, s.rotBuf = frameBufs{}, frameBufs{}, nil
+		s.mu.Unlock()
+		debug.FreeOSMemory()
+	})
+}
+
 // capture grabs one frame from the configured source(s).
 func (s *Screen) capture() (image.Image, string, string, error) {
 	tryFB := func() (image.Image, string, error) {
-		img, info, err := Capture(s.FB)
+		img, info, err := captureFB(s.FB, &s.fbBufs)
 		if err != nil {
 			return nil, "", err
 		}
 		return img, fmt.Sprintf("%s · %d bit", s.FB, info.BitsPerPixel), nil
 	}
 	tryDRM := func() (image.Image, string, error) {
-		img, info, err := CaptureDRM(s.DRM)
+		img, info, err := captureDRM(s.DRM, &s.drmBufs)
 		if err != nil {
 			return nil, "", err
 		}
@@ -199,9 +222,9 @@ func (s *Screen) JPEG() ([]byte, error) {
 
 // PNG returns a recent frame losslessly (for the "save screenshot" button).
 func (s *Screen) PNG() ([]byte, error) {
-	s.mu.Lock()
+	s.mu.Lock() // held while encoding: the next capture reuses the frame's buffers
+	defer s.mu.Unlock()
 	img, err := s.frameLocked()
-	s.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
@@ -281,17 +304,21 @@ func (s *Screen) Acquire() (release func(), err error) {
 func (s *Screen) Interval() time.Duration { return s.interval() }
 
 // rotate turns img clockwise by deg (0, 90, 180 or 270).
-func rotate(img image.Image, deg int) image.Image {
+func rotate(img image.Image, deg int) image.Image { return rotateInto(img, deg, nil) }
+
+// rotateInto turns img into *buf (reused when its size fits; a new image with
+// buf nil).
+func rotateInto(img image.Image, deg int, buf **image.RGBA) image.Image {
 	if deg != 90 && deg != 180 && deg != 270 {
 		return img
 	}
 	b := img.Bounds()
 	w, h := b.Dx(), b.Dy()
-	size := image.Rect(0, 0, h, w)
+	dw, dh := h, w
 	if deg == 180 {
-		size = image.Rect(0, 0, w, h)
+		dw, dh = w, h
 	}
-	dst := image.NewRGBA(size)
+	dst := reuseRGBA(buf, dw, dh)
 	src, fast := img.(*image.RGBA)
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {

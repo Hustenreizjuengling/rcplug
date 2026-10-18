@@ -21,6 +21,14 @@ type DRMInfo struct {
 // CaptureDRM is Linux-only.
 func CaptureDRM(dev string) (image.Image, *DRMInfo, error) { return nil, nil, errUnsupported }
 
+func captureDRM(dev string, bufs *frameBufs) (image.Image, *DRMInfo, error) {
+	return nil, nil, errUnsupported
+}
+
+func captureFB(dev string, bufs *frameBufs) (image.Image, *FBInfo, error) {
+	return nil, nil, errUnsupported
+}
+
 // Do is Linux-only.
 func (p *Panel) Do(id string, value int) error { return errUnsupported }
 

@@ -230,3 +230,39 @@ func TestScreenTurnsAPortraitBuffer(t *testing.T) {
 		t.Fatalf("auto landscape: %+v", st)
 	}
 }
+
+// The mirror reuses its buffers from frame to frame and frees them when
+// nobody has asked for a frame for a while.
+func TestScreenReusesAndFreesItsBuffers(t *testing.T) {
+	old := screenIdle
+	screenIdle = 80 * time.Millisecond
+	defer func() { screenIdle = old }()
+	frame := image.NewRGBA(image.Rect(0, 0, 72, 128))
+	s := &Screen{MaxFPS: 1000, grab: func() (image.Image, string, string, error) { return frame, "drm", "test", nil }}
+	if _, err := s.JPEG(); err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	first := s.rotBuf
+	s.at = time.Time{}
+	s.mu.Unlock()
+	if _, err := s.JPEG(); err != nil {
+		t.Fatal(err)
+	}
+	s.mu.Lock()
+	again := s.rotBuf
+	s.mu.Unlock()
+	if first == nil || again != first {
+		t.Fatalf("turned picture not reused: %p then %p", first, again)
+	}
+	time.Sleep(250 * time.Millisecond)
+	s.mu.Lock()
+	freed := s.img == nil && s.rotBuf == nil && s.jpg == nil
+	s.mu.Unlock()
+	if !freed {
+		t.Fatal("frames kept after the idle time")
+	}
+	if st := s.Status(); !st.Available || st.Width != 128 {
+		t.Fatalf("after freeing, a new frame: %+v", st)
+	}
+}

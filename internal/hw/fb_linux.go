@@ -103,7 +103,9 @@ func ioctl(fd uintptr, req uintptr, arg unsafe.Pointer) error {
 }
 
 // Capture reads the visible framebuffer page into an RGBA image.
-func Capture(dev string) (image.Image, *FBInfo, error) {
+func Capture(dev string) (image.Image, *FBInfo, error) { return captureFB(dev, nil) }
+
+func captureFB(dev string, bufs *frameBufs) (image.Image, *FBInfo, error) {
 	info, err := ProbeFB(dev)
 	if err != nil {
 		return nil, nil, err
@@ -122,10 +124,10 @@ func Capture(dev string) (image.Image, *FBInfo, error) {
 	defer f.Close()
 	// Read only the visible page (double-buffered displays pan via yoffset).
 	off := int64(info.YOffset) * int64(info.Stride)
-	buf := make([]byte, info.Stride*info.Height)
+	buf := bufs.rawBuf(info.Stride * info.Height)
 	if _, err := f.ReadAt(buf, off); err != nil && !errors.Is(err, io.EOF) {
 		return nil, info, err
 	}
-	img, err := toImage(buf, info)
+	img, err := toImageInto(buf, info, bufs)
 	return img, info, err
 }

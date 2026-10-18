@@ -26,6 +26,12 @@ may break compatibility).
 - The update log records each step of an in-app update with the time and the free
   memory, to find out what silences USB audio during an update.
 
+### Changed
+- The screen mirror reuses its frame buffers instead of allocating three new ones for
+  every frame, and frees them 30 s after the last request: on the Duo the console
+  needed about 37 MB while the mirror had been used and kept it; now it falls back to
+  its usual size when nobody watches.
+
 ## 0.6.1 - 2026-10-18
 
 ### Added

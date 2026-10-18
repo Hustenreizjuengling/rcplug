@@ -97,7 +97,9 @@ type DRMInfo struct {
 }
 
 // CaptureDRM grabs the image currently scanned out by the first active CRTC.
-func CaptureDRM(dev string) (image.Image, *DRMInfo, error) {
+func CaptureDRM(dev string) (image.Image, *DRMInfo, error) { return captureDRM(dev, nil) }
+
+func captureDRM(dev string, bufs *frameBufs) (image.Image, *DRMInfo, error) {
 	f, err := os.OpenFile(dev, os.O_RDWR, 0)
 	if err != nil {
 		return nil, nil, err
@@ -208,9 +210,9 @@ func CaptureDRM(dev string) (image.Image, *DRMInfo, error) {
 		return nil, info, fmt.Errorf("pixel format %q not supported", string([]byte{byte(format), byte(format >> 8), byte(format >> 16), byte(format >> 24)}))
 	}
 	// Copy out of the mapping first: the buffer keeps changing underneath.
-	buf := make([]byte, info.Pitch*info.Height)
+	buf := bufs.rawBuf(info.Pitch * info.Height)
 	copy(buf, mem[offset:])
-	img, err := toImage(buf, fbi)
+	img, err := toImageInto(buf, fbi, bufs)
 	return img, info, err
 }
 
