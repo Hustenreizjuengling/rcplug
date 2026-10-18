@@ -54,16 +54,16 @@ flashing from Windows (below). What is still open:
 4. **Sonar's JACK bridge.** CPU load and dropouts when `alsa_out` joins RØDE's audio
    graph, and which JACK port carries which input of the desk
    ([Sonar](https://github.com/Hustenreizjuengling/rcplug-plugins/blob/main/sonar/README.md)).
-5. **USB audio during an rcplug update.** During each update so far the computer's
-   playback through the Duo went silent until another output was chosen and the Duo
-   again. The kernel log shows the Duo's USB device set up anew about half a minute
-   after each update (`dwc2 … new device is high-speed`), most likely when the
-   computer selected it again, so the silence starts earlier. The device has about
-   120 MB of memory to spare; since 0.6.2 the update log records each step with the
-   free memory, and the diagnostics include RØDE's own logs, to find the cause. Since
-   0.6.3 they also hold the state of the sound devices' streams and of the USB device
-   controller (`system/sound.txt`): a stream left in `XRUN` or stopped after an update
-   would show where the sound ends.
+5. **USB audio during an rcplug update.** During updates the computer's playback
+   through the Duo went silent; once (0.6.1 → 0.6.4) the computer lost the Duo as a
+   sound device until it was unplugged and plugged in again, while the desk itself
+   kept working. Memory was not the cause (134 MB free throughout). The kernel log
+   shows the Duo's USB interface stalling (`dwc2 … ep_sethalt`, earlier
+   `ep_stop_xfr: timeout`) a few seconds before the installer started, i.e. while
+   rcplugd downloaded and unpacked the package at full speed. Since 0.6.5 updates
+   download at 256 KB/s, unpack slowly in small flushed pieces and run at the lowest
+   I/O priority. To confirm with the first update installed *by* 0.6.5 (the update
+   *to* 0.6.5 is still downloaded by the older version).
 6. **Operating the screen** (0.6.2, experimental). RØDE's screen app reads its
    touchscreen from `/dev/input/event0`/`event1` (evdev, no libinput); which one is the
    touchscreen, its axis ranges and orientation are in the diagnostics
