@@ -52,7 +52,7 @@ every plugin builds on them.
 | Topic | What | Why |
 |---|---|---|
 | **Update notices** | **Done in 0.6.8:** an opt-in daily check and a badge in the navigation; installing stays a click. | Users miss updates they never look for. |
-| **Dashboard access** | An optional password for the dashboard and all plugin pages; sessions instead of only the console PIN. | Today everyone on the network can use every page. |
+| **Dashboard access** | **Done in 0.6.9:** an optional password for the dashboard and all plugin pages, with sessions that survive updates and a reset at the device. | Today everyone on the network can use every page. |
 | **Event bus** | Plugins publish and subscribe to events through the host (*marker dropped*, *segment started*, *recording saved*). The console's mirror can already report every change to watchers (since 0.6.4), the basis for desk events. | Plugins can work together without knowing each other's APIs. |
 | **Shared audio taps** | One JACK bridge run by the host: plugins ask for ports and get a stream, one opt-in, one place to watch CPU and dropouts. | Every audio plugin would otherwise add its own client to RØDE's graph. |
 

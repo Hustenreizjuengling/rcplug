@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.6.9 - Unreleased
 
+### Added
+- **Dashboard password** (optional; dashboard → System → *Access*): with a password
+  set, every page and API of the host, the plugins' pages included, needs a login.
+  Sessions last 30 days and survive restarts and updates; a new password ends the
+  others. Plugins on the device itself are not asked. A forgotten password is removed
+  at the device: *Forgot the password?* on the login page, then four presses of
+  channel 1's Listen button (the console confirms them to the host). Kept as a
+  PBKDF2-SHA256 hash in `config/dashboard-access.json`.
+
 ## 0.6.8 - 2026-10-18
 
 ### Added

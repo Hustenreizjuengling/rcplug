@@ -271,6 +271,12 @@ The host forwards every request below `/plugins/<name>/` to the plugin:
   other streams work. **WebSocket** upgrades work as well; the host refuses handshakes
   from pages of other sites (their `Origin`), because browsers cannot add `X-Rcplug` to
   them.
+- With a dashboard password set, the host lets only logged-in visitors through (a
+  page without a session goes to the login, an API request gets 401
+  `login_required`); the plugin needs no login of its own. Calls from the device
+  itself over the loopback interface (another plugin, `RCPLUG_HOST_URL`) are not
+  asked. A plugin that forwards requests from the network to the host must set
+  `X-Forwarded-For`, or they would count as the device's own.
 - If the plugin does not answer (starting, stopped, crashed), the host answers 502;
   browsers get a page that tries again every two seconds, so a page opened while the
   plugin starts appears by itself. For an unknown plugin or one without `httpProxy`:

@@ -72,6 +72,7 @@ type Console struct {
 	clientsDoc    interface{}
 	meters        meterState
 	reset         pinReset
+	presence      presenceState
 }
 
 // New creates the console and loads persisted settings.
@@ -102,6 +103,7 @@ func New(o Options) *Console {
 		c.client.SetFullControl(true)
 	}
 	c.mirror.Watch(c.watchPinReset)
+	c.mirror.Watch(c.watchPresence)
 	c.client.OnStatus(func(st desk.Status) {
 		data, _ := json.Marshal(st)
 		c.mirror.Notify("status", data)

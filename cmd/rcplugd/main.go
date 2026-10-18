@@ -90,6 +90,8 @@ func main() {
 	m.HostURL, m.Version = loopbackURL(*addr), version
 	dash, _ := fs.Sub(webFS, "web")
 	srv := host.NewServer(m, dash, version)
+	srv.Access = host.NewAccess(*root)
+	srv.Access.Presence = host.PresenceViaConsole(m)
 	if *allow != "" {
 		srv.AllowHosts = strings.Split(*allow, ",")
 	}

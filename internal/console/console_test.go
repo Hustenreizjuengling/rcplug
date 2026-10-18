@@ -1001,3 +1001,31 @@ func TestPinResetAtTheDevice(t *testing.T) {
 		t.Fatal("spread-out presses reset the PIN")
 	}
 }
+
+func TestPresenceOnlyForTheHost(t *testing.T) {
+	r := newRig(t, rcsim.Options{})
+	if res := r.post(t, "/api/presence", nil, "X-Forwarded-For", "192.168.1.30"); res.code != 403 || res.body["code"] != "host_only" {
+		t.Fatalf("through the proxy: %d %s", res.code, res.raw)
+	}
+	l, _ := r.snap()
+	btn := l.Path("SOLOMUTEBUTTON", 0)
+	done := make(chan resp, 1)
+	go func() { done <- r.post(t, "/api/presence", nil) }()
+	time.Sleep(200 * time.Millisecond)
+	for i := 0; i < 4; i++ {
+		for _, v := range []bool{true, false} {
+			if err := r.sim.Inject(&rcproto.Change{Type: rcproto.PropertyChanged, Path: btn, Name: "soloPressed", Value: rcproto.Bool(v)}); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	select {
+	case res := <-done:
+		if res.code != 200 {
+			t.Fatalf("presence: %d %s", res.code, res.raw)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("presses not reported")
+	}
+}

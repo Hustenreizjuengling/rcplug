@@ -169,6 +169,19 @@ arguments. Review a bundle before you post it anyway.
   refuses handshakes whose `Origin` belongs to another site.
 - **The console run on its own** (during development, without rcplugd in front)
   answers only requests addressed to an IP address or `localhost`.
+- **Dashboard password.** Optional (dashboard → System → *Access*). With a password
+  set, every page and API of the host, the plugins' pages included, needs a login.
+  Requests from the device itself, plugins calling each other over the loopback
+  interface without `X-Forwarded-For`, are not asked (a plugin that forwards requests
+  from the network to the host must set that header). The password is kept as a
+  PBKDF2-SHA256 hash (100,000 rounds, random salt) in `config/dashboard-access.json`,
+  mode 0600, together with a random key that signs the session cookies (`HttpOnly`,
+  `SameSite=Strict`, 30 days). A new password ends every other session. Five wrong
+  passwords within five minutes lock the login for a minute. A forgotten password is
+  removed at the device like the console's PIN: *Forgot the password?* on the login
+  page, then four presses of channel 1's Listen button, which the console confirms to
+  the host directly over the loopback interface (never through the proxy). Deleting
+  the file works as well (the toolkit's setup window can do it).
 - **PIN.** An optional PIN protects every change in the console, including the control
   level and reconnecting. It is stored in the console's data directory with mode 0600,
   compared in constant time, and five wrong attempts within five minutes lock it for
@@ -184,13 +197,15 @@ arguments. Review a bundle before you post it anyway.
 
 ### Limits
 
-There are **no user accounts**. The PIN protects changes to the desk, nothing else:
-everyone who can reach the device on the network can read the whole state (including
-the serial number, network addresses and the names of paired devices), watch the
-start, stop or restart plugins on the
-dashboard, and install the latest signed release of rcplug or a plugin (never
-anything unsigned or older, see [updates.md](updates.md)). The traffic is plain HTTP. rcplug is made for a home or studio network you
-trust. Do not expose port 8080 to the internet.
+There are **no user accounts**: one dashboard password for everyone who may use the
+device, and the console's PIN for changes to the desk. **Without a dashboard
+password**, everyone who can reach the device on the network can read the whole state
+(including the serial number, network addresses and the names of paired devices),
+start, stop or restart plugins, change their settings, and install the latest signed
+release of rcplug or a plugin (never anything unsigned or older, see
+[updates.md](updates.md)). The traffic is plain HTTP, the password included, so it
+protects against others on a network you trust, not against someone who can read that
+network's traffic. Do not expose port 8080 to the internet.
 
 ## Experimental features
 

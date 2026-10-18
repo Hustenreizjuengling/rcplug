@@ -32,6 +32,9 @@ type Server struct {
 	AllowHosts []string
 	// Updates checks for and installs updates; nil switches the API off.
 	Updates *Updater
+	// Access guards everything with the optional dashboard password; nil:
+	// no password possible (tests).
+	Access *Access
 	// Rescan reloads the plugins for POST /api/reload (and logs what it
 	// found); nil means Manager.Load.
 	Rescan func() ([]string, error)
@@ -102,6 +105,14 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/updates/check", sdk.CSRF(http.HandlerFunc(s.handleUpdateCheck)))
 	mux.Handle("POST /api/updates/install", sdk.CSRF(http.HandlerFunc(s.handleUpdateInstall)))
 	mux.Handle("POST /api/updates/auto", sdk.CSRF(http.HandlerFunc(s.handleUpdateAuto)))
+	if s.Access != nil {
+		mux.HandleFunc("GET /api/access", s.handleAccess)
+		mux.Handle("POST /api/login", sdk.CSRF(http.HandlerFunc(s.handleLogin)))
+		mux.Handle("POST /api/logout", sdk.CSRF(http.HandlerFunc(s.handleLogout)))
+		mux.Handle("POST /api/access/password", sdk.CSRF(http.HandlerFunc(s.handlePassword)))
+		mux.Handle("POST /api/access/reset", sdk.CSRF(http.HandlerFunc(s.handleAccessReset)))
+		mux.HandleFunc("GET /login", s.handleLoginPage)
+	}
 	mux.HandleFunc("/plugins/{name}", s.handleProxy)
 	mux.HandleFunc("/plugins/{name}/", s.handleProxy)
 	if s.dashboard != nil {
@@ -109,7 +120,11 @@ func (s *Server) Handler() http.Handler {
 		// patterns take precedence; this serves everything else.
 		mux.Handle("/", http.FileServer(http.FS(s.dashboard)))
 	}
-	return s.checkHost(securityHeaders(sameOrigin(mux)))
+	var h http.Handler = mux
+	if s.Access != nil {
+		h = s.Access.Gate(h)
+	}
+	return s.checkHost(securityHeaders(sameOrigin(h)))
 }
 
 // securityHeaders keeps foreign pages from framing the dashboard or a plugin

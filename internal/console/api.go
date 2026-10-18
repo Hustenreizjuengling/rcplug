@@ -39,6 +39,7 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/resync", c.withPIN(c.handleResync))
 	mux.HandleFunc("POST /api/pin", c.handlePIN)            // verifies the current PIN itself
 	mux.HandleFunc("POST /api/pin/reset", c.handlePinReset) // proven at the device, see pinreset.go
+	mux.HandleFunc("POST /api/presence", c.handlePresence)  // for rcplugd only, see pinreset.go
 	// Everything else under api/ is an error in the API's own format.
 	notFound := func(w http.ResponseWriter, r *http.Request) {
 		sdk.WriteError(w, sdk.NewError(http.StatusNotFound, "not_found", "no such API endpoint (or wrong method): "+r.Method+" "+r.URL.Path))

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rcplug · log in</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%227%22 fill=%22%2319c37d%22/%3E%3Ccircle cx=%228%22 cy=%228%22 r=%223%22 fill=%22%230d1015%22/%3E%3C/svg%3E">
+<style>
+  :root{--bg:#0d1015;--panel:#151a21;--panel2:#1c232c;--line:#2a333f;--fg:#e7edf3;--muted:#9aa8b6;--accent:#19c37d;--danger:#f85149}
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{max-width:380px;margin:12vh auto 0;padding:0 16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+  h1{font-size:18px;margin:0 0 4px}
+  p{margin:6px 0}
+  .muted{color:var(--muted);font-size:13px}
+  input{width:100%;font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin:12px 0}
+  button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);padding:8px 14px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#04261a;font-weight:600;width:100%}
+  button.link{background:none;border:none;color:var(--muted);text-decoration:underline;padding:0;margin-top:14px;font-size:13px}
+  .error{color:#ffb3ae;font-size:13px;min-height:1.2em}
+  .box{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body>
+<main>
+  <form class="card" id="form">
+    <h1 id="title"></h1>
+    <p class="muted" id="hint"></p>
+    <input type="password" id="pw" autocomplete="current-password" required autofocus>
+    <p class="error" id="err" role="alert"></p>
+    <button class="primary" type="submit" id="go"></button>
+    <button class="link" type="button" id="forgot"></button>
+    <div class="box" id="reset" hidden></div>
+  </form>
+</main>
+<script>
+'use strict';
+const T = {
+  en: { title: 'rcplug', hint: 'This RØDECaster\'s dashboard is protected by a password.', placeholder: 'Password', go: 'Log in',
+    wrong: 'Wrong password.', locked: 'Too many wrong passwords; try again in a minute.', failed: 'Could not log in: {err}',
+    forgot: 'Forgot the password?', resetConfirm: 'Remove the password at the device? You then have one minute: press the Listen button of channel 1 on the device four times in quick succession (it is back as before afterwards).',
+    resetWait: 'Now press the Listen button of channel 1 on the device four times in quick succession – {s} s left.',
+    resetDone: 'Password removed at the device. The dashboard is open again; set a new password on its System page.', resetFailed: 'Not removed: {err}' },
+  de: { title: 'rcplug', hint: 'Das Dashboard dieses RØDECasters ist mit einem Passwort geschützt.', placeholder: 'Passwort', go: 'Anmelden',
+    wrong: 'Falsches Passwort.', locked: 'Zu viele falsche Passwörter; bitte in einer Minute erneut versuchen.', failed: 'Anmelden nicht möglich: {err}',
+    forgot: 'Passwort vergessen?', resetConfirm: 'Passwort am Gerät entfernen? Danach hast du eine Minute: Drücke am Gerät viermal schnell hintereinander die Listen-Taste von Kanal 1 (danach ist sie wieder wie vorher).',
+    resetWait: 'Jetzt am Gerät viermal schnell die Listen-Taste von Kanal 1 drücken – noch {s} s.',
+    resetDone: 'Passwort am Gerät entfernt. Das Dashboard ist wieder offen; ein neues Passwort setzt du auf seiner Seite System.', resetFailed: 'Nicht entfernt: {err}' },
+};
+let lang = 'en';
+try { lang = localStorage.getItem('rcplug-lang') || ((navigator.language || '').toLowerCase().startsWith('de') ? 'de' : 'en'); } catch (e) { /* ignore */ }
+if (!T[lang]) lang = 'en';
+document.documentElement.lang = lang;
+const t = (k, p) => (T[lang][k] || T.en[k] || k).replace(/\{(\w+)\}/g, (m, n) => (p && n in p ? p[n] : m));
+const $ = (id) => document.getElementById(id);
+$('title').textContent = t('title');
+$('hint').textContent = t('hint');
+$('pw').placeholder = t('placeholder');
+$('pw').setAttribute('aria-label', t('placeholder'));
+$('go').textContent = t('go');
+$('forgot').textContent = t('forgot');
+
+// Only same-site paths after the login (no open redirect).
+function target() {
+  const n = new URLSearchParams(location.search).get('next') || '/';
+  return n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/\\') ? n : '/';
+}
+async function post(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'X-Rcplug': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  let d = {};
+  try { d = await r.json(); } catch (e) { /* empty */ }
+  return { ok: r.ok, status: r.status, d };
+}
+$('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('go').disabled = true;
+  $('err').textContent = '';
+  const r = await post('/api/login', { password: $('pw').value }).catch((x) => ({ ok: false, d: { error: x.message } }));
+  $('go').disabled = false;
+  if (r.ok || r.d.code === 'no_password') { location.replace(target()); return; }
+  $('err').textContent = r.d.code === 'wrong_password' ? t('wrong') : r.d.code === 'login_locked' ? t('locked') : t('failed', { err: r.d.error || '?' });
+  $('pw').select();
+});
+$('forgot').addEventListener('click', async () => {
+  if (!confirm(t('resetConfirm'))) return;
+  const box = $('reset');
+  box.hidden = false;
+  const r = await post('/api/access/reset');
+  if (!r.ok) { box.textContent = t('resetFailed', { err: r.d.error || r.status }); return; }
+  const id = setInterval(async () => {
+    const s = await fetch('/api/access', { cache: 'no-store' }).then((x) => x.json()).catch(() => null);
+    if (!s) return;
+    const rs = s.reset || {};
+    if (!s.protected) { clearInterval(id); box.textContent = t('resetDone'); setTimeout(() => location.replace(target()), 2500); return; }
+    if (rs.active) { box.textContent = t('resetWait', { s: rs.seconds }); return; }
+    clearInterval(id);
+    box.textContent = t('resetFailed', { err: rs.error || '?' });
+  }, 700);
+});
+</script>
+</body>
+</html>
