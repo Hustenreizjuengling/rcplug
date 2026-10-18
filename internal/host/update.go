@@ -50,6 +50,7 @@ type UpdateConfig struct {
 	Disabled     bool
 	API          string              // GitHub API base URL (default https://api.github.com)
 	PlatformRepo string              // owner/name of rcplug's repository (default DefaultUpdateRepo)
+	CatalogRepo  string              // owner/name of the official plugin catalog (default DefaultCatalog)
 	ExtraKeys    []ed25519.PublicKey // trusted in addition to the built-in release keys
 	Client       *http.Client        // nil: a client with timeouts
 	// Rate limits how fast an update downloads (bytes per second); it
@@ -76,6 +77,11 @@ type Updater struct {
 	found     map[string]*foundUpdate // target → what a check found
 	job       *updateJob
 	announced string // the updates last reported on the event bus
+
+	catalog     CatalogStatus // what the last look at the catalogs found
+	catChecked  time.Time
+	catChecking bool
+	catFound    map[string]*foundUpdate // repo#name → package (catalog.go)
 }
 
 // UpdateStatus is what the dashboard shows.
@@ -140,7 +146,8 @@ var updateStamp = regexp.MustCompile(`(?m)^==== \S+: updating rcplug (\S+) to (\
 type foundUpdate struct {
 	target UpdateTarget
 	asset  release.Asset
-	url    string // download URL of the asset
+	url    string   // download URL of the asset
+	perms  []string // for a catalog install: the permissions the catalog showed
 }
 
 type updateJob struct {
@@ -660,8 +667,11 @@ func (u *Updater) install(ctx context.Context, j *updateJob, fu *foundUpdate) (s
 		return "", err
 	}
 	j.logf("signature and SHA-256 checked (free memory %s)", freeMemory())
-	if fu.target.Target == "rcplug" {
+	switch {
+	case fu.target.Target == "rcplug":
 		return u.installPlatform(j, fu, dir, pkg)
+	case strings.HasPrefix(fu.target.Target, "install:"):
+		return "done", u.installNew(j, fu, dir, pkg)
 	}
 	return "done", u.installPlugin(j, fu, dir, pkg)
 }
@@ -697,19 +707,22 @@ func (u *Updater) installPlatform(j *updateJob, fu *foundUpdate, dir, pkg string
 	return "restarting", nil
 }
 
-func (u *Updater) installPlugin(j *updateJob, fu *foundUpdate, dir, pkg string) error {
+// stagePlugin unpacks a verified plugin package and checks that it is the
+// plugin and version the release manifest lists.
+func (u *Updater) stagePlugin(j *updateJob, fu *foundUpdate, dir, pkg string) (string, *Manifest, error) {
 	name := fu.target.Name
 	staged := filepath.Join(dir, "plugins", name)
 	if err := os.MkdirAll(filepath.Dir(staged), 0o755); err != nil {
-		return err
+		return "", nil, err
 	}
 	j.progress("unpack", 0, fu.asset.Size)
 	if err := extractTarGz(pkg, staged, maxUnpacked, 4*u.cfg.Rate, func(n int64) { j.progress("unpack", n, fu.asset.Size) }); err != nil {
-		return err
+		return "", nil, err
 	}
+	_ = os.Remove(pkg)
 	man, err := LoadManifest(staged)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	// LoadManifest takes the name from the directory; the package must
 	// declare the same one.
@@ -720,10 +733,19 @@ func (u *Updater) installPlugin(j *updateJob, fu *foundUpdate, dir, pkg string) 
 		_ = json.Unmarshal(raw, &declared)
 	}
 	if declared.Name != name {
-		return fmt.Errorf("the package is for the plugin %q, not %s", declared.Name, name)
+		return "", nil, fmt.Errorf("the package is for the plugin %q, not %s", declared.Name, name)
 	}
 	if man.Version != fu.asset.Version {
-		return fmt.Errorf("the package's plugin.json says version %s, the manifest %s", man.Version, fu.asset.Version)
+		return "", nil, fmt.Errorf("the package's plugin.json says version %s, the manifest %s", man.Version, fu.asset.Version)
+	}
+	return staged, man, nil
+}
+
+func (u *Updater) installPlugin(j *updateJob, fu *foundUpdate, dir, pkg string) error {
+	name := fu.target.Name
+	staged, man, err := u.stagePlugin(j, fu, dir, pkg)
+	if err != nil {
+		return err
 	}
 	j.progress("install", 0, 0)
 	j.logf("replacing %s %s with %s", name, fu.target.Current, man.Version)

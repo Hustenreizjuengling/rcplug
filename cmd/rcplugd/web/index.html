@@ -65,6 +65,8 @@
   .tag.update{color:var(--blue);border-color:var(--blue)}
   .perms{margin:0 0 10px;font-size:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
   .tag.perm{cursor:help}
+  #catSources input{font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-width:0}
+  #catSources summary{cursor:pointer;font-weight:600}
   .tag.perm.strong{color:var(--warn);border-color:var(--warn)}
   .badge{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:var(--blue);color:#fff;font-size:11px;font-weight:600;text-align:center;line-height:18px}
   .upd{border-top:1px solid var(--line);padding:10px 0}
@@ -109,6 +111,18 @@ const T = {
     plugins: 'Plugins', system: 'System', rescan: 'Rescan', rescanHint: 'Read the plugins folder again', skipped: 'Skipped plugin folders:',
     none: 'No plugins installed yet.', noneHint: 'Copy a plugin folder into plugins/ and press “Rescan”.', open: 'Open', newTab: 'new tab ↗',
     stop: 'Stop', restart: 'Restart', start: 'Start', log: 'Log', restarts: 'restarts: {n}', startpage: 'start page', audio: 'audio',
+    remove: 'Remove…', rmQ: 'Remove “{name}” from the device? It stops, and its files are deleted.', rmPurge: 'Also delete its data, settings and log',
+    rmGo: 'Remove', rmCancel: 'Cancel',
+    catTitle: 'More plugins', catLoad: 'Show the catalog', catReload: 'Look again', catLoading: 'Loading…',
+    catHint: 'The catalog lists plugins you can install from here. Showing it asks GitHub for the latest signed releases of the catalogs below.',
+    catOff: 'Updates are switched off on this device, and with them the catalog.', catEmpty: 'The catalogs offer no plugins.',
+    catOfficial: 'official', catFrom: 'from {repo}', catInstalled: 'installed ({v})', catInstall: 'Install',
+    catConfirm: 'Install “{name}” {v} from {repo}?\n\nPlugins run with full rights on the device: install only what you trust.',
+    catConfirmPerms: 'It declares:', catConfirmNoPerms: 'It declares no permissions: it only shows its own pages.',
+    catDone: 'Installed: it is in the list above now.', catFailed: 'Installing failed: {err}',
+    catSources: 'Catalogs', catSourcesHint: 'The official catalog holds the plugins published with rcplug. Add other catalogs only from people you trust, since their plugins run with full rights on the device. A catalog is a GitHub repository with signed releases; you need the public key it is signed with.',
+    catSrcRelease: 'release {v}', catSrcPlugins: 'plugins: {n}', catSrcKey: 'key {id}', catRepo: 'GitHub repository (owner/name)', catKey: 'Public key (base64)',
+    catAdd: 'Add', catRemoveSrc: 'Remove', catRemoveSrcQ: 'Remove the catalog {repo}? Plugins installed from it stay.',
     perms: 'Permissions:', 'perm_desk:write': 'changes the desk', perm_audio: 'hears the desk', perm_network: 'network', perm_device: 'device',
     'permHint_desk:write': 'May change the mixer, the recorder and the pads through the console, without the PIN and whatever control level the console has; write protection stops it.',
     permHint_audio: 'May listen to the desk\'s inputs and outputs through the shared audio taps (when they are switched on under System).',
@@ -161,6 +175,18 @@ const T = {
     plugins: 'Plugins', system: 'System', rescan: 'Neu einlesen', rescanHint: 'Plugin-Ordner neu einlesen', skipped: 'Übersprungene Plugin-Ordner:',
     none: 'Noch keine Plugins installiert.', noneHint: 'Plugin-Ordner nach plugins/ kopieren und „Neu einlesen“ drücken.', open: 'Öffnen', newTab: 'neuer Tab ↗',
     stop: 'Stoppen', restart: 'Neu starten', start: 'Starten', log: 'Log', restarts: 'Neustarts: {n}', startpage: 'Startseite', audio: 'Audio',
+    remove: 'Entfernen…', rmQ: '„{name}“ vom Gerät entfernen? Es wird gestoppt, und seine Dateien werden gelöscht.', rmPurge: 'Auch seine Daten, Einstellungen und das Log löschen',
+    rmGo: 'Entfernen', rmCancel: 'Abbrechen',
+    catTitle: 'Weitere Plugins', catLoad: 'Katalog anzeigen', catReload: 'Neu laden', catLoading: 'Lädt…',
+    catHint: 'Der Katalog zeigt Plugins, die du hier installieren kannst. Zum Anzeigen fragt das Gerät GitHub nach den neuesten signierten Releases der Kataloge unten.',
+    catOff: 'Updates sind auf diesem Gerät abgeschaltet und damit auch der Katalog.', catEmpty: 'Die Kataloge bieten keine Plugins an.',
+    catOfficial: 'offiziell', catFrom: 'aus {repo}', catInstalled: 'installiert ({v})', catInstall: 'Installieren',
+    catConfirm: '„{name}“ {v} aus {repo} installieren?\n\nPlugins laufen mit allen Rechten auf dem Gerät: Installiere nur, was du vertraust.',
+    catConfirmPerms: 'Es gibt an:', catConfirmNoPerms: 'Es gibt keine Berechtigungen an: Es zeigt nur seine eigenen Seiten.',
+    catDone: 'Installiert: Es steht jetzt oben in der Liste.', catFailed: 'Die Installation ist fehlgeschlagen: {err}',
+    catSources: 'Kataloge', catSourcesHint: 'Der offizielle Katalog enthält die Plugins, die mit rcplug veröffentlicht werden. Füge andere Kataloge nur von Leuten hinzu, denen du vertraust, denn ihre Plugins laufen mit allen Rechten auf dem Gerät. Ein Katalog ist ein GitHub-Repository mit signierten Releases; du brauchst den öffentlichen Schlüssel, mit dem es signiert wird.',
+    catSrcRelease: 'Release {v}', catSrcPlugins: 'Plugins: {n}', catSrcKey: 'Schlüssel {id}', catRepo: 'GitHub-Repository (owner/name)', catKey: 'Öffentlicher Schlüssel (base64)',
+    catAdd: 'Hinzufügen', catRemoveSrc: 'Entfernen', catRemoveSrcQ: 'Den Katalog {repo} entfernen? Daraus installierte Plugins bleiben.',
     perms: 'Berechtigungen:', 'perm_desk:write': 'ändert das Pult', perm_audio: 'hört das Pult', perm_network: 'Netzwerk', perm_device: 'Gerät',
     'permHint_desk:write': 'Darf über die Konsole Mixer, Recorder und Pads ändern, ohne PIN und unabhängig von der Steuerungsstufe der Konsole; der Schreibschutz hält es auf.',
     permHint_audio: 'Darf die Ein- und Ausgänge des Pults über die gemeinsamen Audio-Abgriffe hören (wenn sie unter System eingeschaltet sind).',
@@ -242,6 +268,8 @@ let plugins = [], invalid = [], sys = null, route = '', loaded = false, pageSig 
 let upd = null, updSig = '', updChecking = false, bootVersion = null;
 const openLogs = {};
 const openOpts = {}; // plugin → the values being edited (kept across re-renders)
+const openRemove = {}; // plugin → {purge} while its remove box is open
+let cat = null, catSig = '', catLoading = false, catSourcesOpen = false;
 
 function fmtUptime(s) {
   const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
@@ -273,7 +301,7 @@ async function refresh() {
   await loadUpdates(); // local; also for the update badge in the navigation
   renderNav();
   if (!route) go();
-  else if (route === 'plugins') { renderPlugins(); updateProgress(); }
+  else if (route === 'plugins') { await loadCatalog(); renderPlugins(); renderCatalog(); updateProgress(); }
   else if (route === 'system') renderSystem();
   else if (route.startsWith('p/')) checkFrame();
 }
@@ -370,6 +398,21 @@ async function act(name, action, btn) {
 
 // ---- plugin management (rebuilt only when something changed, so focus,
 // open logs and scroll positions survive the periodic refresh)
+// The box that asks before a plugin is removed.
+function removeBox(p) {
+  return `<div class="banner rm" style="margin:10px 0 0"><p style="margin:0 0 8px">${esc(t('rmQ', { name: tr(p, 'title') || p.name }))}</p>
+    <label class="row" style="font-size:13px;gap:8px;margin-bottom:10px"><input type="checkbox" data-purge${openRemove[p.name].purge ? ' checked' : ''}> ${esc(t('rmPurge'))}</label>
+    <div class="row"><button class="danger" data-act="rm-go">${esc(t('rmGo'))}</button><button data-act="rm-cancel">${esc(t('rmCancel'))}</button></div></div>`;
+}
+async function removePlugin(name, btn, errEl) {
+  btn.disabled = true;
+  try {
+    await jpost(`api/plugins/${encodeURIComponent(name)}/remove`, { confirm: name, purge: !!(openRemove[name] && openRemove[name].purge) });
+    delete openRemove[name]; delete openOpts[name]; delete openLogs[name];
+  } catch (e) { errEl.textContent = t('failed', { err: e.message }); btn.disabled = false; return; }
+  await refresh();
+}
+
 // What a plugin declares it does (plugin.json "permissions").
 function permsRow(p) {
   const perms = p.permissions || [];
@@ -402,12 +445,14 @@ function renderPlugins() {
         ${u ? `<button data-act="update"${jobActive() ? ' disabled' : ''}>${esc(t('updPlugin'))}</button>` : ''}
         ${p.options && p.options.length ? `<button class="linkbtn" data-act="settings" aria-expanded="${!!openOpts[p.name]}">${esc(t('settings'))}</button>` : ''}
         <button class="linkbtn" data-act="logs" aria-expanded="${!!openLogs[p.name]}">${esc(t('log'))}</button>
+        ${p.removable ? `<button class="linkbtn" data-act="remove" aria-expanded="${!!openRemove[p.name]}">${esc(t('remove'))}</button>` : ''}
         ${p.restarts ? `<span class="muted" style="font-size:12px">${esc(t('restarts', { n: p.restarts }))}</span>` : ''}
         ${p.lastErr && st !== 'running' ? `<span style="font-size:12px;color:var(--warn)">${esc(p.lastErr)}</span>` : ''}
-      </div>${u || (upd && upd.job && upd.job.target === 'plugin:' + p.name) ? `<div data-progress="plugin:${esc(p.name)}"></div>` : ''}<p class="error"></p><div class="opts" ${openOpts[p.name] ? '' : 'hidden'}></div><pre class="logs" ${openLogs[p.name] ? '' : 'hidden'}></pre></div>`;
+      </div>${u || (upd && upd.job && upd.job.target === 'plugin:' + p.name) ? `<div data-progress="plugin:${esc(p.name)}"></div>` : ''}<p class="error"></p>${openRemove[p.name] ? removeBox(p) : ''}<div class="opts" ${openOpts[p.name] ? '' : 'hidden'}></div><pre class="logs" ${openLogs[p.name] ? '' : 'hidden'}></pre></div>`;
   }
-  html += `</div><p class="note" style="text-align:center">${esc(t('footer'))}</p></div>`;
+  html += `</div><div id="catalog"></div><p class="note" style="text-align:center">${esc(t('footer'))}</p></div>`;
   $('#view').innerHTML = html;
+  catSig = ''; // the catalog's container is new
   $('#rescan').onclick = async (e) => {
     e.target.disabled = true;
     try { await jpost('api/reload'); } catch (x) { alert(t('failed', { err: x.message })); }
@@ -418,6 +463,8 @@ function renderPlugins() {
     const name = c.dataset.name, logsEl = $('.logs', c);
     const p = plugins.find((x) => x.name === name);
     if (openOpts[name]) renderOptions(p, $('.opts', c));
+    const purge = $('[data-purge]', c);
+    if (purge) purge.onchange = () => { openRemove[name].purge = purge.checked; };
     c.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
       if (b.dataset.act === 'settings') { toggleOptions(p, $('.opts', c), b); return; }
       if (b.dataset.act === 'logs') {
@@ -428,6 +475,13 @@ function renderPlugins() {
         return;
       }
       if (b.dataset.act === 'update') { installUpdate('plugin:' + name, b); return; }
+      if (b.dataset.act === 'remove') {
+        if (openRemove[name]) delete openRemove[name]; else openRemove[name] = { purge: false };
+        pageSig = ''; renderPlugins(); renderCatalog(); updateProgress();
+        return;
+      }
+      if (b.dataset.act === 'rm-cancel') { delete openRemove[name]; pageSig = ''; renderPlugins(); renderCatalog(); updateProgress(); return; }
+      if (b.dataset.act === 'rm-go') { removePlugin(name, b, $('.error', c)); return; }
       act(name, b.dataset.act, b);
     }));
   });
@@ -687,6 +741,103 @@ async function renderAccess() {
   };
 }
 
+// ---- the plugin catalog (docs/updates.md#plugin-catalog)
+async function loadCatalog() { try { cat = await jget('api/catalog'); } catch (e) { /* keep the last state */ } }
+const trCat = (e, k) => (e.translations && e.translations[lang] && e.translations[lang][k]) || e[k] || '';
+const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toLocaleString(lang, { maximumFractionDigits: 1 }) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+const httpsURL = (u) => (/^https:\/\//.test(u || '') ? u : '');
+
+function renderCatalog() {
+  const el = $('#catalog');
+  if (!el) return;
+  const sig = JSON.stringify([cat, catLoading, lang, upd && upd.job, plugins.map((p) => p.name + '@' + p.version)]);
+  if (sig === catSig) return;
+  catSig = sig;
+  const keep = { repo: $('#catRepo') && $('#catRepo').value, key: $('#catKey') && $('#catKey').value };
+  const loadLabel = catLoading ? t('catLoading') : cat && cat.checkedAt ? t('catReload') : t('catLoad');
+  let h = `<div class="row" style="margin:28px 0 14px"><h2 style="margin:0;font-size:18px">${esc(t('catTitle'))}</h2><span class="spacer"></span>`
+    + `${cat && cat.enabled ? `<button id="catLoad"${catLoading ? ' disabled' : ''}>${esc(loadLabel)}</button>` : ''}</div>`;
+  if (!cat || !cat.enabled) { el.innerHTML = h + `<p class="muted">${esc(cat ? t('catOff') : t('offline'))}</p>`; return; }
+  if (!cat.checkedAt) h += `<p class="muted">${esc(t('catHint'))}</p>`;
+  else {
+    for (const s of cat.sources.filter((x) => x.error)) h += `<p class="error">${esc(s.github)}: ${esc(s.error)}</p>`;
+    if (!cat.plugins.length) h += `<div class="empty">${esc(t('catEmpty'))}</div>`;
+    const j = upd && upd.job, busy = jobActive();
+    h += '<div class="grid">';
+    cat.plugins.forEach((e, i) => {
+      const target = 'install:' + e.name, mine = j && j.target === target;
+      const page = httpsURL(e.page);
+      h += `<div class="card" data-cat="${i}">
+        <div class="row"><h2>${esc(e.icon || '')} ${esc(trCat(e, 'title') || e.name)}</h2><span class="tag">v${esc(e.version)}</span>`
+        + (e.official ? `<span class="tag">${esc(t('catOfficial'))}</span>` : `<span class="tag">${esc(t('catFrom', { repo: e.repo }))}</span>`)
+        + `<span class="spacer"></span>${e.installed ? `<span class="tag running">${esc(t('catInstalled', { v: e.installed }))}</span>` : ''}</div>
+        <p class="desc">${esc(trCat(e, 'description'))}</p>
+        ${permsRow(e)}
+        <div class="row">${e.installed ? '' : `<button class="primary" data-install${busy ? ' disabled' : ''}>${esc(t('catInstall'))}</button>`}
+          <span class="muted" style="font-size:12px">${esc(fmtSize(e.size))}</span>${page ? `<a class="linkbtn" href="${esc(page)}" target="_blank" rel="noopener">${esc(t('updRelease'))}</a>` : ''}</div>
+        <div data-progress="${esc(target)}"></div>`
+        + (mine && j.state === 'error' ? `<p class="error">${esc(t('catFailed', { err: j.error || '?' }))}</p>` : '')
+        + (mine && j.state === 'done' && e.installed ? `<p class="ok">${esc(t('catDone'))}</p>` : '') + '</div>';
+    });
+    h += '</div>';
+  }
+  h += `<details id="catSources" style="margin-top:14px"${catSourcesOpen ? ' open' : ''}><summary>${esc(t('catSources'))}</summary>
+    <p class="note">${esc(t('catSourcesHint'))}</p>`;
+  for (const s of cat.sources) {
+    const bits = [s.official ? t('catOfficial') : '', s.release ? t('catSrcRelease', { v: s.release }) : '', cat.checkedAt && !s.error ? t('catSrcPlugins', { n: s.plugins }) : '', s.keyId ? t('catSrcKey', { id: s.keyId }) : ''].filter(Boolean);
+    h += `<div class="upd"><div class="row"><b>${esc(s.github)}</b><span class="muted" style="font-size:12px">${esc(bits.join(' · '))}</span><span class="spacer"></span>`
+      + `${s.official ? '' : `<button class="linkbtn" data-src-remove="${esc(s.github)}">${esc(t('catRemoveSrc'))}</button>`}</div>${s.error ? `<p class="error">${esc(s.error)}</p>` : ''}</div>`;
+  }
+  h += `<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><input id="catRepo" placeholder="${esc(t('catRepo'))}" aria-label="${esc(t('catRepo'))}" style="flex:1 1 180px" autocomplete="off">`
+    + `<input id="catKey" placeholder="${esc(t('catKey'))}" aria-label="${esc(t('catKey'))}" style="flex:2 1 260px" autocomplete="off"><button id="catAdd">${esc(t('catAdd'))}</button></div><p class="error" id="catSrcErr"></p></details>`;
+  el.innerHTML = h;
+  if (keep.repo) $('#catRepo').value = keep.repo;
+  if (keep.key) $('#catKey').value = keep.key;
+  if ($('#catLoad')) $('#catLoad').onclick = refreshCatalog;
+  $('#catSources').ontoggle = (e) => { catSourcesOpen = e.target.open; };
+  el.querySelectorAll('[data-install]').forEach((b) => (b.onclick = () => installFromCatalog(cat.plugins[+b.closest('[data-cat]').dataset.cat], b)));
+  el.querySelectorAll('[data-src-remove]').forEach((b) => (b.onclick = () => changeSource({ github: b.dataset.srcRemove, remove: true }, b)));
+  $('#catAdd').onclick = (e) => changeSource({ github: $('#catRepo').value, publicKey: $('#catKey').value }, e.target);
+}
+
+async function refreshCatalog() {
+  catLoading = true;
+  renderCatalog();
+  try { cat = await jget('api/catalog?refresh=1'); } catch (e) { alert(t('failed', { err: e.message })); }
+  catLoading = false;
+  renderCatalog();
+  updateProgress();
+}
+
+async function changeSource(body, btn) {
+  if (body.remove && !confirm(t('catRemoveSrcQ', { repo: body.github }))) return;
+  btn.disabled = true;
+  catLoading = true;
+  try {
+    cat = await jpost('api/catalog/sources', body);
+    if (!body.remove) { $('#catRepo').value = ''; $('#catKey').value = ''; }
+    catLoading = false;
+    renderCatalog();
+  } catch (e) {
+    catLoading = false;
+    btn.disabled = false;
+    renderCatalog();
+    $('#catSrcErr').textContent = t('failed', { err: e.message });
+  }
+  updateProgress();
+}
+
+async function installFromCatalog(e, btn) {
+  const perms = (e.permissions || []).map((x) => '• ' + t('perm_' + x) + ': ' + t('permHint_' + x)).join('\n');
+  const q = t('catConfirm', { name: trCat(e, 'title') || e.name, v: e.version, repo: e.repo }) + '\n\n' + (perms ? t('catConfirmPerms') + '\n' + perms : t('catConfirmNoPerms'));
+  if (!confirm(q)) return;
+  btn.disabled = true;
+  try { cat = await jpost('api/catalog/install', { repo: e.repo, plugin: e.name }); await loadUpdates(); }
+  catch (x) { alert(t('failed', { err: x.message })); btn.disabled = false; }
+  renderCatalog();
+  updateProgress();
+}
+
 // ---- updates
 async function loadUpdates() { try { upd = await jget('api/updates'); } catch (e) { /* keep the last state */ } }
 const jobActive = () => !!(upd && upd.job && (upd.job.state === 'running' || upd.job.state === 'restarting'));
@@ -729,7 +880,7 @@ function renderUpdates() {
   if (upd.error) h += `<p class="error">${esc(upd.error)}</p>`;
   const j = upd.job;
   if (j) {
-    const name = j.target === 'rcplug' ? 'rcplug' : j.target.replace(/^plugin:/, '');
+    const name = j.target === 'rcplug' ? 'rcplug' : j.target.replace(/^(plugin|install):/, '');
     const msg = j.state === 'restarting' || (j.state === 'running' && j.target === 'rcplug' && (!j.phase || j.phase === 'install')) ? t('updRestarting', { v: j.version })
       : j.state === 'running' ? t('updRunning', { name, v: j.version })
       : j.state === 'done' ? t('updDone', { name, v: j.version }) : t('updFailed', { err: j.error || '?' });

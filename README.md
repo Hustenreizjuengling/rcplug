@@ -89,7 +89,9 @@ so audio always comes first. Updating rcplug keeps its settings.
 **Updates:** once installed, rcplug updates itself and its plugins from the dashboard
 (**System → Updates**): it checks GitHub only when you ask, shows the release notes and
 installs only signed releases you click. If a new version of rcplug does not start,
-the previous one comes back by itself. See [docs/updates.md](docs/updates.md). A **firmware update**
+the previous one comes back by itself. More plugins install from the dashboard's
+**catalog** (Plugins → More plugins), and **Remove…** takes one off again. See
+[docs/updates.md](docs/updates.md). A **firmware update**
 writes a fresh root partition, and the Duo has no other place that survives it:
 rcplug, its settings and your SSH key are gone afterwards.
 

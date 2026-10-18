@@ -47,6 +47,8 @@ type persistState struct {
 	AutoCheck bool `json:"autoCheck,omitempty"`
 	// AudioTaps: the user switched on the shared audio taps.
 	AudioTaps bool `json:"audioTaps,omitempty"`
+	// Catalogs: plugin catalogs the user added (catalog.go).
+	Catalogs []CatalogSource `json:"catalogs,omitempty"`
 }
 
 // NewManager creates a manager rooted at root. basePort is the first loopback

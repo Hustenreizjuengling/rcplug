@@ -609,6 +609,10 @@ Devices that have your plugin installed offer the new version under
 **System → Updates** and on the plugin's card. Installing it replaces the plugin
 directory and keeps the data directory.
 
+Your repository is also a catalog: users add it with your public key under
+**Plugins → More plugins → Catalogs** and install the plugin from there, without a
+computer ([updates.md](updates.md#plugin-catalog)).
+
 ## 14. Before you publish
 
 The [checklist in the reference](plugin-api.md#checklist) sums up what a plugin must do.

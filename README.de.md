@@ -98,8 +98,10 @@ SSH-Schlüssel sind danach weg.
 **Updates:** Einmal installiert, aktualisiert sich rcplug samt Plugins aus dem
 Dashboard (**System → Updates**): Es fragt GitHub nur, wenn du suchst, zeigt die
 Versionshinweise und installiert nur signierte Releases, die du anklickst. Startet eine
-neue rcplug-Version nicht, kommt die vorherige von selbst zurück. Siehe
-[docs/updates.md](docs/updates.md) (Englisch).
+neue rcplug-Version nicht, kommt die vorherige von selbst zurück. Weitere Plugins
+installierst du aus dem **Katalog** im Dashboard (Plugins → Weitere Plugins), und
+**Entfernen…** nimmt eines wieder herunter. Siehe [docs/updates.md](docs/updates.md)
+(Englisch).
 
 ## Wenn etwas schiefgeht
 

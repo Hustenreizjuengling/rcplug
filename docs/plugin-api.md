@@ -461,10 +461,14 @@ The dashboard's API, open to plugins (`$RCPLUG_HOST_URL`) and scripts. POSTs nee
 
 | Request | Effect |
 |---|---|
-| `GET /api/plugins` | `{"plugins": [...], "invalid": [...]}`: per plugin `name`, `title`, `description`, `version`, `hasUI`, `needsAudio`, `permissions`, `enabled`, `state`, `running`, `pid`, `restarts`, `lastErr`, `port`, `primary`, `order`, `icon`, `unknownFields`, `translations`, `actions` |
+| `GET /api/plugins` | `{"plugins": [...], "invalid": [...]}`: per plugin `name`, `title`, `description`, `version`, `hasUI`, `needsAudio`, `permissions`, `removable`, `enabled`, `state`, `running`, `pid`, `restarts`, `lastErr`, `port`, `primary`, `order`, `icon`, `unknownFields`, `translations`, `actions` |
 | `GET /api/plugins/<name>/logs` | `{"lines": [...]}`, the last 500 lines |
 | `POST /api/plugins/<name>/enable`, `/disable`, `/restart` | Start and remember, stop and remember, restart |
 | `POST /api/reload` | Rescan the plugins directory |
+| `POST /api/plugins/<name>/remove` `{"confirm": "<name>", "purge": false}` | Stops the plugin and deletes its directory; `purge` also deletes its data, settings and logs. Not for plugins of rcplug's device package (`removable` is false) |
+| `GET /api/catalog`, `GET /api/catalog?refresh=1` | The [plugin catalog](updates.md#plugin-catalog): `sources` and `plugins` (`name`, `title`, `description`, `icon`, `translations`, `permissions`, `version`, `size`, `repo`, `official`, `installed`) as last seen; `refresh=1` asks GitHub again (at most every 20 s) |
+| `POST /api/catalog/install` `{"repo", "plugin"}` | Installs a plugin from the catalog; progress as for updates (`job`, target `install:<name>`) |
+| `POST /api/catalog/sources` `{"github", "publicKey"}` or `{"github", "remove": true}` | Adds or removes a catalog |
 | `GET /api/system` | Host name, version, uptimes, load, memory, CPU temperature, free storage |
 | `POST /api/uninstall` `{"confirm": "uninstall"}` | Removes rcplug from the device: stops it and every plugin, removes the init script and the install directory with all data (only one named `rcplug` that holds `rcplugd`) |
 | `GET /api/processes?sort=cpu\|mem&limit=20&all=1` | The device's processes: `pid`, `name`, `command` (secrets masked), `cpu` (percent of one core since the previous request), `cpuTime`, `rssKB`, `threads`, `owner` (`rcplug` with the `plugin`, or `rode`); `all=1` includes kernel threads |
@@ -528,6 +532,7 @@ The Go SDK has `sdk.Publish(ctx, type, data)` and `sdk.Events(ctx, prefixes...)`
 | `host.plugin.state` | `name`, `state` (`running`, `backoff`, `stopped`), `error` | A plugin starts, crashes or stops |
 | `host.update.available` | `updates`: `target`, `name`, `current`, `latest` | A check finds updates (once per new set) |
 | `host.update.installed`, `.restarting`, `.failed` | `target`, `version`, `error` | An update ends; rcplug itself restarts to finish |
+| `host.plugin.installed`, `host.plugin.removed` | `name`, `version`, `repo`; `name`, `purged` | A plugin was installed from a catalog or removed |
 
 Desk events are best effort: a plugin that must not miss a state (a lamp that has to
 be right after its own restart) reads it from the console as well (`api/summary`).

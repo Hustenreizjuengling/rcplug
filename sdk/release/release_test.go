@@ -167,3 +167,37 @@ func TestBuiltinKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestDescribeInfo(t *testing.T) {
+	dir := t.TempDir()
+	plugin := filepath.Join(dir, "sonar-0.6.0-aarch64.tar.gz")
+	long := strings.Repeat("ä", 700)
+	writeTarGz(t, plugin, map[string]string{"plugin.json": `{"name":"sonar","version":"0.6.0","exec":["./sonar"],
+		"title":"Sonar","description":"` + long + `","icon":"◉","needsAudio":true,"permissions":["network","network"],
+		"translations":{"de":{"description":"Richtung"},"../x":{"title":"bad"},"fr":{}}}`})
+	a, err := Describe(plugin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := a.Info
+	if in == nil || in.Title != "Sonar" || in.Icon != "◉" || len([]rune(in.Description)) != maxInfoDescription {
+		t.Fatalf("info: %+v", in)
+	}
+	if strings.Join(in.Permissions, ",") != "network,audio" {
+		t.Errorf("permissions: %v", in.Permissions)
+	}
+	if len(in.Translations) != 1 || in.Translations["de"]["description"] != "Richtung" {
+		t.Errorf("translations: %v", in.Translations)
+	}
+	// An older host reads a manifest with info as before.
+	raw, _ := json.Marshal(Manifest{Format: 1, Project: "p", Version: "1.0.0", Assets: []Asset{a}})
+	var old struct {
+		Assets []struct{ Name, Plugin, Version string }
+	}
+	if err := json.Unmarshal(raw, &old); err != nil || old.Assets[0].Plugin != "sonar" {
+		t.Errorf("old reader: %v %+v", err, old)
+	}
+	if _, err := Parse(raw); err != nil {
+		t.Error(err)
+	}
+}

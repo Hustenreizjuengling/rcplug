@@ -4,12 +4,13 @@ Where rcplug is going, and plugins that would be worth building. Nothing here is
 promise; priorities follow what users need and what the first tests on hardware
 show. Ideas and comments are welcome as issues.
 
-**Today (0.7.0):**
+**Today (0.7.1):**
 
 - **Host:** dashboard and plugin supervisor, signed in-app updates with rollback,
   diagnostics, plugin settings in the dashboard, update notices, an optional dashboard
-  password, an event bus for plugins, shared audio taps, plugin permissions, the
-  device's processes with their CPU and RAM, and removing rcplug from the dashboard.
+  password, an event bus for plugins, shared audio taps, plugin permissions, a plugin
+  catalog to install and remove plugins, the device's processes with their CPU and RAM,
+  and removing rcplug from the dashboard.
   - Updates download gently and show a progress bar.
 - **Console:** the whole desk in the browser, reading along on the real Duo.
   - Live meters from the mixer's memory.
@@ -59,14 +60,14 @@ The host's own features, which every plugin builds on:
 
 ## Next: the platform
 
-In this order: uninstalling from the dashboard, plugin permissions (both done), the
-plugin catalog, the Python SDK. The Pro II and flashing from macOS need hardware to
+In this order: uninstalling from the dashboard, plugin permissions, the plugin catalog
+(all three done), the Python SDK. The Pro II and flashing from macOS need hardware to
 test on.
 
 
 | Topic | What | Why |
 |---|---|---|
-| **Plugin catalog** | A signed index of known plugins: install from the dashboard, not only update. Shows author, source, size and what the plugin may do. Other catalogs can be added with their key. | Installing a plugin should not need a computer and SSH. |
+| **Plugin catalog** | **Done in 0.7.1:** the dashboard lists the plugins of signed releases (rcplug-plugins, and catalogs users add with their key) with description, size, source and permissions, installs them and removes plugins again. | Installing a plugin should not need a computer and SSH. |
 | **Plugin permissions** | **Done in 0.7.0:** the manifest declares what a plugin does (`desk:write`, `audio`, `network`, `device`) and the dashboard shows it on the plugin's card. The console takes writes only from plugins with `desk:write`, named by their token, without the PIN and whatever level the browsers have; the audio taps stream only to plugins with `audio`. | With third-party plugins, "everything runs as root and may write" is too coarse. |
 | **Uninstall from the dashboard** | **Done in 0.7.0:** *Remove rcplug* on the dashboard's System page. With it, nothing a user does needs a shell or a computer any more, except installing. | Users of a desk are podcasters, not Linux admins; no step may need a shell on the device. |
 | **Python SDK** | One file with the environment helpers, a server with the `X-Rcplug` check and a console client. The firmware ships Python 3.10. | Many makers write Python, and nothing needs to be cross-compiled. |

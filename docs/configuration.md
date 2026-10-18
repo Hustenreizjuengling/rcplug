@@ -29,6 +29,7 @@ saved as `config/console.json`, then restart the console.
 | `--low-prio` | | `true` | Run everything at nice 19 |
 | `--updates` | `RCPLUG_UPDATES` | on | Offer updates of rcplug and its plugins from signed GitHub releases; `RCPLUG_UPDATES=off` (or `0`, `false`, `no`) switches them off. See [updates.md](updates.md) |
 | `--update-repo` | `RCPLUG_UPDATE_REPO` | `Hustenreizjuengling/rcplug` | GitHub repository (`owner/name`) of rcplug's own releases |
+| | `RCPLUG_CATALOG_REPO` | `Hustenreizjuengling/rcplug-plugins` | GitHub repository of the official [plugin catalog](updates.md#plugin-catalog) |
 | | `RCPLUG_UPDATE_API` | `https://api.github.com` | GitHub API base URL, for tests and mirrors. Plain `http://` only to the loopback interface |
 | | `RCPLUG_UPDATE_KEYS` | | Release keys trusted in addition to the built-in ones (base64 Ed25519, comma-separated), for forks and tests |
 | | `RCPLUG_UPDATE_RATE` | `256` | How fast an update downloads, in KB per second (it unpacks at four times that); `0` = no limit. Keeps the device's USB audio undisturbed, see [updates.md](updates.md) |

@@ -99,7 +99,7 @@ func main() {
 		srv.AllowHosts = strings.Split(*allow, ",")
 	}
 	if *updates {
-		cfg := host.UpdateConfig{API: os.Getenv("RCPLUG_UPDATE_API"), PlatformRepo: *updRepo}
+		cfg := host.UpdateConfig{API: os.Getenv("RCPLUG_UPDATE_API"), PlatformRepo: *updRepo, CatalogRepo: os.Getenv("RCPLUG_CATALOG_REPO")}
 		if v := os.Getenv("RCPLUG_UPDATE_RATE"); v != "" { // KB per second; 0 = no limit (tests)
 			if kb, err := strconv.Atoi(v); err == nil && kb >= 0 {
 				cfg.Rate = int64(kb) << 10

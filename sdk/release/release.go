@@ -61,12 +61,88 @@ type Asset struct {
 	Kind    string `json:"kind,omitempty"`    // KindPlatform, KindPlugin or "" for other files
 	Plugin  string `json:"plugin,omitempty"`  // for KindPlugin: the plugin's name
 	Version string `json:"version,omitempty"` // for KindPlugin: the plugin's version
+	// Info is what a catalog shows about a plugin before it is installed,
+	// taken from its plugin.json (rcplug 0.7.1 and later).
+	Info *PluginInfo `json:"info,omitempty"`
+}
+
+// PluginInfo describes a plugin package for the dashboard's catalog.
+type PluginInfo struct {
+	Title        string                       `json:"title,omitempty"`
+	Description  string                       `json:"description,omitempty"`
+	Icon         string                       `json:"icon,omitempty"`
+	Permissions  []string                     `json:"permissions,omitempty"`
+	Translations map[string]map[string]string `json:"translations,omitempty"` // language → "title"/"description"
+}
+
+// Limits for PluginInfo: a catalog shows a card, not a page.
+const (
+	maxInfoTitle       = 80
+	maxInfoDescription = 600
+	maxInfoIcon        = 8
+)
+
+func clip(s string, n int) string {
+	r := []rune(strings.TrimSpace(s))
+	if len(r) > n {
+		return string(r[:n-1]) + "…"
+	}
+	return string(r)
+}
+
+// infoFrom builds a package's PluginInfo from its plugin.json.
+func infoFrom(raw []byte) *PluginInfo {
+	var pm struct {
+		Title        string                       `json:"title"`
+		Description  string                       `json:"description"`
+		Icon         string                       `json:"icon"`
+		NeedsAudio   bool                         `json:"needsAudio"`
+		Permissions  []string                     `json:"permissions"`
+		Translations map[string]map[string]string `json:"translations"`
+	}
+	if json.Unmarshal(raw, &pm) != nil {
+		return nil
+	}
+	info := &PluginInfo{Title: clip(pm.Title, maxInfoTitle), Description: clip(pm.Description, maxInfoDescription)}
+	if icon := []rune(strings.TrimSpace(pm.Icon)); len(icon) <= maxInfoIcon {
+		info.Icon = string(icon)
+	}
+	seen := map[string]bool{}
+	for _, p := range pm.Permissions {
+		if !seen[p] {
+			seen[p] = true
+			info.Permissions = append(info.Permissions, p)
+		}
+	}
+	if pm.NeedsAudio && !seen["audio"] {
+		info.Permissions = append(info.Permissions, "audio")
+	}
+	for lang, tr := range pm.Translations {
+		if !langCode.MatchString(lang) {
+			continue
+		}
+		t := map[string]string{}
+		if v := clip(tr["title"], maxInfoTitle); v != "" {
+			t["title"] = v
+		}
+		if v := clip(tr["description"], maxInfoDescription); v != "" {
+			t["description"] = v
+		}
+		if len(t) > 0 {
+			if info.Translations == nil {
+				info.Translations = map[string]map[string]string{}
+			}
+			info.Translations[lang] = t
+		}
+	}
+	return info
 }
 
 var (
 	assetName  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]*$`)
 	pluginName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 	hexSHA256  = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	langCode   = regexp.MustCompile(`^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$`)
 )
 
 // Parse reads and checks a manifest.
@@ -298,8 +374,12 @@ func classify(file string, a *Asset) error {
 		case "install.sh":
 			a.Kind = KindPlatform
 		case "plugin.json":
+			raw, err := io.ReadAll(io.LimitReader(tr, 1<<20))
+			if err != nil {
+				return fmt.Errorf("plugin.json: %w", err)
+			}
 			var pm struct{ Name, Version string }
-			if err := json.NewDecoder(io.LimitReader(tr, 1<<20)).Decode(&pm); err != nil {
+			if err := json.Unmarshal(raw, &pm); err != nil {
 				return fmt.Errorf("plugin.json: %w", err)
 			}
 			if !pluginName.MatchString(pm.Name) {
@@ -309,6 +389,7 @@ func classify(file string, a *Asset) error {
 				return fmt.Errorf("plugin.json: %w", err)
 			}
 			a.Kind, a.Plugin, a.Version = KindPlugin, pm.Name, pm.Version
+			a.Info = infoFrom(raw)
 			return nil
 		}
 	}

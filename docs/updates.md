@@ -51,6 +51,34 @@ rcplug never contacts GitHub.
 Updating from the computer with the toolkit's wizard works as before and is the way
 back after a firmware update.
 
+## Plugin catalog
+
+**Plugins → More plugins → Show the catalog** lists the plugins you can install from
+the dashboard, with their description, size, source and
+[permissions](plugin-api.md#permissions). **Install** shows the permissions once more
+and installs the plugin like an update: downloaded at the same gentle rate, checked
+against the signed `release.json`, unpacked, moved into `plugins/` and started if its
+manifest says `autostart`. Updates of it come through **System → Updates** as for every
+plugin.
+
+- **The official catalog** is the latest release of
+  [rcplug-plugins](https://github.com/Hustenreizjuengling/rcplug-plugins), signed with
+  rcplug's own keys.
+- **Other catalogs:** under *Catalogs*, add a GitHub repository (`owner/name`) and the
+  public key its releases are signed with (the content of its author's
+  `rcplug-release.pub`). That key is trusted for that repository only; a catalog whose
+  release does not verify shows the error and offers nothing. Add catalogs only from
+  people you trust: plugins run as root on the device. The list is kept in
+  `state.json`; removing a catalog leaves the plugins installed from it alone.
+- The catalog shows what each package's `plugin.json` says (title, description, icon,
+  translations, permissions), as recorded in the signed `release.json`. A package that
+  asks for a permission its catalog entry did not show is not installed.
+- **Remove…** on a plugin's card stops the plugin and deletes its directory; with the
+  box ticked, also its data, settings and log. The console belongs to rcplug and has
+  no such button.
+
+The catalog asks GitHub only when you click; with updates switched off it is off too.
+
 ## How updates are secured
 
 - Every release carries `release.json`, which lists each package with its size and
@@ -113,7 +141,10 @@ neither a draft nor a pre-release counts). Next to the packages it has:
 
 `kind` is `platform` for a package with `install.sh` at its root (rcplug itself) and
 `plugin` for one with `plugin.json` at its root; other files may be listed without a
-kind and are never installed. One release can carry several plugins, one package
+kind and are never installed. Since rcplug 0.7.1 a plugin's entry also carries `info`
+from its `plugin.json` for the [catalog](#plugin-catalog): `title`, `description`
+(shortened to 80 and 600 characters), `icon`, `permissions` (`needsAudio` counts as
+`audio`) and `translations`; older hosts ignore it. One release can carry several plugins, one package
 each; rcplugd picks the package whose `plugin` is the installed plugin's name.
 
 `cmd/rcplug-release` writes and checks all of this:
@@ -151,6 +182,12 @@ checks the signature and every file.
 
 The release workflow of rcplug-plugins (`make package sign`, then
 `rcplug-release verify`) is a complete example.
+
+A repository published this way is also a [catalog](#plugin-catalog): users add it
+with your public key and install its plugins from the dashboard. Sign with
+`rcplug-release` 0.7.1 or later, so that the catalog shows your plugins' titles,
+descriptions and permissions. To have a plugin in the official catalog, propose it to
+rcplug-plugins.
 
 ## The project's signing key
 

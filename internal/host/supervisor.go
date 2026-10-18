@@ -115,6 +115,8 @@ type Status struct {
 	Options []Option `json:"options,omitempty"`
 	// Permissions are what the plugin declares it does (permissions.go).
 	Permissions []string `json:"permissions,omitempty"`
+	// Removable: not part of rcplug's device package (catalog.go).
+	Removable bool `json:"removable"`
 }
 
 func (p *Plugin) status() Status {
@@ -131,6 +133,7 @@ func (p *Plugin) status() Status {
 		Running: st == StateRunning, PID: p.pid, Restarts: p.restarts, LastErr: p.lastErr,
 		Port: p.port, Primary: m.Primary, Order: m.Order, Icon: m.Icon, Unknown: m.Unknown,
 		Translations: m.Translations, Actions: m.Actions, Options: m.Options, Permissions: m.Permissions,
+		Removable: !platformPlugins[m.Name],
 	}
 }
 

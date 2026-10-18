@@ -6,6 +6,19 @@ may break compatibility).
 
 ## 0.7.1 - Unreleased
 
+### Added
+- **Plugin catalog** (Plugins → *More plugins*): the dashboard lists the plugins of
+  the official catalog (the latest signed release of rcplug-plugins) and of catalogs
+  users add with their public key, with description, size, source and permissions,
+  and installs them with a click: downloaded gently, verified against the signed
+  `release.json`, refused if the package asks for a permission the catalog did not
+  show. `GET /api/catalog`, `POST /api/catalog/install`, `POST /api/catalog/sources`.
+- **Remove a plugin** from its card (*Remove…*), optionally with its data, settings
+  and log. `POST /api/plugins/<name>/remove`. The console belongs to rcplug and stays.
+- `rcplug-release` records each plugin's title, description, icon, permissions and
+  translations in `release.json` (`info`), for the catalog; older hosts ignore it.
+- Events `host.plugin.installed` and `host.plugin.removed`.
+
 ## 0.7.0 - 2026-10-18
 
 ### Changed (breaking for plugins)
