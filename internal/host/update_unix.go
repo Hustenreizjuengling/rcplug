@@ -33,6 +33,15 @@ func spawnInstaller(payload, logFile, resultFile string) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	go cmd.Wait() // reap it if this process is still alive when it ends
+	setIdleIO(cmd.Process.Pid) // its copies go easy on the storage (see pace.go)
+	go cmd.Wait()              // reap it if this process is still alive when it ends
 	return nil
+}
+
+// smallReceiveBuffer caps an update connection's receive buffer at 64 KB, so
+// the network delivers a download in small pieces (see pace.go).
+func smallReceiveBuffer(network, address string, c syscall.RawConn) error {
+	return c.Control(func(fd uintptr) {
+		_ = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_RCVBUF, 64<<10)
+	})
 }

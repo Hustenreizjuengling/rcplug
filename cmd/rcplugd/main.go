@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -94,6 +95,14 @@ func main() {
 	}
 	if *updates {
 		cfg := host.UpdateConfig{API: os.Getenv("RCPLUG_UPDATE_API"), PlatformRepo: *updRepo}
+		if v := os.Getenv("RCPLUG_UPDATE_RATE"); v != "" { // KB per second; 0 = no limit (tests)
+			if kb, err := strconv.Atoi(v); err == nil && kb >= 0 {
+				cfg.Rate = int64(kb) << 10
+				if kb == 0 {
+					cfg.Rate = -1
+				}
+			}
+		}
 		// Extra keys are for forks and tests; rcplugd.env is root's file.
 		for _, k := range strings.Split(os.Getenv("RCPLUG_UPDATE_KEYS"), ",") {
 			if strings.TrimSpace(k) == "" {

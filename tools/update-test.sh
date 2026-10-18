@@ -61,6 +61,7 @@ run() {
 RCPLUG_UPDATE_API=http://127.0.0.1:$GHPORT
 RCPLUG_UPDATE_REPO=tester/rcplug
 RCPLUG_UPDATE_KEYS=$(cat "$W/keys/rcplug-release.pub")
+RCPLUG_UPDATE_RATE=2048
 EOF
   "$SB/initd/rcplug" restart >/dev/null
   wait_version 0.8.0

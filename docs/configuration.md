@@ -30,6 +30,7 @@ saved as `config/console.json`, then restart the console.
 | `--update-repo` | `RCPLUG_UPDATE_REPO` | `Hustenreizjuengling/rcplug` | GitHub repository (`owner/name`) of rcplug's own releases |
 | | `RCPLUG_UPDATE_API` | `https://api.github.com` | GitHub API base URL, for tests and mirrors. Plain `http://` only to the loopback interface |
 | | `RCPLUG_UPDATE_KEYS` | | Release keys trusted in addition to the built-in ones (base64 Ed25519, comma-separated), for forks and tests |
+| | `RCPLUG_UPDATE_RATE` | `256` | How fast an update downloads, in KB per second (it unpacks at four times that); `0` = no limit. Keeps the device's USB audio undisturbed, see [updates.md](updates.md) |
 | `--diagnostics FILE` | | | Write a diagnostics zip (`-` = stdout) and exit: from the running host if it answers at `--addr`, otherwise from the files on disk |
 | `--call "METHOD /path"` | | | Call the running host's API (e.g. `POST /api/reload`) and print the answer, then exit; for scripts on the device. Exit status 0 on success, 1 on an error answer, 2 on a bad call |
 | `--check` | | | Print whether the host answers and the problems found in the logs, then exit (used by the wizard) |

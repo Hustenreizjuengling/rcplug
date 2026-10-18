@@ -70,7 +70,8 @@ func (c *Console) runMeters(ctx context.Context) {
 			}
 		}
 		live := err == nil
-		if c.meters.live.Swap(live) != live || !c.meters.logged.Swap(true) {
+		first := !c.meters.logged.Swap(true)
+		if c.meters.live.Swap(live) != live || first {
 			if live {
 				c.opts.Logf("console: reading meters from the mixer's shared memory")
 			} else {

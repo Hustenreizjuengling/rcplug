@@ -16,7 +16,8 @@ import (
 // stay inside dst, and the unpacked size is bounded: a package is checked
 // against its signed SHA-256 before, but this keeps a mistake in a release
 // from writing anywhere else.
-func extractTarGz(file, dst string, maxTotal int64) error {
+func extractTarGz(file, dst string, maxTotal, rate int64) error {
+	p := newPacer(rate)
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -68,7 +69,7 @@ func extractTarGz(file, dst string, maxTotal int64) error {
 			if err != nil {
 				return err
 			}
-			_, err = io.Copy(out, io.LimitReader(tr, h.Size))
+			_, err = io.Copy(&pacedFile{f: out, p: p, syncEvery: 256 << 10}, io.LimitReader(tr, h.Size))
 			if cerr := out.Close(); err == nil {
 				err = cerr
 			}

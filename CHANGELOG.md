@@ -6,6 +6,16 @@ may break compatibility).
 
 ## 0.6.5 - Unreleased
 
+### Fixed
+- **Updates no longer disturb USB audio** (to be confirmed on the device): during an
+  update the computer lost the Duo as a sound device. The kernel log shows its USB
+  interface stalling while the package was being downloaded and unpacked; the network,
+  the storage and the USB audio share the interrupt handling at the same real-time
+  priority. Updates now download at 256 KB per second with a small receive buffer,
+  unpack at 1 MB per second, write in small flushed pieces and run at the lowest I/O
+  priority (`RCPLUG_UPDATE_RATE`). This applies to updates installed by 0.6.5 and later.
+- The console logged the start of the meters twice.
+
 ## 0.6.4 - 2026-10-18
 
 ### Added

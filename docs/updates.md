@@ -32,6 +32,12 @@ Requirements:
   network comes up.
 - Free storage of about three times the package size plus 20 MB.
 
+An update goes easy on the device: it downloads at 256 KB per second (a package of
+8 MB takes about half a minute), unpacks at 1 MB per second and writes to the storage
+in small pieces at the lowest I/O priority. On a Duo, a download at full speed
+disturbed the USB audio to the computer, which then lost the Duo as a sound device
+until it was unplugged (`RCPLUG_UPDATE_RATE` changes the rate).
+
 To switch updates off, put `RCPLUG_UPDATES=off` into `config/rcplugd.env` and restart
 rcplug (see [configuration.md](configuration.md)). The dashboard then offers none, and
 rcplug never contacts GitHub.

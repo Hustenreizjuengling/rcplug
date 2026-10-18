@@ -400,7 +400,7 @@ func TestExtractRejectsEscapes(t *testing.T) {
 		gz.Close()
 		file := filepath.Join(t.TempDir(), "p.tar.gz")
 		os.WriteFile(file, buf.Bytes(), 0o644)
-		if err := extractTarGz(file, filepath.Join(t.TempDir(), "out"), 1<<20); err == nil {
+		if err := extractTarGz(file, filepath.Join(t.TempDir(), "out"), 1<<20, 0); err == nil {
 			t.Errorf("%s: extracted", name)
 		}
 	}

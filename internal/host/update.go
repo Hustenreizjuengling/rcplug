@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -51,7 +52,14 @@ type UpdateConfig struct {
 	PlatformRepo string              // owner/name of rcplug's repository (default DefaultUpdateRepo)
 	ExtraKeys    []ed25519.PublicKey // trusted in addition to the built-in release keys
 	Client       *http.Client        // nil: a client with timeouts
+	// Rate limits how fast an update downloads (bytes per second); it
+	// unpacks at four times that. 0 = DefaultUpdateRate, negative = no limit.
+	Rate int64
 }
+
+// DefaultUpdateRate keeps a download of a few megabytes gentle on the device
+// (see pace.go): an 8 MB package takes about half a minute.
+const DefaultUpdateRate = 256 << 10
 
 // Updater checks for and installs updates.
 type Updater struct {
@@ -159,7 +167,18 @@ func NewUpdater(m *Manager, version string, cfg UpdateConfig) *Updater {
 	}
 	u.keys = append(u.keys, cfg.ExtraKeys...)
 	if cfg.Client == nil {
-		u.cfg.Client = &http.Client{Timeout: 10 * time.Minute}
+		// A small receive buffer keeps the network from delivering a
+		// download in large bursts (see pace.go).
+		d := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Control: smallReceiveBuffer}
+		tr := http.DefaultTransport.(*http.Transport).Clone()
+		tr.DialContext = d.DialContext
+		u.cfg.Client = &http.Client{Timeout: 10 * time.Minute, Transport: tr}
+	}
+	switch {
+	case u.cfg.Rate == 0:
+		u.cfg.Rate = DefaultUpdateRate
+	case u.cfg.Rate < 0:
+		u.cfg.Rate = 0
 	}
 	c := *u.cfg.Client
 	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
@@ -454,7 +473,8 @@ func (u *Updater) download(ctx context.Context, raw, dst string, a release.Asset
 		return err
 	}
 	h := sha256.New()
-	n, err := io.Copy(io.MultiWriter(out, h), io.LimitReader(resp.Body, a.Size+1))
+	body := &pacedReader{r: io.LimitReader(resp.Body, a.Size+1), p: newPacer(u.cfg.Rate)}
+	n, err := io.Copy(io.MultiWriter(&pacedFile{f: out, p: newPacer(0), syncEvery: 256 << 10}, h), body)
 	if cerr := out.Close(); err == nil {
 		err = cerr
 	}
@@ -493,7 +513,12 @@ func (u *Updater) Install(target string) error {
 }
 
 func (u *Updater) run(j *updateJob, fu *foundUpdate) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	// This goroutine's thread reads and writes at the lowest I/O priority;
+	// it stays locked, so the thread ends with the goroutine and the
+	// priority goes nowhere else.
+	runtime.LockOSThread()
+	idleIO()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 	state, err := u.install(ctx, j, fu)
 	if err != nil {
@@ -533,7 +558,7 @@ func (u *Updater) install(ctx context.Context, j *updateJob, fu *foundUpdate) (s
 
 func (u *Updater) installPlatform(j *updateJob, fu *foundUpdate, dir, pkg string) (string, error) {
 	payload := filepath.Join(dir, "payload")
-	if err := extractTarGz(pkg, payload, maxUnpacked); err != nil {
+	if err := extractTarGz(pkg, payload, maxUnpacked, 4*u.cfg.Rate); err != nil {
 		return "", err
 	}
 	_ = os.Remove(pkg)
@@ -566,7 +591,7 @@ func (u *Updater) installPlugin(j *updateJob, fu *foundUpdate, dir, pkg string) 
 	if err := os.MkdirAll(filepath.Dir(staged), 0o755); err != nil {
 		return err
 	}
-	if err := extractTarGz(pkg, staged, maxUnpacked); err != nil {
+	if err := extractTarGz(pkg, staged, maxUnpacked, 4*u.cfg.Rate); err != nil {
 		return err
 	}
 	man, err := LoadManifest(staged)
