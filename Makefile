@@ -21,7 +21,7 @@ LOCAL_MIXER ?= 127.0.0.1:2345
 # Extra plugin directories for run-local, e.g. EXTRA_PLUGINS=../my-plugin
 EXTRA_PLUGINS ?=
 
-.PHONY: help all check fmt fmt-check vet lint test test-race test-arm64 fuzz web-test update-test install-test sign docs-check \
+.PHONY: help all check fmt fmt-check vet lint test test-race test-arm64 test-root fuzz web-test update-test install-test sign docs-check \
         build build-arm64 build-host examples package package-host run-local sim clean
 
 help: ## show this help
@@ -51,6 +51,11 @@ test-race: ## unit tests with the race detector
 
 test-arm64: ## unit tests as arm64 binaries under qemu-user (needs qemu-aarch64)
 	CGO_ENABLED=0 GOARCH=arm64 $(GO) test -exec qemu-aarch64 ./...
+
+test-root: ## the tests that need root (reading along on lo), run with sudo
+	@tmp="$$(mktemp -d)"; trap 'rm -rf "$$tmp"' EXIT; set -e; \
+	$(GO) test -c -o "$$tmp/desk.test" ./internal/desk; \
+	sudo "$$tmp/desk.test" -test.run 'OnLoopback' -test.count=1 -test.v
 
 fuzz: ## fuzz the protocol decoder for 30 s
 	$(GO) test -run '^$$' -fuzz FuzzDecodeChange -fuzztime 30s ./internal/rcproto

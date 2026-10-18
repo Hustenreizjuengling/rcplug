@@ -478,6 +478,37 @@ func TestPanelAndScreenRotationAreSettings(t *testing.T) {
 	}
 }
 
+// Reading along: the status says so, and "read the state again" restarts
+// the device's screen (at most every 10 s); connected, there is nothing to
+// restart.
+func TestResyncRestartsTheScreenWhileReadingAlong(t *testing.T) {
+	calls := 0
+	old := restartScreen
+	restartScreen = func() error { calls++; return nil }
+	defer func() { restartScreen = old }()
+	client := desk.NewClient(desk.Config{Addr: "127.0.0.1:2345", Mode: "tap", Logf: quiet}, desk.NewMirror())
+	hs := httptest.NewServer(sdk.CSRF(New(Options{Client: client, Logf: quiet}).Handler()))
+	defer hs.Close()
+	r := &rig{http: hs}
+	if st := r.do(t, http.MethodGet, "/api/status", nil); st.body["passive"] != true {
+		t.Fatalf("status: %s", st.raw)
+	}
+	if res := r.post(t, "/api/resync", map[string]string{}); res.code != 200 || calls != 1 {
+		t.Fatalf("resync: %d %s (calls %d)", res.code, res.raw, calls)
+	}
+	if res := r.post(t, "/api/resync", map[string]string{}); res.code != 429 || calls != 1 {
+		t.Fatalf("second resync: %d %s (calls %d)", res.code, res.raw, calls)
+	}
+
+	connected := newRig(t, rcsim.Options{})
+	if res := connected.post(t, "/api/resync", map[string]string{}); res.code != 409 || res.body["code"] != "not_passive" {
+		t.Fatalf("resync while connected: %d %s", res.code, res.raw)
+	}
+	if st := connected.do(t, http.MethodGet, "/api/status", nil); st.body["passive"] != false {
+		t.Fatalf("connected status: %s", st.raw)
+	}
+}
+
 func TestUntestedModelIsReadOnly(t *testing.T) {
 	root, _ := rcsim.DuoTree()
 	rcsim.MakeRealistic(root)

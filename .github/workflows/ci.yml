@@ -28,6 +28,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: gofmt, vet, race tests, web tests, shellcheck, doc links
         run: make check
+      - name: Tests that need root (reading along on the loopback interface)
+        run: make test-root
 
   minimum-go:
     name: Tests with the minimum Go version (go.mod)

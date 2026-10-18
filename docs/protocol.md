@@ -29,6 +29,21 @@ What the server does, read from `rc_audio_mixer` in firmware 1.7.6 and 1.7.3
   the binary cannot emit the signals its interface declares, and the methods that
   would return the tree are commented out in it.
 
+## Reading along
+
+Because the mixer serves one client and the screen holds it, the console on the
+device does not connect. It opens a packet socket on the loopback interface with a
+kernel filter for the mixer's port, puts both directions of the screen's TCP
+connection back together and applies the messages: from the mixer the full sync and
+every change, from the screen every change it sends (the mixer does not echo them;
+a full sync from the screen's side is ignored). It never sends anything. Lost
+packets, a lost frame boundary or the end of the connection mark the mirror stale
+until the screen connects again; the console's *Read the state again* restarts the
+screen app for that (`rc_gui_juce`, which RØDE's `display-start.sh` starts again
+within about three seconds). Implemented in
+[`internal/desk/tap.go`](../internal/desk/tap.go), tested against the simulator on the
+loopback interface (`make test-root`).
+
 ## Transport
 
 Both directions use the same frame:

@@ -16,7 +16,8 @@ and the plugins ([device-notes.md](device-notes.md#first-test-on-a-real-duo)).
 1. **The console on a single-client mixer.** On the real Duo the mixer serves one
    client and the device's screen holds it. Plan: (a) a mirror that reads the
    screen's connection alongside it on the loopback interface, without being a
-   client, started before the screen at boot (read-only, cannot disturb the desk);
+   client, started before the screen at boot (read-only, cannot disturb the desk):
+   **implemented in 0.6.0**, to be confirmed on hardware;
    (b) control through the front-panel emulation (mute, listen, pads, pages, the
    wheel), whose effect the mirror then shows: **works since 0.5.1/0.5.2** on the
    *Display* page, together with the screen mirror; (c) later and experimental, a

@@ -16,7 +16,7 @@ everything below.
 | Topic | What the firmware has | Used by |
 |---|---|---|
 | CPU and OS | Amlogic AXG (A113D), 4× Cortex-A53, aarch64; Yocto (Poky), kernel 5.10.17 with PREEMPT_RT | static arm64 builds |
-| Init system | SysV init, runlevel 5; `/etc/init.d`, Yocto's `update-rc.d`, BusyBox `start-stop-daemon` | installer (autostart `S20rcplug`) |
+| Init system | SysV init, runlevel 5; `/etc/init.d`, Yocto's `update-rc.d`, BusyBox `start-stop-daemon` | installer (autostart `S05rcplug`, before RØDE's screen `S06rode-display-service`; `S20` before 0.6) |
 | Shell tools | `/bin/sh` is bash; GNU coreutils, sed, grep, gawk, findutils; BusyBox 1.35 for `tar`, `ip`, `wget`, `nc` | installer, init and device scripts stay POSIX sh |
 | Storage | only the root partition (ext4, rw, A/B: `mmcblk1p1`/`p2`) and RØDE's own vfat partitions `/Application/update-staging` and `/Application/emmc-data`; a firmware update writes a fresh root partition | installer: `/usr/local/rcplug`, removed by a firmware update |
 | Access | OpenSSH: root login with a key only (`PasswordAuthentication no`, root's password is RØDE's); `authorized_keys` is empty in the stock image, so you add your key to the firmware once ([enable-ssh.md](https://github.com/Hustenreizjuengling/rcplug-toolkit/blob/main/docs/enable-ssh.md)). No firewall rules. rcplug ships no credentials. | wizard, setup |
@@ -68,8 +68,10 @@ from Windows to a patched 1.7.6):
   ([protocol.md](protocol.md)) and the screen holds it, so the console's connection is
   refused. Its boot grace kept it from taking the screen's place at boot; it now shows
   *busy* and does not retry by itself. The mixer's D-Bus object is no way around this.
-  The console is being reworked to read the screen's connection alongside it and to
-  operate the desk through the front panel ([roadmap](roadmap.md)).
+  Since 0.6 the console reads the screen's connection along instead
+  ([protocol.md](protocol.md#reading-along)) and operates the desk through the front
+  panel; reading along is tested against the simulator and still to be confirmed on
+  the device.
 - **The front-panel emulation works**: injecting *Listen 1* (`b0 19 00`, 50 ms,
   `b0 19 01` into `/dev/ttyAML3` with `TIOCSTI`) toggled it exactly like the button,
   LED included, and a second press turned it off again. It needs no connection to the

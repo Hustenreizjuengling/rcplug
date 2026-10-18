@@ -7,7 +7,7 @@ import { store, on, single, val, isLoading } from './store.js';
 import { setCapabilities, controlLevel } from './policy.js';
 import { createScope } from './scope.js';
 import { confirmDialog } from './dialogs.js';
-import { setControl, reconnect, request } from './api.js';
+import { setControl, reconnect, resync, request } from './api.js';
 import { liveState } from './live.js';
 import { views } from './views/index.js';
 
@@ -68,6 +68,14 @@ function banners() {
   const st = liveState.status;
   const conn = st && st.connection;
   if (conn && conn.state !== 'live') out.push(h('div', { class: 'banner' + (conn.state === 'conflict' ? ' bad' : ''), role: 'status' }, connText(conn), store.loaded ? ' – ' + t('banner.lastKnown') : ''));
+  // Reading along: the whole state comes only when the device's screen
+  // connects; restarting the screen brings it.
+  if (conn && conn.mode === 'tap' && conn.state === 'waiting') {
+    out.push(h('div', { class: 'banner info' }, t('banner.tapWaiting'), ' ',
+      h('button', { class: 'btn small', type: 'button', onclick: resyncNow }, t('banner.tapResync'))));
+  } else if (conn && conn.mode === 'tap' && conn.state === 'live' && current.id !== 'display') {
+    out.push(h('div', { class: 'banner info' }, t('banner.tapLive'), ' ', h('a', { href: '#display' }, t('banner.busyLink'))));
+  }
   // Busy: the device's screen holds the mixer, but its buttons still work.
   if (conn && conn.code === 'desk_busy' && current.id !== 'display') out.push(h('div', { class: 'banner info' }, t('banner.busyHint'), ' ', h('a', { href: '#display' }, t('banner.busyLink'))));
   else if (store.stale) out.push(h('div', { class: 'banner', role: 'status' }, t('banner.lastKnown')));
@@ -79,8 +87,11 @@ function banners() {
 
 export function connText(c) {
   switch (c.state) {
-    case 'live': return t('state.live');
-    case 'waiting': return t('state.waitingN', { n: Math.ceil(c.waitSeconds || 0) });
+    case 'live': return c.mode === 'tap' ? t('state.liveTap') : t('state.live');
+    case 'waiting':
+      if (c.code === 'tap_waiting') return t('state.tapWaiting');
+      if (c.code === 'tap_lost') return t('state.tapLost');
+      return t('state.waitingN', { n: Math.ceil(c.waitSeconds || 0) });
     case 'backoff': return t('state.backoff') + (c.nextRetrySeconds ? ' – ' + t('state.retryIn', { n: Math.ceil(c.nextRetrySeconds) }) : '') + (c.code ? ' (' + t('code.' + c.code) + ')' : '');
     case 'conflict': return t('state.conflict');
     default: return t('state.' + c.state);
@@ -94,7 +105,7 @@ export function renderHeader() {
   const live = liveState.open && conn && conn.state === 'live';
   pill.className = 'conn ' + (!liveState.open ? 'bad' : !conn ? '' : live ? 'live' : conn.state === 'conflict' ? 'bad' : 'warn');
   // The banner explains a conflict at length; the pill stays short.
-  $('.txt', pill).textContent = !liveState.open ? t('header.offline') : !conn ? '…' : live ? t('header.live', { n: (conn.changesPerSecond || 0).toFixed(0) })
+  $('.txt', pill).textContent = !liveState.open ? t('header.offline') : !conn ? '…' : live ? t(conn.mode === 'tap' ? 'header.liveTap' : 'header.live', { n: (conn.changesPerSecond || 0).toFixed(0) })
     : conn.state === 'conflict' ? t('code.guard_conflict') : connText(conn);
   // Without a live connection the meters would freeze at their last levels.
   document.body.classList.toggle('notlive', !live);
@@ -125,6 +136,11 @@ export function renderHeader() {
     lastState = conn.state;
     if (was && (was === 'live' || conn.state === 'live')) render();
   }
+}
+
+async function resyncNow() {
+  if (!(await confirmDialog(t('banner.tapResyncConfirm'), t('banner.tapResync')))) return;
+  resync(t('banner.tapResyncOk'));
 }
 
 async function reconnectNow() {

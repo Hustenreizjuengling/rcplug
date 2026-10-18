@@ -19,7 +19,14 @@ This page explains each safeguard and its limits.
 The touch screen is a client of the same control port the console uses, and the
 firmware serves **one client at a time** (1.7.3 and 1.7.6, seen on a real Duo; see
 [protocol.md](protocol.md)): while the screen is connected nobody else gets in, and a
-client that connects before the screen would lock it out. So the console:
+client that connects before the screen would lock it out. On a RØDECaster the console
+therefore **does not connect at all**: it reads along with the screen's connection
+(`--desk-mode auto`, see [protocol.md](protocol.md#reading-along)), which cannot
+disturb it, and changes the desk only through the front panel. *Read the state
+again* restarts the screen app once (about three seconds; RØDE's own scripts restart
+it the same way, and the mixer keeps running); it is rate-limited and needs the PIN
+if one is set. Where the console does connect (`--desk-mode connect`, e.g. through a
+tunnel), it:
 
 1. **never retries a busy desk by itself**: when the port refuses connections while
    another client holds it, the console shows *busy* (`desk_busy`, naming the

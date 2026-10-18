@@ -24,10 +24,10 @@ dazu ein [Kochbuch](docs/cookbook.md) und die [Schnittstellen-Referenz](docs/plu
 > arm64-Programmen unter QEMU und installiert in die Original-Firmware 1.7.6 und 1.7.3.
 > **Erster Test an einem echten Duo (Firmware 1.7.6):** Flashen, SSH, Installer,
 > In-App-Updates, Dashboard und Plugins funktionieren, und die Konsole bedient das
-> Pult über seine Tasten und zeigt seinen Bildschirm. Ihr vollständiges Abbild des Pults
-> kommt noch nicht ans Mischpult: Es bedient nur einen Client gleichzeitig, und den
-> belegt der Bildschirm des Geräts; das wird umgebaut
-> ([docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo), Englisch). Die
+> Pult über seine Tasten und zeigt seinen Bildschirm. Das Mischpult bedient nur einen
+> Client gleichzeitig, und den belegt der Bildschirm des Geräts; seit 0.6 liest die
+> Konsole diese Verbindung mit, um das ganze Pult abzubilden (am Gerät noch zu
+> bestätigen; [docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo), Englisch). Die
 > Konsole nimmt dem Bildschirm nie den Platz weg. Nach der Installation ist sie nur lesend.
 >
 > rcplug steht in keiner Verbindung zu RØDE. Nutzung auf eigene Gefahr; bitte den
@@ -52,7 +52,7 @@ einsetzen, die nicht ausfallen darf.
 
 | Gerät | Stand |
 |---|---|
-| RØDECaster Duo, Firmware 1.7.x | Läuft auf einem echten Duo (1.7.6): Host, Dashboard, In-App-Updates und Plugins; die Konsole bedient die Tasten des Geräts und spiegelt seinen Bildschirm. Ihr Abbild des ganzen Pults kommt noch nicht ans Mischpult (es bedient nur den Bildschirm des Geräts); wird umgebaut. |
+| RØDECaster Duo, Firmware 1.7.x | Läuft auf einem echten Duo (1.7.6): Host, Dashboard, In-App-Updates und Plugins; die Konsole bedient die Tasten des Geräts und spiegelt seinen Bildschirm. Seit 0.6 liest die Konsole mit, was der Bildschirm des Geräts bekommt, und zeigt das ganze Pult (am Gerät noch zu bestätigen). |
 | RØDECaster Pro II | Wird erkannt und **nur lesend** angezeigt. Steuerung braucht ein geprüftes Profil, siehe [docs/adding-a-model.md](docs/adding-a-model.md). |
 | Andere / unbekannt | Nur lesend. |
 

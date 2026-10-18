@@ -114,14 +114,20 @@ something need the header `X-Rcplug: 1`.
 
 The data flow:
 
-1. `desk.Client` connects to `127.0.0.1:2345` and receives a **full sync**: the whole
-   tree (on the Duo about 870 nodes with 6900 properties).
+1. `desk.Client` receives a **full sync**: the whole tree (on the Duo about 870 nodes
+   with 6900 properties). On a RØDECaster the mixer serves one client, the device's
+   own screen, so the client **reads along** with the screen's connection on the
+   loopback interface (`internal/desk/tap.go`) and never connects; the full sync comes
+   when the screen connects (rcplug starts before it at boot). Against the simulator
+   or through an SSH tunnel it connects to the port itself.
 2. Every later message is a small change (property changed, child added, …). The
    client applies it to the `desk.Mirror`.
 3. Every 60 ms the console sends the changes collected since the last batch to all
    browsers over Server-Sent Events, keeping only the latest value per property.
 4. A write from the browser is checked by the policy, sent to the desk and applied to
-   the mirror at once (the desk does not echo a client's own writes).
+   the mirror at once (the desk does not echo a client's own writes). Reading along
+   cannot write: there the device is operated through its front panel (buttons,
+   wheel, pads), whose effect the mirror then shows.
 
 Structural changes (a show is loaded, a pad added) change the tree's **epoch**. Paths
 are child indices, so a write carries the epoch it was computed against and is refused

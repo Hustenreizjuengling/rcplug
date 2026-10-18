@@ -45,6 +45,7 @@ saved as `config/console.json`, then restart the console.
 | `--read-only` | off | Refuse every write, whatever the control level |
 | `--allow-untested-model` | off | Offer control on models without a verified profile |
 | `--guard` | on | The GUI guard, see [safety.md](safety.md) |
+| `--desk-mode` | `auto` | How the console gets the state: `tap` reads along with the device's screen (needs root; no writes, control through the front panel), `connect` is a client of the mixer's port, `auto` reads along on a RØDECaster (where `/usr/bin/rc_audio_mixer` exists and the mixer is local) and connects anywhere else (the simulator, an SSH tunnel) |
 | `--boot-grace` | `75s` | Wait until the system has been up this long before connecting (only with the guard on and a desk on this machine, where the device's own screen may still be connecting) |
 | `--handshake` | `auto` | Session-open message: `auto` (only if no full sync arrives within 3 s), `always`, `never` |
 | `--screen` | `auto` | Screen mirror source: `auto`, `fb`, `drm` or `off`. Users still have to switch it on. |

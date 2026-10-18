@@ -4,7 +4,24 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.5.3 - Unreleased
+## 0.6.0 - Unreleased
+
+### Added
+- **The console reads along.** On a RØDECaster the mixer serves one client, the
+  device's screen, so the console no longer connects: it reads the screen's
+  connection on the loopback interface (a packet socket with a kernel filter, both
+  TCP directions reassembled) and mirrors the whole desk from it, without ever
+  sending anything. Changes go through the device buttons on the *Display* page. The
+  state comes with the screen's connection: rcplug now starts before the screen at
+  boot (`S05`, existing installs are moved from `S20`), and *Read the state again*
+  restarts the screen app (about three seconds) when it was missed, e.g. after an
+  update of rcplug. `--desk-mode auto|tap|connect` (default `auto`: reading along on
+  a RØDECaster, connecting to the simulator or through a tunnel).
+- `make test-root` (also in CI): reading along on the real loopback interface,
+  against the simulator.
+
+### Changed
+- The init script does not wait for rcplugd at boot, so RØDE's screen is not delayed.
 
 ## 0.5.2 - 2026-10-18
 

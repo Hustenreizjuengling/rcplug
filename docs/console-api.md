@@ -37,7 +37,9 @@ Responses are JSON, except the screen images. Errors look like `{"error": "human
 
 | Field | Meaning |
 |---|---|
-| `connection.state` | `waiting` (boot grace), `connecting`, `syncing`, `live`, `backoff` (retrying), `conflict` (the GUI guard stepped back, see [safety.md](safety.md)), `stopped` |
+| `connection.state` | `waiting` (boot grace; or, reading along, waiting for a full sync: `code` `tap_waiting` or `tap_lost`), `connecting`, `syncing`, `live`, `backoff` (retrying; `tap_failed` if reading along is impossible, e.g. without root), `conflict` (the GUI guard stepped back, see [safety.md](safety.md)), `stopped` |
+| `connection.mode` | `tap` (reading along with the device's screen) or `connect` |
+| `passive` | `true` while reading along: the tree cannot be written (`meta.control.writable` is empty), the front panel can |
 | `control` | The current control level: `off`, `basic` or `expert` |
 | `controlLimit` | Why control is limited even if a level is set: `read_only` (started with `--read-only`), `untested_model` (no verified profile), or empty |
 | `epoch` | Changes whenever the tree's structure changes (it starts at a random value; the examples here use 1). Writes must carry it. |
@@ -157,6 +159,7 @@ Every write:
 | `api/settings` | `{"screen": true}`, `{"screenRotate": "auto"}`, `{"panel": true}` | Switches the screen mirror on or off; turns its picture (`auto`: a portrait buffer such as the Duo's becomes landscape, or `0`, `90`, `180`, `270` degrees clockwise); switches the front-panel emulation on or off. Saved across restarts. |
 | `api/pin` | `{"current", "new"}` | Sets, changes (`current` required) or removes (`new: ""`) the PIN |
 | `api/reconnect` | `{}` | Reconnects to the desk, also after the GUI guard stepped back. At most every 10 s. |
+| `api/resync` | `{}` | Reading along only: restarts the device's screen app, whose new connection brings a full sync. At most every 10 s. |
 | `api/panel` | `{"control", "value"}` | Experimental front-panel emulation; needs it switched on (`api/settings` or `--panel`) and the expert level |
 
 A **marker** is `api/set` on `RECORDER.requestDropMarker` with the current time in

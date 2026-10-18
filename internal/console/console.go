@@ -195,6 +195,7 @@ func (c *Console) statusDoc() map[string]interface{} {
 		"pinRequired":  c.pin.set(),
 		"screen":       screen,
 		"panel":        panel,
+		"passive":      c.client.Passive(),
 		"version":      c.opts.Version,
 	}
 	c.mirror.View(func(s desk.Snapshot) {

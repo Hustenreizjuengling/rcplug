@@ -189,9 +189,13 @@ find "$DIR/plugins" -type f -name '*.sh' -exec chmod 0755 {} + 2>/dev/null || tr
 chmod 0755 "$STAGE/initd"
 mv -f "$STAGE/initd" "$INITDIR/rcplug" || fail "installing the init script failed"
 
-# Register for autostart (skipped in a test sandbox).
+# Register for autostart (skipped in a test sandbox): start 05, before RØDE's
+# screen (S06rode-display-service), so the console reads along from the
+# screen's first connection to the mixer; stop 20. Earlier versions used
+# S20, so the old links go first.
 if [ -z "${RCPLUG_INITDIR:-}" ] && command -v update-rc.d >/dev/null 2>&1; then
-  update-rc.d rcplug defaults >/dev/null 2>&1 || true
+  update-rc.d -f rcplug remove >/dev/null 2>&1 || true
+  update-rc.d rcplug defaults 05 20 >/dev/null 2>&1 || true
 fi
 
 if ! "$INITDIR/rcplug" start; then

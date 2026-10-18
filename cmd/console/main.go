@@ -37,6 +37,7 @@ func main() {
 		bootGrace = flag.Duration("boot-grace", 75*time.Second, "wait until the system is up this long before connecting")
 		readOnly  = flag.Bool("read-only", false, "hard-disable all writes (overrides the UI setting)")
 		handshake = flag.String("handshake", "auto", "session-open handshake: auto (only if the desk stays silent) | always | never")
+		deskMode  = flag.String("desk-mode", "auto", "how to get the desk state: auto (read along with the device's screen on a RØDECaster, whose mixer serves one client; connect elsewhere) | tap | connect")
 		untested  = flag.Bool("allow-untested-model", false, "offer control on models without a verified profile (e.g. Pro II)")
 		screenSrc = flag.String("screen", "auto", "screen mirror source: auto (DRM first, then the framebuffer) | fb | drm | off (users must still enable it in the UI)")
 		fbDev     = flag.String("fb", "/dev/fb0", "framebuffer device for the screen mirror")
@@ -80,7 +81,7 @@ func main() {
 	}
 
 	client := desk.NewClient(desk.Config{
-		Addr: *deskAddr, Guard: *guard, BootGrace: *bootGrace, ReadOnly: *readOnly, Handshake: *handshake,
+		Addr: *deskAddr, Guard: *guard, BootGrace: *bootGrace, ReadOnly: *readOnly, Handshake: *handshake, Mode: *deskMode,
 	}, desk.NewMirror())
 	// Started by rcplugd, settings and the PIN live in the plugin's data
 	// directory. Run standalone (e.g. go run ./cmd/console --sim) they stay in

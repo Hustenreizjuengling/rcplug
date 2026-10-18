@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -48,8 +49,18 @@ type Config struct {
 	// "auto" sends it once if the desk stays silent after connecting (TCP
 	// normally needs none), "always" sends it right away, "never" disables it.
 	Handshake string
-	Logf      func(format string, args ...interface{})
+	// Mode is how the client gets the state: "connect" (a client of the
+	// mixer's port), "tap" (read along with the device's screen, see tap.go)
+	// or "auto": tap on a RØDECaster, whose mixer serves one client (the
+	// screen), connect anywhere else (the simulator, an SSH tunnel). Empty is
+	// "connect".
+	Mode string
+	Logf func(format string, args ...interface{})
 }
+
+// rodeMixer is the mixer's binary on a RØDECaster; "auto" reads along where it
+// exists.
+var rodeMixer = "/usr/bin/rc_audio_mixer"
 
 // Stats are cumulative counters for diagnostics.
 type Stats struct {
@@ -74,7 +85,8 @@ type Status struct {
 	LiveSeconds float64 `json:"liveSeconds"`
 	NextRetry   float64 `json:"nextRetrySeconds,omitempty"`
 	Wait        float64 `json:"waitSeconds,omitempty"` // boot grace remaining
-	Guard       string  `json:"guard"`                 // off | active | unavailable | remote
+	Guard       string  `json:"guard"`                 // off | active | unavailable | remote | passive
+	Mode        string  `json:"mode"`                  // connect | tap
 	ReadOnly    bool    `json:"readOnly"`
 	Rate        float64 `json:"changesPerSecond"`
 	Stats       Stats   `json:"stats"`
@@ -112,6 +124,7 @@ type Client struct {
 	retryAt   time.Time
 	waitUntil time.Time
 	guardMode string
+	mode      string // connect | tap
 	stats     Stats
 	onStatus  func(Status)
 
@@ -137,9 +150,25 @@ func NewClient(cfg Config, mirror *Mirror) *Client {
 		cfg.Logf = log.Printf
 	}
 	c := &Client{cfg: cfg, mirror: mirror, state: StateStopped, since: time.Now(), kick: make(chan struct{}, 1)}
+	c.mode = "connect"
+	switch cfg.Mode {
+	case "tap":
+		c.mode = "tap"
+	case "auto":
+		if _, err := os.Stat(rodeMixer); err == nil && isLocalAddr(cfg.Addr) {
+			c.mode = "tap"
+		}
+	}
 	c.guardMode = c.computeGuardMode()
+	if c.mode == "tap" {
+		c.guardMode = "passive" // it never connects, so it cannot push anyone out
+	}
 	return c
 }
+
+// Passive reports whether the client reads along instead of connecting: it
+// mirrors the desk but cannot write to it.
+func (c *Client) Passive() bool { return c.mode == "tap" }
 
 // ReadOnly reports whether writes are hard-disabled.
 func (c *Client) ReadOnly() bool { return c.cfg.ReadOnly }
@@ -234,7 +263,7 @@ func (c *Client) Status() Status {
 	st := Status{
 		State: c.state, Addr: c.cfg.Addr, Code: c.code, Error: c.lastErr,
 		Since: c.since.Format(time.RFC3339), Guard: c.guardMode,
-		ReadOnly: c.cfg.ReadOnly, Rate: rate, Stats: c.stats,
+		ReadOnly: c.cfg.ReadOnly, Rate: rate, Stats: c.stats, Mode: c.mode,
 	}
 	switch c.state {
 	case StateLive:
@@ -268,6 +297,10 @@ func (c *Client) Reconnect() {
 
 // Run maintains the connection until ctx is cancelled.
 func (c *Client) Run(ctx context.Context) {
+	if c.mode == "tap" {
+		c.runTap(ctx)
+		return
+	}
 	defer c.setState(StateStopped, "", "")
 	backoff := time.Second
 	for ctx.Err() == nil {
@@ -613,6 +646,9 @@ func (c *Client) lostPeers(before map[string]bool, own string) []string {
 func (c *Client) Write(epoch uint64, build func(s Snapshot) (*rcproto.Change, error)) (*rcproto.Change, error) {
 	if c.cfg.ReadOnly {
 		return nil, ErrReadOnly
+	}
+	if c.mode == "tap" {
+		return nil, ErrPassive
 	}
 	c.wmu.Lock()
 	defer c.wmu.Unlock()

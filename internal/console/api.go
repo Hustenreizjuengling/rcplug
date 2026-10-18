@@ -39,6 +39,7 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/control", c.withPIN(c.handleControl))
 	mux.HandleFunc("POST /api/settings", c.withPIN(c.handleSettings))
 	mux.HandleFunc("POST /api/reconnect", c.withPIN(c.handleReconnect))
+	mux.HandleFunc("POST /api/resync", c.withPIN(c.handleResync))
 	mux.HandleFunc("POST /api/panel", c.withPIN(c.handlePanel))
 	mux.HandleFunc("POST /api/pin", c.handlePIN) // verifies the current PIN itself
 	// Everything else under api/ is an error in the API's own format.
@@ -81,12 +82,19 @@ func (c *Console) handleTree(w http.ResponseWriter, r *http.Request) {
 		sdk.WriteError(w, desk.ErrNotSynced)
 		return
 	}
+	caps := Capabilities(level, s.Root)
+	if c.client.Passive() {
+		// Reading along cannot write; the level still counts for the
+		// front panel.
+		caps["writable"] = map[string][]string{}
+	}
 	meta, _ := json.Marshal(map[string]interface{}{
+		"passive":      c.client.Passive(),
 		"layout":       s.Layout,
 		"sources":      rcproto.Sources,
 		"outputs":      rcproto.Outputs,
 		"faders":       s.Layout.Faders(),
-		"control":      Capabilities(level, s.Root),
+		"control":      caps,
 		"controlLimit": limit,
 		"unityFader":   rcproto.UnityFader,
 	})
@@ -627,6 +635,40 @@ func (c *Console) handleReconnect(w http.ResponseWriter, r *http.Request) {
 	c.client.Reconnect()
 	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
+
+// handleResync gets a fresh full sync while reading along: it restarts the
+// device's screen app, whose new connection to the mixer carries the whole
+// state. Rate-limited like a reconnect.
+func (c *Console) handleResync(w http.ResponseWriter, r *http.Request) {
+	if !c.client.Passive() {
+		sdk.WriteError(w, sdk.NewError(http.StatusConflict, "not_passive", "the console is connected to the mixer itself; use reconnect"))
+		return
+	}
+	c.mu.Lock()
+	wait := 10*time.Second - time.Since(c.lastReconnect)
+	if wait > 0 {
+		c.mu.Unlock()
+		err := sdk.NewError(http.StatusTooManyRequests, "rate_limited",
+			"reading the state again is limited to once per 10 s; try again in "+strconv.Itoa(int(wait.Seconds())+1)+" s")
+		c.auditAction(r, "resync", "", err)
+		sdk.WriteError(w, err)
+		return
+	}
+	c.lastReconnect = time.Now()
+	c.mu.Unlock()
+	if err := restartScreen(); err != nil {
+		e := sdk.NewError(http.StatusConflict, "resync_failed", err.Error())
+		c.auditAction(r, "resync", "", e)
+		sdk.WriteError(w, e)
+		return
+	}
+	c.opts.Logf("console: device screen restarted to read the state again, by %s", remoteOf(r))
+	c.auditAction(r, "resync", "", nil)
+	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// restartScreen is desk.RestartScreen; tests replace it.
+var restartScreen = desk.RestartScreen
 
 // --- display mirror and front panel
 

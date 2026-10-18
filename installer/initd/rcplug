@@ -54,7 +54,14 @@ do_start() {
   # Short options: BusyBox start-stop-daemon may lack the long ones.
   start-stop-daemon -S -b -m -p "$PIDFILE" \
     -x /bin/sh -- -c "exec \"$BIN\" --root \"$RCPLUG_DIR\" --addr \"$RCPLUG_ADDR\" >>\"$LOG\" 2>&1" || return 1
-  # Report a host that exits right away (e.g. the port is taken).
+  # At boot return at once: rcplug starts before RØDE's screen (S05 < S06) so
+  # the console can read along from the screen's first connection, and must
+  # not delay it. init passes PREVLEVEL, /etc/init.d/rc exports it as
+  # "previous"; at boot it is N (or S). Elsewhere (the installer) report a
+  # host that exits right away (e.g. the port is taken).
+  case "${previous:-}/${PREVLEVEL:-}" in
+    N/* | S/* | */N | */S) return 0 ;;
+  esac
   sleep 1
   running || { echo "rcplug: failed to start, see $RCPLUG_DIR/logs/rcplugd.log (and $LOG)" >&2; return 1; }
 }
