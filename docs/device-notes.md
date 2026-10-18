@@ -62,8 +62,10 @@ flashing from Windows (below). What is still open:
    `ep_stop_xfr: timeout`) a few seconds before the installer started, i.e. while
    rcplugd downloaded and unpacked the package at full speed. Since 0.6.5 updates
    download at 256 KB/s, unpack slowly in small flushed pieces and run at the lowest
-   I/O priority. To confirm with the first update installed *by* 0.6.5 (the update
-   *to* 0.6.5 is still downloaded by the older version).
+   I/O priority. The update to 0.6.5, still downloaded by 0.6.4 at full speed, stalled
+   the interface again; the computer reset it about 45 seconds later (`ep_stop_xfr:
+   timeout`, then a new enumeration), as after the earlier updates. To confirm with the
+   first update installed *by* 0.6.5.
 6. **Operating the screen** (0.6.2, experimental). RØDE's screen app reads its
    touchscreen from `/dev/input/event0`/`event1` (evdev, no libinput); which one is the
    touchscreen, its axis ranges and orientation are in the diagnostics

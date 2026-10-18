@@ -6,6 +6,10 @@ may break compatibility).
 
 ## 0.6.6 - Unreleased
 
+### Changed
+- Device notes: what the update logs of 0.6.4 and 0.6.5 showed about the USB audio
+  dropout. This release mainly lets the paced updates of 0.6.5 be tried on a device.
+
 ## 0.6.5 - 2026-10-18
 
 ### Fixed
