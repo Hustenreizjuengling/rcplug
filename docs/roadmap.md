@@ -58,21 +58,51 @@ The host's own features, which every plugin builds on:
 | **Event bus** | *0.6.10:* plugins publish and subscribe to events through the host; the console reports the desk (recording, markers, mutes, pads, show), the host its plugins and updates. |
 | **Shared audio taps** | *0.6.11:* one JACK bridge run by the host: plugins ask for ports and get a stream, one opt-in, one place to watch it. Sonar 0.5.1 uses it. |
 
-## Next: the platform
+## Done: the platform (0.7.0 – 0.7.2)
 
-In this order: uninstalling from the dashboard, plugin permissions, the plugin catalog
-(all three done), the Python SDK. The Pro II and flashing from macOS need hardware to
-test on.
+Installing, removing and trusting plugins without a computer:
 
+| Topic | What |
+|---|---|
+| **Uninstall from the dashboard** | *0.7.0:* *Remove rcplug* on the dashboard's System page. Nothing a user does needs a shell or a computer any more, except installing. |
+| **Plugin permissions** | *0.7.0:* the manifest declares what a plugin does (`desk:write`, `audio`, `network`, `device`) and the dashboard shows it on the plugin's card. The console takes writes only from plugins with `desk:write`, named by their token, without the PIN and whatever level the browsers have; the audio taps stream only to plugins with `audio`. |
+| **Plugin catalog** | *0.7.1:* the dashboard lists the plugins of signed releases (rcplug-plugins, and catalogs users add with their key) with description, size, source and permissions, installs them and removes plugins again. |
+| **Resources** | *0.7.2:* processes with CPU and RAM that add up to the device's totals, and the device's resources once a minute in the diagnostics bundle. |
+
+## Next: the whole device in the console
+
+Everything the device's own screen does, from the browser. The console already shows
+the whole desk and changes mixing, channel processing, effects and outputs; what is
+missing:
+
+1. **Settings shown as raw numbers** become real controls with named choices
+   (multitrack and recording modes, headphone types, mix-minus, pad types and modes,
+   input types and microphone presets), once the meaning of each value is known.
+2. **SMART pads** configured from the browser (name, colour, play mode, loop, effect
+   and mixer pads), not only played.
+3. **Functions the screen app carries out** (switching shows, Bluetooth connections,
+   recording destination, system settings): they need *full control*
+   ([protocol.md](protocol.md#full-control)), which is still to be confirmed on a
+   real Duo, and each one tested there before it is offered.
+
+Reading along, the console changes what has a button on the device (mute, listen,
+physical faders); everything else needs full control.
+
+## Waiting for hardware
 
 | Topic | What | Why |
 |---|---|---|
-| **Plugin catalog** | **Done in 0.7.1:** the dashboard lists the plugins of signed releases (rcplug-plugins, and catalogs users add with their key) with description, size, source and permissions, installs them and removes plugins again. | Installing a plugin should not need a computer and SSH. |
-| **Plugin permissions** | **Done in 0.7.0:** the manifest declares what a plugin does (`desk:write`, `audio`, `network`, `device`) and the dashboard shows it on the plugin's card. The console takes writes only from plugins with `desk:write`, named by their token, without the PIN and whatever level the browsers have; the audio taps stream only to plugins with `audio`. | With third-party plugins, "everything runs as root and may write" is too coarse. |
-| **Uninstall from the dashboard** | **Done in 0.7.0:** *Remove rcplug* on the dashboard's System page. With it, nothing a user does needs a shell or a computer any more, except installing. | Users of a desk are podcasters, not Linux admins; no step may need a shell on the device. |
-| **Python SDK** | One file with the environment helpers, a server with the `X-Rcplug` check and a console client. The firmware ships Python 3.10. | Many makers write Python, and nothing needs to be cross-compiled. |
 | **RØDECaster Pro II** | A verified profile from a state capture ([adding-a-model.md](adding-a-model.md)), so control can be enabled. | Same platform, larger audience. |
 | **Flashing from macOS** | The toolkit's flasher on macOS. | Windows and Linux only today. |
+
+## On hold
+
+- **Python SDK.** The firmware's Python 3.10 is a minimal build (about 60 modules,
+  checked in the 1.7.6 image): no `socket`, `json`, `http`, `ssl` or `ctypes`. A plugin
+  in it could neither serve a page nor call the host or the console, and bringing an
+  interpreter is too big for the device. If scripts with pages are wanted, the way
+  would be a CGI mode in the host (it runs a script per request, with the request in
+  its environment and on stdin), which would serve shell scripts as well.
 
 ## Plugin ideas
 

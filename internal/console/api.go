@@ -325,17 +325,19 @@ func (c *Console) write(by who, epoch uint64, path []int, name string, value int
 }
 
 // panelProps are the properties that, while reading along, are changed on the
-// front panel: a channel's buttons, a physical fader's position.
+// front panel: a channel's buttons, a physical fader's position, and the
+// SMART pads of the bank the device shows.
 var panelProps = map[string]map[string]string{
-	"CHANNEL": {"channelOutputMute": "mute", "channelCueEnable": "listen"},
-	"FADER":   {"faderLevel": "fader"},
+	"CHANNEL":   {"channelOutputMute": "mute", "channelCueEnable": "listen"},
+	"FADER":     {"faderLevel": "fader"},
+	"PADBUTTON": {"padButtonPressed": "pad"},
 }
 
 // writeByPanel handles a write while reading along: the console cannot write
 // to the mixer, but mute and listen of a channel with physical buttons are
-// pressed on the front panel, and a physical fader's position is set there
-// (until the real fader moves; the policy allows it at the expert level
-// only). The device reports the result, which the mirror then shows; nothing
+// pressed on the front panel, a SMART pad of the bank the device shows is
+// pressed there, and a physical fader's position is set there (until the real
+// fader moves; the policy allows it at the expert level only). The device reports the result, which the mirror then shows; nothing
 // is applied here.
 func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name string, value interface{}) (*rcproto.Change, string, error) {
 	nodeType, button := "?", ""
@@ -356,8 +358,12 @@ func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name strin
 			return
 		}
 		nodeType = n.Type
-		i := -1 // the strip with a physical fader and buttons
-		for j := 0; j < s.Layout.PhysicalFaders; j++ {
+		i := -1 // the strip with a physical fader and buttons, or the pad
+		physical := s.Layout.PhysicalFaders
+		if n.Type == "PADBUTTON" {
+			physical = s.Layout.PadsPerBank
+		}
+		for j := 0; j < physical; j++ {
 			if slices.Equal(s.Layout.Path(n.Type, j), path) {
 				i = j
 			}
@@ -389,9 +395,14 @@ func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name strin
 	}
 	ch := &rcproto.Change{Type: rcproto.PropertyChanged, Path: append([]int(nil), path...), Name: name, Value: want}
 	pos := 0
-	if nodeType == "FADER" {
+	switch {
+	case nodeType == "FADER":
 		pos = int(want.I) // a position, set as it is
-	} else if cur.Truth() == want.Truth() {
+	case nodeType == "PADBUTTON":
+		if !want.Truth() {
+			return ch, nodeType, nil // the press on the panel released the pad already
+		}
+	case cur.Truth() == want.Truth():
 		return ch, nodeType, nil // already so: pressing would toggle it back
 	}
 	if err := c.opts.Panel.Do(button, pos); err != nil {

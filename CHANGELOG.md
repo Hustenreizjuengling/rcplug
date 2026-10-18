@@ -6,6 +6,11 @@ may break compatibility).
 
 ## 0.7.3 - Unreleased
 
+### Added
+- Reading along, the console plays the **SMART pads** of the bank the device shows:
+  a click on a pad presses it on the front panel (with the device buttons switched
+  on). Other banks need the bank selected on the device first; the console says so.
+
 ## 0.7.2 - 2026-10-18
 
 ### Changed

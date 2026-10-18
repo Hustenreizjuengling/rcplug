@@ -589,6 +589,24 @@ func TestReadingAlongWritesThroughTheFrontPanel(t *testing.T) {
 	if got := strings.Join(fp.pressed, ","); got != "mute1,listen1,fader1" || fp.values[2] != 30 {
 		t.Fatalf("pressed %v, values %v", got, fp.values)
 	}
+
+	// A SMART pad of the bank the device shows is pressed on the panel; its
+	// release is part of that press. Pads beyond the physical six are not.
+	var pad1, pad7 []int
+	mirror.View(func(s desk.Snapshot) { pad1, pad7 = s.Layout.Path("PADBUTTON", 1), s.Layout.Path("PADBUTTON", 7) })
+	press := func(path []int) resp {
+		return r.post(t, "/api/press", map[string]interface{}{"epoch": epoch, "path": path, "name": "padButtonPressed", "ms": 20})
+	}
+	if res := press(pad1); res.code != 200 {
+		t.Fatalf("pad 2: %d %s", res.code, res.raw)
+	}
+	if res := press(pad7); res.code != 403 || res.body["code"] != "passive" {
+		t.Fatalf("pad 8: %d %s", res.code, res.raw)
+	}
+	time.Sleep(150 * time.Millisecond) // the release
+	if got := strings.Join(fp.pressed, ","); got != "mute1,listen1,fader1,pad2" {
+		t.Fatalf("pressed %v", got)
+	}
 }
 
 func TestUntestedModelIsReadOnly(t *testing.T) {

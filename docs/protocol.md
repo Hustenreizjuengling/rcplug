@@ -75,7 +75,9 @@ loopback interface (`make test-root`).
 ## Full control
 
 Reading along can only watch, so changes go through the front panel, which only
-reaches what has a button. *Full control* (experimental, off by default, switched on
+reaches what has a button: mute and listen of the four physical channels, their
+faders (at the expert level), and since 0.7.3 the six SMART pads of the bank the
+device shows. *Full control* (experimental, off by default, switched on
 at the expert level on the console's *System* page) uses the one-client behaviour
 instead: the console takes the mixer's place itself and then serves the device's
 screen on the mixer's port, which the mixer does not listen on while it has a client.

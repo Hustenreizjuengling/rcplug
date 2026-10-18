@@ -113,7 +113,7 @@ export default {
 
   'pads.intro': '● = bank active on the device. Tap a pad to trigger it (with control enabled).', 'pads.bank': 'Bank {n}', 'pads.pad': 'Pad {n}',
   'pads.unused': 'unassigned', 'pads.trigger': 'Trigger {name}', 'pads.details': 'Details of {name}', 'pads.title': 'SMART pad: {name}',
-  'pads.gain': 'Volume', 'pads.selectBank': 'Select bank {n} on the device', 'pads.bankDenied': 'Changing the bank is not allowed',
+  'pads.gain': 'Volume', 'pads.selectBank': 'Select bank {n} on the device', 'pads.bankDenied': 'Changing the bank is not allowed', 'pads.bankOnDevice': 'Reading along, only the pads of the bank the device shows play: select bank {n} on the device',
   'pad.type0': 'empty', 'pad.type1': 'Sound', 'pad.type2': 'Effect', 'pad.type3': 'Mixer', 'pad.type4': 'MIDI', 'pad.type5': 'Video', 'pad.type6': 'CallMe', 'pad.typeN': 'type {n}',
 
   'player.title': 'Player', 'player.state': 'State', 'player.file': 'File', 'player.position': 'Position', 'player.speed': 'Speed',

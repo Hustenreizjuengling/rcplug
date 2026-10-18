@@ -21,7 +21,8 @@ export function canWrite(path, name) {
   if (!writable[n.t] || !writable[n.t].has(name)) return false;
   if (level === 'basic' && n.t === 'FADER' && name === 'faderLevel' && famIndex('FADER', path) < store.L.physicalFaders) return false;
   // Reading along, the server writes on the front panel: the buttons and
-  // faders of the physical channels.
-  if (store.meta.passive && !((n.t === 'CHANNEL' || n.t === 'FADER') && famIndex(n.t, path) < store.L.physicalFaders)) return false;
+  // faders of the physical channels, and the pads of the bank the device shows.
+  if (store.meta.passive && !(((n.t === 'CHANNEL' || n.t === 'FADER') && famIndex(n.t, path) < store.L.physicalFaders)
+    || (n.t === 'PADBUTTON' && famIndex(n.t, path) < (store.L.padsPerBank || 6)))) return false;
   return true;
 }

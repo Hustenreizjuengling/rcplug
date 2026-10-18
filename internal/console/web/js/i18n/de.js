@@ -117,7 +117,7 @@ export default {
 
   'pads.intro': '● = am Gerät aktive Bank. Pad antippen zum Auslösen (bei Steuerung).', 'pads.bank': 'Bank {n}', 'pads.pad': 'Pad {n}',
   'pads.unused': 'nicht belegt', 'pads.trigger': '{name} auslösen', 'pads.details': 'Details zu {name}', 'pads.title': 'SMART Pad: {name}',
-  'pads.gain': 'Lautstärke', 'pads.selectBank': 'Bank {n} am Gerät auswählen', 'pads.bankDenied': 'Bankwechsel nicht erlaubt',
+  'pads.gain': 'Lautstärke', 'pads.selectBank': 'Bank {n} am Gerät auswählen', 'pads.bankDenied': 'Bankwechsel nicht erlaubt', 'pads.bankOnDevice': 'Beim Mitlesen spielen nur die Pads der Bank, die das Gerät zeigt: Bank {n} am Gerät wählen',
   'pad.type0': 'leer', 'pad.type1': 'Sound', 'pad.type2': 'Effekt', 'pad.type3': 'Mixer', 'pad.type4': 'MIDI', 'pad.type5': 'Video', 'pad.type6': 'CallMe', 'pad.typeN': 'Typ {n}',
 
   'player.title': 'Player', 'player.state': 'Status', 'player.file': 'Datei', 'player.position': 'Position', 'player.speed': 'Geschwindigkeit',

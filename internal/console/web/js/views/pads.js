@@ -30,7 +30,7 @@ function padEl(scope, bank, slot, p, rerender) {
   if (can) {
     el.addEventListener('click', async () => {
       if (bank !== Number(val(gui, 'selectedBank'))) {
-        if (!canWrite(gui, 'selectedBank')) { report({ message: t('pads.bankDenied') }); return; }
+        if (!canWrite(gui, 'selectedBank')) { report({ message: t(store.meta.passive ? 'pads.bankOnDevice' : 'pads.bankDenied', { n: bank + 1 }) }); return; }
         if (!(await setProp(scope, gui, 'selectedBank', bank))) return;
         await new Promise((r) => setTimeout(r, 120));
       }
