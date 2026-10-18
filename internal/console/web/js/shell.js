@@ -9,7 +9,7 @@ import { createScope } from './scope.js';
 import { confirmDialog } from './dialogs.js';
 import { setControl, reconnect, resync, request } from './api.js';
 import { liveState } from './live.js';
-import { views } from './views/index.js';
+import { views, tools, icons } from './views/index.js';
 
 let current = null;
 let scope = null;
@@ -61,6 +61,29 @@ function markTab() {
     a.classList.toggle('on', on);
     if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
+  // The tools fold away unless one of them is open (or the bar is a row).
+  const fold = $('#tabs details');
+  if (fold && (tools.has(current.id) || narrow.matches)) fold.open = true;
+}
+
+const narrow = window.matchMedia('(max-width: 760px)');
+const SVG = 'http://www.w3.org/2000/svg';
+function icon(id) {
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  const p = document.createElementNS(SVG, 'path');
+  p.setAttribute('d', icons[id] || '');
+  svg.append(p);
+  return svg;
+}
+const navLink = (v) => h('a', { href: '#' + v.id, 'data-view': v.id }, icon(v.id), h('span', null, t(v.title)));
+
+function buildNav() {
+  const nav = $('#tabs');
+  const fold = h('details', null, h('summary', null, t('nav.tools')), ...views.filter((v) => tools.has(v.id)).map(navLink));
+  nav.replaceChildren(...views.filter((v) => !tools.has(v.id)).map(navLink), fold);
+  narrow.addEventListener('change', markTab);
 }
 
 function banners() {
@@ -163,8 +186,7 @@ async function chooseLevel(lv) {
 }
 
 export function initShell() {
-  const nav = $('#tabs');
-  nav.replaceChildren(...views.map((v) => h('a', { href: '#' + v.id, 'data-view': v.id }, t(v.title))));
+  buildNav();
   $$('.ctl button').forEach((b) => {
     b.textContent = t('level.' + b.dataset.level);
     b.title = t('level.' + b.dataset.level + 'Hint');
@@ -178,7 +200,7 @@ export function initShell() {
   document.title = t('page.title');
   // Inside the rcplug shell (an iframe) the shell already shows a header.
   if (window.self !== window.top) document.body.classList.add('embedded');
-  const fixTabs = () => { $('#tabs').style.top = $('.top').offsetHeight + 'px'; };
+  const fixTabs = () => document.documentElement.style.setProperty('--top', $('.top').offsetHeight + 'px');
   window.addEventListener('resize', fixTabs);
   fixTabs();
 

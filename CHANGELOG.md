@@ -6,6 +6,19 @@ may break compatibility).
 
 ## 0.8.3 - Unreleased
 
+### Changed
+- **The console has a side bar** instead of a row of tabs: Mixer, Routing, Inputs,
+  Effects, Outputs, SMART pads, Recording, Device, and *Tools* (Explorer, Log)
+  folded away at the bottom; small inline icons (a few hundred bytes), no framework.
+  On a phone it becomes a row to swipe. Channel strip names stay on one line.
+
+### Fixed
+- **SMART pads that play while held** work from the browser: a pad is pressed while
+  the mouse button, finger or key is down and released when it comes up (before, a
+  click was always a 150 ms press). A hold the browser never ends (a closed tab) is
+  released by the console after 30 seconds, and only the newest press of a button is
+  released that way. `api/press` takes `ms` up to 30 000.
+
 ## 0.8.2 - 2026-10-18
 
 ### Added

@@ -28,14 +28,37 @@ function padEl(scope, bank, slot, p, rerender) {
   scope.bind(p, 'padActive', (v) => el.classList.toggle('active', !!v));
   scope.bind(p, 'padProgress', (v) => (prog.style.transform = `scaleX(${Math.max(0, Math.min(1, Number(v) || 0))})`));
   if (can) {
-    el.addEventListener('click', async () => {
-      if (bank !== Number(val(gui, 'selectedBank'))) {
-        if (!canWrite(gui, 'selectedBank')) { report({ message: t(store.meta.passive ? 'pads.bankOnDevice' : 'pads.bankDenied', { n: bank + 1 }) }); return; }
-        if (!(await setProp(scope, gui, 'selectedBank', bank))) return;
-        await new Promise((r) => setTimeout(r, 120));
-      }
-      press(scope, btnPath, 'padButtonPressed', 150);
-    });
+    // Pressed while the mouse button, finger or key is down, released when
+    // it comes up, so pads that play while held work as on the device. If
+    // the release never comes (a closed tab), the console lets go after 30 s.
+    let pressing = null;
+    const down = (e) => {
+      if (e.type === 'pointerdown' && e.button !== 0) return;
+      if (e.type === 'keydown' && (e.repeat || (e.key !== ' ' && e.key !== 'Enter'))) return;
+      e.preventDefault();
+      if (pressing) return;
+      if (e.pointerId !== undefined) el.setPointerCapture(e.pointerId);
+      el.classList.add('down');
+      pressing = (async () => {
+        if (bank !== Number(val(gui, 'selectedBank'))) {
+          if (!canWrite(gui, 'selectedBank')) { report({ message: t(store.meta.passive ? 'pads.bankOnDevice' : 'pads.bankDenied', { n: bank + 1 }) }); return false; }
+          if (!(await setProp(scope, gui, 'selectedBank', bank))) return false;
+          await new Promise((r) => setTimeout(r, 120));
+        }
+        await press(scope, btnPath, 'padButtonPressed', 30000);
+        return true;
+      })();
+    };
+    const up = async (e) => {
+      if (e.type === 'keyup' && e.key !== ' ' && e.key !== 'Enter') return;
+      const p = pressing;
+      pressing = null;
+      el.classList.remove('down');
+      if (p && (await p)) setProp(scope, btnPath, 'padButtonPressed', false);
+    };
+    for (const ev of ['pointerdown', 'keydown']) el.addEventListener(ev, down);
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture', 'keyup', 'blur']) el.addEventListener(ev, up);
+    el.addEventListener('contextmenu', (e) => e.preventDefault()); // a long touch is a hold, not a menu
   }
   const info = h('button', { class: 'padinfo', type: 'button', 'aria-label': t('pads.details', { name }), onclick: (e) => { e.stopPropagation(); padDrawer(p); } }, 'ⓘ');
   return h('div', { class: 'padwrap' }, el, info);

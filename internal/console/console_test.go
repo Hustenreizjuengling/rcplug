@@ -1196,3 +1196,34 @@ func TestChangeLog(t *testing.T) {
 		t.Fatal("not cleared")
 	}
 }
+
+// A held pad: the browser presses with a long hold and releases itself; the
+// hold's own late release does not let go of a newer press.
+func TestHeldPressIsReleasedByTheNewestOnly(t *testing.T) {
+	r := newRig(t, rcsim.Options{})
+	r.control(t, "basic")
+	l, epoch := r.snap()
+	pad := l.Path("PADBUTTON", 0)
+	value := func() bool { v, _ := r.sim.Snapshot().At(pad).Get("padButtonPressed"); return v.Truth() }
+	press := func(ms int) {
+		if res := r.post(t, "/api/press", map[string]interface{}{"epoch": epoch, "path": pad, "name": "padButtonPressed", "ms": ms}); res.code != 200 {
+			t.Fatalf("press: %d %s", res.code, res.raw)
+		}
+	}
+	release := func() {
+		if res := r.post(t, "/api/set", map[string]interface{}{"epoch": epoch, "path": pad, "name": "padButtonPressed", "value": false}); res.code != 200 {
+			t.Fatalf("release: %d %s", res.code, res.raw)
+		}
+	}
+	press(300) // held …
+	eventually(t, value)
+	release() // … and let go by the browser
+	eventually(t, func() bool { return !value() })
+	press(5000) // held again before the first hold's own release is due
+	time.Sleep(500 * time.Millisecond)
+	if !value() {
+		t.Fatal("the first hold's late release let go of the second press")
+	}
+	release()
+	eventually(t, func() bool { return !value() })
+}

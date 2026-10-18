@@ -486,9 +486,15 @@ func (c *Console) handlePress(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// ms is how long the press lasts: a click (150 ms), or a hold, which
+	// the browser ends itself with a release and this only ends if the
+	// browser never does (at most maxHold).
 	ms := req.Ms
-	if ms <= 0 || ms > 2000 {
+	if ms <= 0 {
 		ms = 150
+	}
+	if ms > int(maxHold/time.Millisecond) {
+		ms = int(maxHold / time.Millisecond)
 	}
 	remote := c.who(r)
 	down, err := c.write(remote, req.Epoch, req.Path, req.Name, true)
@@ -496,6 +502,14 @@ func (c *Console) handlePress(w http.ResponseWriter, r *http.Request) {
 		sdk.WriteError(w, err)
 		return
 	}
+	key := fmt.Sprint(down.Path, req.Name)
+	c.mu.Lock()
+	if c.presses == nil {
+		c.presses = map[string]uint64{}
+	}
+	c.presses[key]++
+	gen := c.presses[key]
+	c.mu.Unlock()
 	nodeType := ""
 	c.mirror.View(func(s desk.Snapshot) {
 		if n := s.Root.At(down.Path); n != nil {
@@ -504,6 +518,12 @@ func (c *Console) handlePress(w http.ResponseWriter, r *http.Request) {
 	})
 	go func() {
 		time.Sleep(time.Duration(ms) * time.Millisecond)
+		c.mu.Lock()
+		newer := c.presses[key] != gen
+		c.mu.Unlock()
+		if newer {
+			return // pressed again since: that press's own release counts
+		}
 		// Always try to release, even if the tree moved meanwhile — but only
 		// on the same kind of node at the same path.
 		var epoch uint64
@@ -781,6 +801,9 @@ func (c *Console) handleResync(w http.ResponseWriter, r *http.Request) {
 	c.auditAction(r, "resync", "", nil)
 	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
+
+// maxHold ends a held button the browser never released (a closed tab).
+const maxHold = 30 * time.Second
 
 // restartScreen is desk.RestartScreen; tests replace it.
 var restartScreen = desk.RestartScreen

@@ -161,7 +161,7 @@ Every write:
 | Request | Body | Effect |
 |---|---|---|
 | `api/set` | `{"epoch", "path", "name", "value"}` | Sets an existing property. The value is converted to the property's type; numeric strings are refused. |
-| `api/press` | `{"epoch", "path", "name", "ms"}` | A button press: `true`, then `false` after `ms` (e.g. `PADBUTTON.padButtonPressed`) |
+| `api/press` | `{"epoch", "path", "name", "ms"}` | A button press: `true`, then `false` after `ms` (default 150, at most 30 000; e.g. `PADBUTTON.padButtonPressed`). To hold a button, press with a long `ms` and release it yourself with `api/set` … `false`; a later press of the same button is not released by an earlier one's timer. |
 | `api/trigger` | `{"epoch", "path", "name"}` | A binary trigger pulse (e.g. `MIX.mixLinkRequest`) |
 | `api/link` | `{"epoch", "source", "output", "link"}` | Links or unlinks a routing cell with the sequence the device expects |
 | `api/record` | `{"epoch", "value"}` | Recorder: 0 stop, 1 pause, 2 record |

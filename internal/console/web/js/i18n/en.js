@@ -8,7 +8,7 @@ export default {
 
 
   'readonly.hint': 'display only', 'render.error': 'Could not render: {err}',
-  'tab.mixer': 'Mixer', 'tab.routing': 'Routing', 'tab.inputs': 'Inputs', 'tab.outputs': 'Outputs & master', 'tab.effects': 'Effects',
+  'tab.mixer': 'Mixer', 'tab.routing': 'Routing', 'tab.inputs': 'Inputs', 'tab.outputs': 'Outputs', 'nav.tools': 'Tools', 'tab.effects': 'Effects',
   'tab.pads': 'SMART pads', 'tab.recorder': 'Recording', 'tab.system': 'Device', 'tab.explorer': 'Explorer', 'tab.audit': 'Log',
   'header.live': 'Live · {n}/s', 'header.liveTap': 'Live (reading along) · {n}/s', 'header.offline': 'Console unreachable – reconnecting…', 'header.firmware': 'firmware {v}',
   'header.show': 'show “{name}”', 'header.language': 'Switch language',
