@@ -830,9 +830,8 @@ func TestMetersFromTheMixersMemory(t *testing.T) {
 	if v := get(fader5, "faderLevel"); !v.Equal(virtual) {
 		t.Errorf("an on-screen fader was changed: %v", v)
 	}
-	if res := r.do(t, "GET", "/api/status", nil); res.body["meters"] != true {
-		t.Errorf("status meters %v", res.body["meters"])
-	}
+	// Live is set just after the first reading is in the tree.
+	eventually(t, func() bool { return r.do(t, "GET", "/api/status", nil).body["meters"] == true })
 
 	if !get(run.Path(0), "meterStereo").Truth() {
 		t.Error("the stereo flag comes from the meter memory too")
