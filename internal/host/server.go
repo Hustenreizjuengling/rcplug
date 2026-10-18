@@ -102,6 +102,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/plugins", s.handlePlugins)
 	mux.HandleFunc("GET /api/system", s.handleSystem)
 	mux.HandleFunc("GET /api/processes", s.handleProcesses)
+	mux.Handle("POST /api/uninstall", sdk.CSRF(http.HandlerFunc(s.handleUninstall)))
 	mux.HandleFunc("GET /api/plugins/{name}/logs", s.handleLogs)
 	mux.HandleFunc("GET /api/diagnostics", s.handleDiagnostics)
 	mux.Handle("POST /api/plugins/{name}/{action}", sdk.CSRF(http.HandlerFunc(s.handleAction)))

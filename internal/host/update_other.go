@@ -15,3 +15,8 @@ func spawnInstaller(payload, logFile, resultFile string) error {
 
 // smallReceiveBuffer only matters on the device.
 func smallReceiveBuffer(network, address string, c syscall.RawConn) error { return nil }
+
+// spawnDetached is only available where the device runs (Linux).
+func spawnDetached(script string, args ...string) error {
+	return errors.New("not supported on this system")
+}

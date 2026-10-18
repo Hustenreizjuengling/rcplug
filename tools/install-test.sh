@@ -2,7 +2,8 @@
 # Tests the device installer (installer/install.sh) in a sandbox: a fresh
 # install, a reinstall that keeps settings and data, a reinstall that fails
 # halfway (the previous version must come back and run), a version that does
-# not start (rolled back), and a first install that does not start.
+# not start (rolled back), a first install that does not start, and the
+# uninstall from the dashboard.
 #
 #   tools/install-test.sh        (make install-test)
 set -euo pipefail
@@ -77,5 +78,13 @@ grep -q 'going back to the previous version' "$W/install.log" || { cat "$W/insta
 wait_version 1.1.0
 [ -f "$D/plugins/console/plugin.json" ] || fail "the console plugin was not restored"
 [ ! -e "$D/.previous" ] || fail ".previous left after a rollback"
+
+echo "== uninstall from the dashboard"
+curl -fsS --max-time 5 -X POST -H 'X-Rcplug: 1' -H 'Content-Type: application/json' -d '{"confirm":"uninstall"}' \
+  "http://127.0.0.1:$PORT/api/uninstall" >/dev/null || fail "the dashboard refused to uninstall"
+for _ in $(seq 1 100); do [ ! -e "$D" ] && [ ! -e "$W/initd/rcplug" ] && break; sleep 0.1; done
+[ ! -e "$D" ] || fail "the install directory is still there"
+[ ! -e "$W/initd/rcplug" ] || fail "the init script is still there"
+if curl -fsS --max-time 2 "http://127.0.0.1:$PORT/api/system" >/dev/null 2>&1; then fail "rcplug still answers"; fi
 
 echo "OK"

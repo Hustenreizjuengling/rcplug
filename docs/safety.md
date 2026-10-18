@@ -256,4 +256,8 @@ Installing is done by [rcplug-toolkit](https://github.com/Hustenreizjuengling/rc
   `sshpass` through the environment.
 - The SSH host key is remembered on first use and checked afterwards.
 - Everything rcplug installs lives in one directory (including its logs) plus
-  `/etc/init.d/rcplug`. `--uninstall` removes all of it, including plugin data.
+  `/etc/init.d/rcplug`. `--uninstall` removes all of it, including plugin data, and so
+  does *Remove rcplug* at the bottom of the dashboard's System page (after typing a
+  word and a confirmation; behind the dashboard password if one is set). The dashboard
+  only removes a directory named `rcplug` that holds `rcplugd`, never a development
+  tree. A firmware update removes rcplug as well.

@@ -6,6 +6,12 @@ may break compatibility).
 
 ## 0.6.12 - Unreleased
 
+### Added
+- **Remove rcplug** from the dashboard (System page, at the bottom): stops rcplug and
+  every plugin and removes them with all data; the device keeps working. Only an
+  install directory named `rcplug` is removed, never a development tree.
+  `POST /api/uninstall`.
+
 ## 0.6.11 - 2026-10-18
 
 ### Added

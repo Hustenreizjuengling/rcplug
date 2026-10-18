@@ -46,3 +46,16 @@ func smallReceiveBuffer(network, address string, c syscall.RawConn) error {
 		_ = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_RCVBUF, 64<<10)
 	})
 }
+
+// spawnDetached runs a script in its own session, so it outlives this
+// process (which the script may stop); its output is dropped.
+func spawnDetached(script string, args ...string) error {
+	cmd := exec.Command("/bin/sh", append([]string{"-c", script, "rcplug-task"}, args...)...)
+	cmd.Dir = "/"
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go cmd.Wait()
+	return nil
+}
