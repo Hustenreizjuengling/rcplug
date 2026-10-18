@@ -170,3 +170,63 @@ func TestPickSourcePrefersDRM(t *testing.T) {
 		t.Errorf("mode fb must use the framebuffer, got %s", src)
 	}
 }
+
+// A 2×3 picture with one coloured pixel per corner shows where each corner
+// ends up.
+func TestRotate(t *testing.T) {
+	src := image.NewRGBA(image.Rect(0, 0, 2, 3))
+	red, green, blue := color.RGBA{255, 0, 0, 255}, color.RGBA{0, 255, 0, 255}, color.RGBA{0, 0, 255, 255}
+	src.Set(0, 0, red)   // top left
+	src.Set(1, 0, green) // top right
+	src.Set(0, 2, blue)  // bottom left
+	for _, c := range []struct {
+		deg              int
+		w, h             int
+		red, green, blue image.Point
+	}{
+		{90, 3, 2, image.Pt(2, 0), image.Pt(2, 1), image.Pt(0, 0)},
+		{180, 2, 3, image.Pt(1, 2), image.Pt(0, 2), image.Pt(1, 0)},
+		{270, 3, 2, image.Pt(0, 1), image.Pt(0, 0), image.Pt(2, 1)}, // the top right comes to the top left
+	} {
+		got := rotate(src, c.deg)
+		if b := got.Bounds(); b.Dx() != c.w || b.Dy() != c.h {
+			t.Errorf("%d°: size %v", c.deg, b)
+		}
+		for name, want := range map[string]struct {
+			p   image.Point
+			col color.RGBA
+		}{"red": {c.red, red}, "green": {c.green, green}, "blue": {c.blue, blue}} {
+			if got.At(want.p.X, want.p.Y) != want.col {
+				t.Errorf("%d°: %s not at %v", c.deg, name, want.p)
+			}
+		}
+	}
+	if rotate(src, 0) != image.Image(src) {
+		t.Error("0° must return the picture itself")
+	}
+}
+
+// The Duo draws its landscape screen into a portrait buffer: by default it is
+// turned to landscape; a fixed setting overrides that.
+func TestScreenTurnsAPortraitBuffer(t *testing.T) {
+	frame := image.NewRGBA(image.Rect(0, 0, 720, 1280))
+	s := &Screen{MaxFPS: 1000, grab: func() (image.Image, string, string, error) { return frame, "drm", "test", nil }}
+	if st := s.Status(); st.Width != 1280 || st.Height != 720 || st.Rotation != 270 || st.Rotate != "auto" {
+		t.Fatalf("auto: %+v", st)
+	}
+	s.SetRotation(0)
+	if st := s.Status(); st.Width != 720 || st.Height != 1280 || st.Rotation != 0 || st.Rotate != "0" {
+		t.Fatalf("fixed 0: %+v", st)
+	}
+	s.SetRotation(90)
+	if st := s.Status(); st.Width != 1280 || st.Rotation != 90 || st.Rotate != "90" {
+		t.Fatalf("fixed 90: %+v", st)
+	}
+	s.SetRotation(RotateAuto)
+	frame = image.NewRGBA(image.Rect(0, 0, 800, 480)) // a landscape buffer stays as it is
+	s.SetRotation(RotateAuto)
+	s.at = time.Time{}
+	if st := s.Status(); st.Width != 800 || st.Rotation != 0 {
+		t.Fatalf("auto landscape: %+v", st)
+	}
+}

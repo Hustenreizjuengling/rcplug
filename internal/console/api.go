@@ -195,6 +195,8 @@ type writeReq struct {
 	Link    bool        `json:"link"`
 	Level   string      `json:"level"`
 	Screen  *bool       `json:"screen"`
+	Rotate  *string     `json:"screenRotate"`
+	Panel   *bool       `json:"panel"`
 	Current string      `json:"current"`
 	New     string      `json:"new"`
 	Control string      `json:"control"` // panel control id
@@ -523,11 +525,44 @@ func (c *Console) notifyControl() {
 	c.mirror.Notify("control", data)
 }
 
-// handleSettings toggles the screen mirror.
+// handleSettings switches the screen mirror, turns its picture and switches
+// the front-panel emulation.
 func (c *Console) handleSettings(w http.ResponseWriter, r *http.Request) {
 	req, ok := decode(w, r)
 	if !ok {
 		return
+	}
+	if req.Rotate != nil {
+		v := *req.Rotate
+		if v == "auto" {
+			v = ""
+		}
+		if _, ok := rotations[v]; !ok && v != "" {
+			sdk.WriteError(w, errBadRequest(`screenRotate must be "auto", "0", "90", "180" or "270"`))
+			return
+		}
+		c.mu.Lock()
+		c.settings.ScreenRotate = v
+		c.saveSettingsLocked()
+		c.mu.Unlock()
+		if c.opts.Screen != nil {
+			c.opts.Screen.SetRotation(screenRotation(v))
+		}
+		c.auditAction(r, "screen rotate", *req.Rotate, nil)
+	}
+	if req.Panel != nil {
+		if *req.Panel && c.opts.Panel == nil {
+			err := sdk.NewError(http.StatusConflict, "panel_unavailable", "front-panel emulation is not available here")
+			c.auditAction(r, "panel", "true", err)
+			sdk.WriteError(w, err)
+			return
+		}
+		c.mu.Lock()
+		c.settings.Panel = *req.Panel
+		c.saveSettingsLocked()
+		c.mu.Unlock()
+		c.opts.Logf("console: front panel %v by %s", *req.Panel, remoteOf(r))
+		c.auditAction(r, "panel", strconv.FormatBool(*req.Panel), nil)
 	}
 	if req.Screen != nil {
 		if *req.Screen && c.opts.Screen == nil {
@@ -621,7 +656,7 @@ func (c *Console) handleHW(w http.ResponseWriter, r *http.Request) {
 	default:
 		doc["screen"] = map[string]interface{}{"enabled": false, "available": true}
 	}
-	p := map[string]interface{}{"enabled": c.opts.PanelEnabled, "controls": hw.PanelControls}
+	p := map[string]interface{}{"enabled": c.panelOn(), "forced": c.opts.PanelEnabled, "controls": hw.PanelControls}
 	if c.opts.Panel != nil {
 		if err := c.opts.Panel.Available(); err != nil {
 			p["error"] = err.Error()
@@ -719,8 +754,8 @@ func (c *Console) handleMJPEG(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Console) handlePanel(w http.ResponseWriter, r *http.Request) {
-	if !c.opts.PanelEnabled || c.opts.Panel == nil {
-		sdk.WriteError(w, sdk.NewError(http.StatusForbidden, "panel_disabled", "front-panel emulation is not enabled (start the plugin with --panel)"))
+	if !c.panelOn() {
+		sdk.WriteError(w, sdk.NewError(http.StatusForbidden, "panel_disabled", "front-panel emulation is switched off (switch it on on the console's Display page)"))
 		return
 	}
 	if lv, _ := c.Level(); lv != LevelExpert {

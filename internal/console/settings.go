@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Hustenreizjuengling/rcplug/internal/hw"
 	"github.com/Hustenreizjuengling/rcplug/sdk"
 )
 
@@ -19,6 +20,23 @@ type Settings struct {
 	// Screen enables the display mirror. Off by default: the mirror shows
 	// everything on the device screen, including secrets being typed there.
 	Screen bool `json:"screen"`
+	// ScreenRotate turns the mirrored picture: "" (auto: a portrait buffer,
+	// as on the Duo, becomes landscape), "0", "90", "180" or "270" degrees
+	// clockwise.
+	ScreenRotate string `json:"screenRotate,omitempty"`
+	// Panel switches the front-panel emulation on (--panel does it for good).
+	Panel bool `json:"panel,omitempty"`
+}
+
+// rotations are the valid ScreenRotate values besides "" (auto).
+var rotations = map[string]int{"0": 0, "90": 90, "180": 180, "270": 270}
+
+// screenRotation turns a ScreenRotate setting into degrees or hw.RotateAuto.
+func screenRotation(s string) int {
+	if deg, ok := rotations[s]; ok {
+		return deg
+	}
+	return hw.RotateAuto
 }
 
 // pinStore keeps the optional write PIN in a root-only file (never on a

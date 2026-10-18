@@ -154,10 +154,10 @@ Every write:
 | `api/link` | `{"epoch", "source", "output", "link"}` | Links or unlinks a routing cell with the sequence the device expects |
 | `api/record` | `{"epoch", "value"}` | Recorder: 0 stop, 1 pause, 2 record |
 | `api/control` | `{"level": "off" \| "basic" \| "expert"}` | Changes the control level (refused with `read_only` or `untested_model` where control is not possible) |
-| `api/settings` | `{"screen": true}` | Switches the screen mirror on or off |
+| `api/settings` | `{"screen": true}`, `{"screenRotate": "auto"}`, `{"panel": true}` | Switches the screen mirror on or off; turns its picture (`auto`: a portrait buffer such as the Duo's becomes landscape, or `0`, `90`, `180`, `270` degrees clockwise); switches the front-panel emulation on or off. Saved across restarts. |
 | `api/pin` | `{"current", "new"}` | Sets, changes (`current` required) or removes (`new: ""`) the PIN |
 | `api/reconnect` | `{}` | Reconnects to the desk, also after the GUI guard stepped back. At most every 10 s. |
-| `api/panel` | `{"control", "value"}` | Experimental front-panel emulation; needs `--panel` and the expert level |
+| `api/panel` | `{"control", "value"}` | Experimental front-panel emulation; needs it switched on (`api/settings` or `--panel`) and the expert level |
 
 A **marker** is `api/set` on `RECORDER.requestDropMarker` with the current time in
 milliseconds (an int64), as the console's UI does.

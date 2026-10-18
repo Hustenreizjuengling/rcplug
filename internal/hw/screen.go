@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -24,6 +25,9 @@ type Screen struct {
 	grab func() (image.Image, string, string, error) // test hook replacing capture
 
 	mu      sync.Mutex
+	fixed   bool // rotate is set; otherwise a portrait buffer is turned to landscape
+	rotate  int  // degrees clockwise when fixed
+	turned  int  // the turn applied to the cached frame
 	at      time.Time
 	img     image.Image
 	jpg     []byte
@@ -43,6 +47,40 @@ type ScreenStatus struct {
 	Detail    string  `json:"detail,omitempty"`
 	Error     string  `json:"error,omitempty"`
 	FPS       float64 `json:"fps"`
+	// Rotation is how far the picture is turned (degrees clockwise), Rotate
+	// the setting ("auto" or the same number).
+	Rotation int    `json:"rotation"`
+	Rotate   string `json:"rotate"`
+}
+
+// RotateAuto turns a portrait buffer by 270° (90° counter-clockwise) and
+// leaves a landscape one alone: the Duo's GUI draws its landscape screen
+// into a 720×1280 buffer whose top is on the right.
+const RotateAuto = -1
+
+// SetRotation sets how frames are turned: RotateAuto, 0, 90, 180 or 270
+// degrees clockwise. Other values count as RotateAuto.
+func (s *Screen) SetRotation(deg int) {
+	fixed := deg == 0 || deg == 90 || deg == 180 || deg == 270
+	if !fixed {
+		deg = 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.fixed != fixed || s.rotate != deg {
+		s.fixed, s.rotate, s.at = fixed, deg, time.Time{} // the next request captures anew
+	}
+}
+
+// rotation returns the clockwise turn for a w×h buffer.
+func (s *Screen) rotation(w, h int) int {
+	switch {
+	case s.fixed:
+		return s.rotate
+	case h > w:
+		return 270
+	}
+	return 0
 }
 
 // ErrBusy is returned when the stream limit is reached.
@@ -67,6 +105,11 @@ func (s *Screen) frameLocked() (image.Image, error) {
 		grab = s.grab
 	}
 	img, src, detail, err := grab()
+	if err == nil {
+		b := img.Bounds()
+		s.turned = s.rotation(b.Dx(), b.Dy())
+		img = rotate(img, s.turned)
+	}
 	s.at, s.img, s.err, s.jpg = time.Now(), img, err, nil
 	if err == nil {
 		s.source, s.detail = src, detail
@@ -182,6 +225,10 @@ func (s *Screen) Status() ScreenStatus {
 	}
 	st.Available, st.Source, st.Detail, st.Blank = true, s.source, s.detail, isBlank(img)
 	st.Width, st.Height = img.Bounds().Dx(), img.Bounds().Dy()
+	st.Rotation, st.Rotate = s.turned, "auto"
+	if s.fixed {
+		st.Rotate = strconv.Itoa(s.rotate)
+	}
 	return st
 }
 
@@ -209,3 +256,38 @@ func (s *Screen) Acquire() (release func(), err error) {
 
 // Interval is the time between frames of a stream.
 func (s *Screen) Interval() time.Duration { return s.interval() }
+
+// rotate turns img clockwise by deg (0, 90, 180 or 270).
+func rotate(img image.Image, deg int) image.Image {
+	if deg != 90 && deg != 180 && deg != 270 {
+		return img
+	}
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	size := image.Rect(0, 0, h, w)
+	if deg == 180 {
+		size = image.Rect(0, 0, w, h)
+	}
+	dst := image.NewRGBA(size)
+	src, fast := img.(*image.RGBA)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			var dx, dy int
+			switch deg {
+			case 90:
+				dx, dy = h-1-y, x
+			case 180:
+				dx, dy = w-1-x, h-1-y
+			default: // 270: the right edge becomes the top
+				dx, dy = y, w-1-x
+			}
+			if fast {
+				si, di := src.PixOffset(b.Min.X+x, b.Min.Y+y), dst.PixOffset(dx, dy)
+				copy(dst.Pix[di:di+4], src.Pix[si:si+4])
+			} else {
+				dst.Set(dx, dy, img.At(b.Min.X+x, b.Min.Y+y))
+			}
+		}
+	}
+	return dst
+}

@@ -6,6 +6,20 @@ may break compatibility).
 
 ## 0.5.2 - Unreleased
 
+### Added
+- The console's *Display* page switches the front-panel emulation on and off itself
+  (with a confirmation, saved across restarts), so no `config/console.json` is needed;
+  `--panel` still switches it on for good. It works at the expert level only.
+- The screen mirror's orientation: by default a portrait buffer is turned to
+  landscape, which the Duo needs (its GUI draws the 1280×720 screen into a 720×1280
+  buffer); *Display* offers automatic, 0°, 90°, 180° and 270°.
+- When the mixer is busy, every page of the console points to *Display*, where the
+  device can be operated through its buttons.
+
+### Fixed
+- Switching the screen mirror on or off without the device state needed a reload of
+  the page before the picture appeared.
+
 ## 0.5.1 - 2026-10-18
 
 ### Added

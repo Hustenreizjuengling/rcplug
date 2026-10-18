@@ -432,6 +432,52 @@ func TestScreenMirrorIsOptIn(t *testing.T) {
 	}
 }
 
+// The front panel is switched on in the UI (no --panel needed) and stays on
+// across a restart; the picture's rotation is a setting as well.
+func TestPanelAndScreenRotationAreSettings(t *testing.T) {
+	r := newRig(t, rcsim.Options{}, func(o *Options) { o.Panel = &hw.Panel{TTY: "/dev/null"} })
+	if res := r.post(t, "/api/control", map[string]string{"level": "expert"}); res.code != 200 {
+		t.Fatalf("expert: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/panel", map[string]string{"control": "listen1"}); res.code != 403 || res.body["code"] != "panel_disabled" {
+		t.Fatalf("panel before switching it on: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/settings", map[string]bool{"panel": true}); res.code != 200 {
+		t.Fatalf("switch panel on: %d %s", res.code, res.raw)
+	}
+	hwDoc := r.do(t, http.MethodGet, "/api/hw", nil).body["panel"].(map[string]interface{})
+	if hwDoc["enabled"] != true || hwDoc["forced"] != false {
+		t.Fatalf("hw panel: %v", hwDoc)
+	}
+	// Switched on: the press reaches the tty (/dev/null refuses TIOCSTI).
+	if res := r.post(t, "/api/panel", map[string]string{"control": "listen1"}); res.code != 400 || !strings.Contains(string(res.raw), "TIOCSTI") {
+		t.Fatalf("panel when on: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/settings", map[string]string{"screenRotate": "90"}); res.code != 200 {
+		t.Fatalf("rotate: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/settings", map[string]string{"screenRotate": "45"}); res.code != 400 {
+		t.Fatalf("bad rotation accepted: %d %s", res.code, res.raw)
+	}
+	var saved Settings
+	if err := sdk.LoadJSON(filepath.Join(r.dir, "settings.json"), &saved); err != nil {
+		t.Fatal(err)
+	}
+	if !saved.Panel || saved.ScreenRotate != "90" {
+		t.Fatalf("saved %+v", saved)
+	}
+	again := New(Options{Client: r.client, DataDir: r.dir, Logf: quiet, Panel: &hw.Panel{TTY: "/dev/null"}})
+	if !again.panelOn() {
+		t.Fatal("the panel switch did not survive a restart")
+	}
+	if res := r.post(t, "/api/settings", map[string]interface{}{"panel": false, "screenRotate": "auto"}); res.code != 200 {
+		t.Fatalf("switch off: %d %s", res.code, res.raw)
+	}
+	if r.console.panelOn() || r.console.settings.ScreenRotate != "" {
+		t.Fatalf("after switching off: panel %v, rotate %q", r.console.panelOn(), r.console.settings.ScreenRotate)
+	}
+}
+
 func TestUntestedModelIsReadOnly(t *testing.T) {
 	root, _ := rcsim.DuoTree()
 	rcsim.MakeRealistic(root)

@@ -50,9 +50,7 @@ flashing from Windows (below). What is still open:
    to its interpretation.
 4. **Gain ranges.** The real ranges of the input gains are not known; the *Control*
    level only lets them move in small steps until they are.
-5. **Screen capture as a second DRM client.** rcplug reads the GUI's scanout buffer
-   as root; whether the kernel hands it over while the GUI is DRM master is untested.
-6. **Sonar's JACK bridge.** CPU load and dropouts when `alsa_out` joins RØDE's audio
+5. **Sonar's JACK bridge.** CPU load and dropouts when `alsa_out` joins RØDE's audio
    graph, and which JACK port carries which input of the desk
    ([Sonar](https://github.com/Hustenreizjuengling/rcplug-plugins/blob/main/sonar/README.md)).
 ## First test on a real Duo
@@ -76,10 +74,13 @@ from Windows to a patched 1.7.6):
   `b0 19 01` into `/dev/ttyAML3` with `TIOCSTI`) toggled it exactly like the button,
   LED included, and a second press turned it off again. It needs no connection to the
   mixer, so the console's *Display* page (front panel and screen mirror) can operate
-  the desk although the screen holds the mixer's port. To use it: save
-  `{"args": ["--panel"]}` as `config/console.json` in the install directory, start
-  the console (dashboard → Plugins), choose *Expert* in the console's header and open
-  *Display*. Since 0.5.1 the *Display* and *Log* pages work without the device state.
+  the desk although the screen holds the mixer's port: on the console's *Display*
+  page choose *Switch on the device buttons* and the *Expert* level (since 0.5.2; 0.5.1
+  needed `--panel`). Every button of the device, the wheel and the pads worked from
+  the browser.
+- **The screen mirror works next to the GUI** (DRM, 2 frames per second). The GUI
+  draws its 1280×720 landscape screen into a 720×1280 buffer whose top is on the
+  right; since 0.5.2 the mirror turns it.
 - **Diagnostics** now include the network and unix sockets with their processes and
   the names on the D-Bus system bus, which is what this needed.
 

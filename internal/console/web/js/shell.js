@@ -31,7 +31,7 @@ export function render() {
     if (scope) scope.dispose();
     scope = null;
     mounted = '';
-    $('#main').replaceChildren(h('div', { class: 'empty' }, h('p', null, t('loading.none')), lastError ? h('p', { class: 'muted' }, lastError.message) : null));
+    $('#main').replaceChildren(...banners(), h('div', { class: 'empty' }, h('p', null, t('loading.none')), lastError ? h('p', { class: 'muted' }, lastError.message) : null));
     markTab();
     return;
   }
@@ -68,6 +68,8 @@ function banners() {
   const st = liveState.status;
   const conn = st && st.connection;
   if (conn && conn.state !== 'live') out.push(h('div', { class: 'banner' + (conn.state === 'conflict' ? ' bad' : ''), role: 'status' }, connText(conn), store.loaded ? ' – ' + t('banner.lastKnown') : ''));
+  // Busy: the device's screen holds the mixer, but its buttons still work.
+  if (conn && conn.code === 'desk_busy' && current.id !== 'display') out.push(h('div', { class: 'banner info' }, t('banner.busyHint'), ' ', h('a', { href: '#display' }, t('banner.busyLink'))));
   else if (store.stale) out.push(h('div', { class: 'banner', role: 'status' }, t('banner.lastKnown')));
   const limit = store.loaded ? store.meta.controlLimit : st && st.controlLimit;
   if (limit === 'untested_model' && store.loaded) out.push(h('div', { class: 'banner info' }, t('banner.untested', { model: store.L.modelName })));

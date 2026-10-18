@@ -153,7 +153,11 @@ export default {
   'display.streamLost': 'Bildstrom unterbrochen – Ansicht neu öffnen.', 'display.save': 'Screenshot (PNG) speichern',
   'display.blank': 'Das Bild ist einfarbig. Entweder ist das Display gerade dunkel, oder die Oberfläche zeichnet an einer anderen Stelle als {detail}.',
   'display.source': 'Quelle: {detail} · nur Anzeige, Touch wird nicht übertragen.',
-  'panel.title': 'Bedienfeld (Tasten am Gerät)', 'panel.disabled': 'Die Emulation der Geräte-Tasten ist experimentell und ausgeschaltet. Aktivierung: „--panel“ in config/console.json eintragen (siehe Doku) und Steuerstufe „Experte“ wählen.',
+  'panel.title': 'Bedienfeld (Tasten am Gerät)', 'panel.disabled': 'Das Nachbilden der Gerätetasten ist experimentell und ausgeschaltet.',
+  'panel.enable': 'Gerätetasten einschalten', 'panel.disable': 'Gerätetasten ausschalten',
+  'panel.enableConfirm': 'Die Konsole sendet dann dieselben Signale wie die Tasten am Gerät. Selten kann ein Druck mit einem echten Tastendruck im selben Moment zusammenfallen. Bedienbar in der Steuerstufe „Experte“.',
+  'display.rotate': 'Ausrichtung', 'display.rotateAuto': 'automatisch',
+  'banner.busyHint': 'Über die Ansicht „Display“ bedienst du das Gerät mit seinen Tasten und siehst seinen Bildschirm.', 'banner.busyLink': 'Zu „Display“',
   'panel.expertOnly': 'Nur in der Steuerstufe „Experte“ bedienbar.', 'panel.faderLabel': '{name} (setzt Position)',
   'panel.note': 'Sendet dieselben Signale wie die echten Tasten. Ein emulierter Fader springt zurück, sobald der echte Fader bewegt wird.',
 

@@ -6,7 +6,7 @@ import { request, setSettings, panel, report } from '../api.js';
 import { confirmDialog } from '../dialogs.js';
 import { controlLevel } from '../policy.js';
 
-function screenCard(scope, hw) {
+function screenCard(scope, hw, rerender) {
   const c = h('section', { class: 'card' }, h('h3', null, t('display.screen')));
   const sc = hw.screen || {};
   if (!sc.available && !sc.enabled) {
@@ -15,13 +15,13 @@ function screenCard(scope, hw) {
   }
   if (!sc.enabled) {
     c.append(h('p', null, t('display.optIn')), h('button', { class: 'btn primary', type: 'button', onclick: async () => {
-      if (await confirmDialog(t('display.optInConfirm'), t('display.enable'))) setSettings({ screen: true });
+      if (await confirmDialog(t('display.optInConfirm'), t('display.enable')) && await setSettings({ screen: true })) rerender();
     } }, t('display.enable')));
     return c;
   }
   const st = sc.status || {};
   if (!st.available) {
-    c.append(h('p', { class: 'muted' }, t('display.error', { err: st.error || '?' })), h('button', { class: 'btn', type: 'button', onclick: () => setSettings({ screen: false }) }, t('display.disable')));
+    c.append(h('p', { class: 'muted' }, t('display.error', { err: st.error || '?' })), h('button', { class: 'btn', type: 'button', onclick: async () => { if (await setSettings({ screen: false })) rerender(); } }, t('display.disable')));
     return c;
   }
   const src = 'api/screen.mjpg';
@@ -43,17 +43,27 @@ function screenCard(scope, hw) {
   scope.onDispose(() => { img.removeAttribute('src'); document.removeEventListener('visibilitychange', onVis); });
   c.querySelector('h3').append(h('span', { class: 'tag' }, `${st.width}×${st.height} · ${st.source === 'drm' ? 'DRM' : 'Framebuffer'} · ${st.fps} fps`));
   if (st.blank) c.append(h('div', { class: 'banner' }, t('display.blank', { detail: st.detail || '' })));
+  // The Duo draws its screen into a portrait buffer; "auto" turns it.
+  const rot = h('select', { 'aria-label': t('display.rotate') }, ...['auto', '0', '90', '180', '270'].map((v) =>
+    h('option', { value: v, selected: (st.rotate || 'auto') === v }, v === 'auto' ? t('display.rotateAuto') : v + '°')));
+  rot.addEventListener('change', async () => { if (await setSettings({ screenRotate: rot.value })) rerender(); });
   c.append(img, h('div', { class: 'row', style: 'margin-top:8px' },
     h('a', { class: 'btn', href: 'api/screen.png', download: '' }, t('display.save')),
-    h('button', { class: 'btn', type: 'button', onclick: () => setSettings({ screen: false }) }, t('display.disable')),
+    h('button', { class: 'btn', type: 'button', onclick: async () => { if (await setSettings({ screen: false })) rerender(); } }, t('display.disable')),
+    h('label', { class: 'small muted' }, t('display.rotate'), ' ', rot),
     h('span', { class: 'muted small' }, t('display.source', { detail: st.detail || st.source }))));
   return c;
 }
 
-function panelCard(hw) {
+function panelCard(hw, rerender) {
   const p = hw.panel || {};
   const c = h('section', { class: 'card' }, h('h3', null, t('panel.title'), p.enabled ? h('span', { class: 'tag amber' }, t('experimental')) : null));
-  if (!p.enabled) { c.append(h('p', { class: 'muted' }, t('panel.disabled'))); return c; }
+  if (!p.enabled) {
+    c.append(h('p', { class: 'muted' }, t('panel.disabled')), h('button', { class: 'btn primary', type: 'button', onclick: async () => {
+      if (await confirmDialog(t('panel.enableConfirm'), t('panel.enable')) && await setSettings({ panel: true })) rerender();
+    } }, t('panel.enable')));
+    return c;
+  }
   if (p.error) c.append(h('div', { class: 'banner bad' }, p.error));
   const disabled = controlLevel() !== 'expert';
   if (disabled) c.append(h('div', { class: 'banner' }, t('panel.expertOnly')));
@@ -74,6 +84,7 @@ function panelCard(hw) {
     c.append(h('h4', { class: 'section-title' }, panelGroup(g)), grid);
   }
   c.append(h('p', { class: 'muted small' }, t('panel.note')));
+  if (!p.forced) c.append(h('button', { class: 'btn', type: 'button', onclick: async () => { if (await setSettings({ panel: false })) rerender(); } }, t('panel.disable')));
   return c;
 }
 
@@ -81,11 +92,11 @@ export const display = {
   id: 'display',
   title: 'tab.display',
   noTree: true, // works without the device state: the panel and the screen do not need it
-  render(scope) {
+  render(scope, rerender) {
     const wrap = h('div', { class: 'grid cols-2' }, h('section', { class: 'card' }, h('p', { class: 'muted' }, t('loading'))));
     request('api/hw').then((hw) => {
       if (scope.dead) return;
-      wrap.replaceChildren(screenCard(scope, hw), panelCard(hw));
+      wrap.replaceChildren(screenCard(scope, hw, rerender), panelCard(hw, rerender));
     }).catch(report);
     return [wrap];
   },

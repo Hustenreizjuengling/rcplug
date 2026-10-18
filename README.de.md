@@ -23,11 +23,12 @@ dazu ein [Kochbuch](docs/cookbook.md) und die [Schnittstellen-Referenz](docs/plu
 > Simulator, der einen echten Duo-Gerätezustand (Firmware 1.7.4) abspielt, mit den
 > arm64-Programmen unter QEMU und installiert in die Original-Firmware 1.7.6 und 1.7.3.
 > **Erster Test an einem echten Duo (Firmware 1.7.6):** Flashen, SSH, Installer,
-> Dashboard und Plugins funktionieren. Die Konsole erreicht das Mischpult noch nicht:
-> Es bedient nur einen Client gleichzeitig, und den belegt der Bildschirm des Geräts.
-> Die Konsole wird dafür umgebaut ([docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo),
-> Englisch); sie nimmt dem Bildschirm nie den Platz weg. Nach der Installation ist sie
-> nur lesend.
+> In-App-Updates, Dashboard und Plugins funktionieren, und die Konsole bedient das
+> Pult über seine Tasten und zeigt seinen Bildschirm. Ihr vollständiges Abbild des Pults
+> kommt noch nicht ans Mischpult: Es bedient nur einen Client gleichzeitig, und den
+> belegt der Bildschirm des Geräts; das wird umgebaut
+> ([docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo), Englisch). Die
+> Konsole nimmt dem Bildschirm nie den Platz weg. Nach der Installation ist sie nur lesend.
 >
 > rcplug steht in keiner Verbindung zu RØDE. Nutzung auf eigene Gefahr; bitte den
 > Haftungsausschluss unten lesen.
@@ -51,7 +52,7 @@ einsetzen, die nicht ausfallen darf.
 
 | Gerät | Stand |
 |---|---|
-| RØDECaster Duo, Firmware 1.7.x | Läuft auf einem echten Duo (1.7.6): Host, Dashboard, In-App-Updates und Plugins. Spiegel und Steuerung der Konsole sind umgesetzt, kommen aber noch nicht ans Mischpult (es bedient nur den Bildschirm des Geräts); wird umgebaut. |
+| RØDECaster Duo, Firmware 1.7.x | Läuft auf einem echten Duo (1.7.6): Host, Dashboard, In-App-Updates und Plugins; die Konsole bedient die Tasten des Geräts und spiegelt seinen Bildschirm. Ihr Abbild des ganzen Pults kommt noch nicht ans Mischpult (es bedient nur den Bildschirm des Geräts); wird umgebaut. |
 | RØDECaster Pro II | Wird erkannt und **nur lesend** angezeigt. Steuerung braucht ein geprüftes Profil, siehe [docs/adding-a-model.md](docs/adding-a-model.md). |
 | Andere / unbekannt | Nur lesend. |
 

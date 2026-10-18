@@ -149,7 +149,11 @@ export default {
   'display.streamLost': 'Picture stream interrupted – reopen the view.', 'display.save': 'Save screenshot (PNG)',
   'display.blank': 'The picture is a single colour. Either the screen is dark right now, or the GUI draws somewhere other than {detail}.',
   'display.source': 'Source: {detail} · display only, touch is not forwarded.',
-  'panel.title': 'Front panel (device buttons)', 'panel.disabled': 'Emulating the device’s buttons is experimental and switched off. To enable it, add “--panel” to config/console.json (see the docs) and choose the expert level.',
+  'panel.title': 'Front panel (device buttons)', 'panel.disabled': 'Emulating the device’s buttons is experimental and switched off.',
+  'panel.enable': 'Switch on the device buttons', 'panel.disable': 'Switch off the device buttons',
+  'panel.enableConfirm': 'The console then sends the same signals as the buttons on the device. Rarely, a press can coincide with a real button press at the same moment. Usable at the expert control level.',
+  'display.rotate': 'Orientation', 'display.rotateAuto': 'automatic',
+  'banner.busyHint': 'On the Display page you operate the device with its buttons and see its screen.', 'banner.busyLink': 'Go to Display',
   'panel.expertOnly': 'Only usable at the expert control level.', 'panel.faderLabel': '{name} (sets position)',
   'panel.note': 'Sends the same signals as the real buttons. An emulated fader jumps back as soon as the real fader is moved.',
 

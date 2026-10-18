@@ -50,7 +50,7 @@ saved as `config/console.json`, then restart the console.
 | `--screen` | `auto` | Screen mirror source: `auto`, `fb`, `drm` or `off`. Users still have to switch it on. |
 | `--fb`, `--drm` | `/dev/fb0`, `/dev/dri/card0` | Devices for the screen mirror |
 | `--fps` | `2` | Maximum screen mirror frames per second |
-| `--panel` | off | Experimental front-panel emulation (expert level only) |
+| `--panel` | off | Switches the experimental front-panel emulation on for good. Without it, users switch it on and off on the console's *Display* page; either way it works only at the expert level. |
 | `--tty` | `/dev/ttyAML3` | Serial line of the front panel |
 | `--sim` | off | Start a built-in simulated Duo and connect to it |
 | `--addr` | `127.0.0.1:8082` | Listen address when run standalone (the host passes its own) |

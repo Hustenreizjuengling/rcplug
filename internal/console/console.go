@@ -30,7 +30,8 @@ type Options struct {
 	DataDir string
 	// Screen is the display mirror (nil = not available).
 	Screen *hw.Screen
-	// Panel emulates front-panel input; PanelEnabled must be set as well.
+	// Panel emulates front-panel input. It is used when PanelEnabled is set
+	// (--panel) or the user switched it on (Settings.Panel).
 	Panel        *hw.Panel
 	PanelEnabled bool
 	// AllowUntested offers control on models without a verified profile.
@@ -92,6 +93,12 @@ func New(o Options) *Console {
 	}
 	if _, err := ParseLevel(c.settings.Control); err != nil {
 		c.settings.Control = "off"
+	}
+	if _, ok := rotations[c.settings.ScreenRotate]; !ok {
+		c.settings.ScreenRotate = ""
+	}
+	if o.Screen != nil {
+		o.Screen.SetRotation(screenRotation(c.settings.ScreenRotate))
 	}
 	c.client.OnStatus(func(st desk.Status) {
 		data, _ := json.Marshal(st)
@@ -161,11 +168,24 @@ func (c *Console) Handler() http.Handler {
 	return mux
 }
 
+// panelOn reports whether the front-panel emulation is switched on, by
+// --panel or by the user.
+func (c *Console) panelOn() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.panelOnLocked()
+}
+
+func (c *Console) panelOnLocked() bool {
+	return c.opts.Panel != nil && (c.opts.PanelEnabled || c.settings.Panel)
+}
+
 // statusDoc is GET api/status and the SSE hello event.
 func (c *Console) statusDoc() map[string]interface{} {
 	level, limit := c.Level()
 	c.mu.Lock()
 	screen := c.settings.Screen && c.opts.Screen != nil
+	panel := c.panelOnLocked()
 	c.mu.Unlock()
 	doc := map[string]interface{}{
 		"connection":   c.client.Status(),
@@ -174,7 +194,7 @@ func (c *Console) statusDoc() map[string]interface{} {
 		"readOnly":     c.client.ReadOnly(),
 		"pinRequired":  c.pin.set(),
 		"screen":       screen,
-		"panel":        c.opts.PanelEnabled,
+		"panel":        panel,
 		"version":      c.opts.Version,
 	}
 	c.mirror.View(func(s desk.Snapshot) {
