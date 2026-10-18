@@ -69,12 +69,13 @@ type Updater struct {
 	keys    []ed25519.PublicKey
 	spawn   func(payload, logFile, resultFile string) error
 
-	mu       sync.Mutex
-	status   UpdateStatus
-	checked  time.Time
-	checking bool
-	found    map[string]*foundUpdate // target → what a check found
-	job      *updateJob
+	mu        sync.Mutex
+	status    UpdateStatus
+	checked   time.Time
+	checking  bool
+	found     map[string]*foundUpdate // target → what a check found
+	job       *updateJob
+	announced string // the updates last reported on the event bus
 }
 
 // UpdateStatus is what the dashboard shows.
@@ -409,11 +410,24 @@ func (u *Updater) Check(ctx context.Context) UpdateStatus {
 	sort.SliceStable(targets[1:], func(i, j int) bool { return targets[1+i].Name < targets[1+j].Name })
 
 	now := time.Now()
+	var avail []map[string]string
+	var sig []string
+	for _, t := range targets {
+		if t.Available {
+			avail = append(avail, map[string]string{"target": t.Target, "name": t.Name, "current": t.Current, "latest": t.Latest})
+			sig = append(sig, t.Target+"@"+t.Latest)
+		}
+	}
 	u.mu.Lock()
 	u.checking, u.checked = false, now
 	u.status = UpdateStatus{CheckedAt: &now, Targets: targets}
 	u.found = found
+	announce := strings.Join(sig, ",") != u.announced && len(sig) > 0
+	u.announced = strings.Join(sig, ",")
 	u.mu.Unlock()
+	if announce {
+		u.m.hostEvent("host.update.available", map[string]interface{}{"updates": avail})
+	}
 	return u.Status()
 }
 
@@ -611,13 +625,24 @@ func (u *Updater) run(j *updateJob, fu *foundUpdate) {
 		_ = os.RemoveAll(filepath.Join(u.m.Root(), ".update"))
 	}
 	j.mu.Lock()
-	defer j.mu.Unlock()
 	if err != nil {
 		j.st.State, j.st.Error = "error", err.Error()
 		j.st.Log = append(j.st.Log, "failed: "+err.Error())
-		return
+	} else {
+		j.st.State = state
 	}
-	j.st.State = state
+	target, version := j.st.Target, j.st.Version
+	j.mu.Unlock()
+	data := map[string]interface{}{"target": target, "version": version}
+	switch {
+	case err != nil:
+		data["error"] = err.Error()
+		u.m.hostEvent("host.update.failed", data)
+	case state == "restarting":
+		u.m.hostEvent("host.update.restarting", data)
+	default:
+		u.m.hostEvent("host.update.installed", data)
+	}
 }
 
 func (u *Updater) install(ctx context.Context, j *updateJob, fu *foundUpdate) (string, error) {

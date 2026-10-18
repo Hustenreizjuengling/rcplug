@@ -26,7 +26,8 @@ one outside the host, point it at a running one:
 [Drop a marker](#drop-a-marker) ·
 [Start and stop recording](#start-and-stop-recording) ·
 [React to a SMART pad](#react-to-a-smart-pad) ·
-[Call a URL when recording starts](#call-a-url-when-recording-starts-or-stops)
+[Call a URL when recording starts](#call-a-url-when-recording-starts-or-stops) ·
+[Work together through events](#work-together-through-events)
 
 **The page**
 [Live data](#push-live-data-to-the-page) ·
@@ -336,6 +337,54 @@ func run(ctx context.Context, command string) {
 
 Five reads a second cost little: the summary comes from the console's mirror, not
 from the desk.
+
+### Work together through events
+
+The console reports what happens on the desk on the host's event bus, and any plugin
+can publish there too ([Events](plugin-api.md#events)). This one turns the console's
+recording events into its own `onair.lamp` event, which a lamp, a chat bot or a sign
+on the door can follow without knowing the console:
+
+```go
+// onair-events turns the console's recording events into an on-air signal
+// on the event bus: "onair.lamp" with {"on": true|false}, which any other
+// plugin (a lamp, a chat message, a sign on the door) can follow without
+// knowing the console.
+package main
+
+import (
+	"log"
+
+	"github.com/Hustenreizjuengling/rcplug/sdk"
+)
+
+func main() {
+	ctx, stop := sdk.SignalContext()
+	defer stop()
+	for e := range sdk.Events(ctx, "desk.recording.") {
+		if e.Source != "console" { // only the console reports the desk
+			continue
+		}
+		var on bool
+		switch e.Type {
+		case "desk.recording.started", "desk.recording.resumed":
+			on = true
+		case "desk.recording.stopped", "desk.recording.paused":
+			on = false
+		default:
+			continue
+		}
+		if err := sdk.Publish(ctx, "onair.lamp", map[string]bool{"on": on}); err != nil {
+			log.Print(err)
+		}
+	}
+}
+```
+
+`sdk.Events` reconnects and catches up by itself. Check `e.Source`: only the console
+reports the desk, and every event's source is set by the host. Events are best effort;
+where a missed one would leave something wrong (a lamp after a restart), read the
+state once at the start as well, as the next recipe does.
 
 ### Call a URL when recording starts or stops
 

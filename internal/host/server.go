@@ -35,6 +35,8 @@ type Server struct {
 	// Access guards everything with the optional dashboard password; nil:
 	// no password possible (tests).
 	Access *Access
+	// Events is the event bus; nil switches its API off.
+	Events *Bus
 	// Rescan reloads the plugins for POST /api/reload (and logs what it
 	// found); nil means Manager.Load.
 	Rescan func() ([]string, error)
@@ -112,6 +114,11 @@ func (s *Server) Handler() http.Handler {
 		mux.Handle("POST /api/access/password", sdk.CSRF(http.HandlerFunc(s.handlePassword)))
 		mux.Handle("POST /api/access/reset", sdk.CSRF(http.HandlerFunc(s.handleAccessReset)))
 		mux.HandleFunc("GET /login", s.handleLoginPage)
+	}
+	if s.Events != nil {
+		mux.HandleFunc("GET /api/events", s.handleEvents)
+		mux.HandleFunc("GET /api/events/stream", s.handleEventStream)
+		mux.Handle("POST /api/events", sdk.CSRF(http.HandlerFunc(s.handlePublish)))
 	}
 	mux.HandleFunc("/plugins/{name}", s.handleProxy)
 	mux.HandleFunc("/plugins/{name}/", s.handleProxy)

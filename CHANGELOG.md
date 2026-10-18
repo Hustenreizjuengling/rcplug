@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.6.10 - Unreleased
 
+### Added
+- **Event bus:** plugins publish and subscribe to events through the host
+  (`POST /api/events` with the plugin's `RCPLUG_TOKEN`, `GET /api/events/stream`,
+  `sdk.Publish`, `sdk.Events`). The console reports the desk: recording started,
+  paused, resumed, stopped and saved, markers, mute and listen per channel, SMART pads,
+  the show and its connection. The host reports plugins starting, crashing and
+  stopping, and updates. The dashboard's System page lists the events live. See
+  docs/plugin-api.md#events.
+
 ## 0.6.9 - 2026-10-18
 
 ### Added

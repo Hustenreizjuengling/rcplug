@@ -1029,3 +1029,78 @@ func TestPresenceOnlyForTheHost(t *testing.T) {
 		t.Fatal("presses not reported")
 	}
 }
+
+type fakeBus struct {
+	mu     sync.Mutex
+	events []string
+	data   []map[string]interface{}
+}
+
+func (f *fakeBus) publish(ctx context.Context, typ string, data interface{}) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.events = append(f.events, typ)
+	m, _ := data.(map[string]interface{})
+	f.data = append(f.data, m)
+	return nil
+}
+
+func (f *fakeBus) seen(typ string) map[string]interface{} {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, e := range f.events {
+		if e == typ {
+			return f.data[i]
+		}
+	}
+	return nil
+}
+
+func TestDeskEvents(t *testing.T) {
+	fb := &fakeBus{}
+	r := newRig(t, rcsim.Options{}, func(o *Options) { o.Publish = fb.publish })
+	eventually(t, func() bool { return fb.seen("desk.connection.live") != nil })
+	l, _ := r.snap()
+	set := func(path []int, name string, v rcproto.Value) {
+		t.Helper()
+		if err := r.sim.Inject(&rcproto.Change{Type: rcproto.PropertyChanged, Path: path, Name: name, Value: v}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rec := l.Path("RECORDER", 0)
+	set(rec, "recordState", rcproto.Int(2))
+	eventually(t, func() bool { return fb.seen("desk.recording.started") != nil })
+	set(rec, "recordState", rcproto.Int(1))
+	set(rec, "recordState", rcproto.Int(2))
+	set(rec, "requestDropMarker", rcproto.Int(1234))
+	set(rec, "recordState", rcproto.Int(0))
+	eventually(t, func() bool { return fb.seen("desk.recording.stopped") != nil })
+	for _, typ := range []string{"desk.recording.paused", "desk.recording.resumed", "desk.recording.marker"} {
+		if fb.seen(typ) == nil {
+			t.Errorf("no %s", typ)
+		}
+	}
+	ch := l.Path("CHANNEL", 0)
+	cur, _ := r.sim.Snapshot().At(ch).Get("channelOutputMute")
+	set(ch, "channelOutputMute", rcproto.Bool(!cur.Truth()))
+	eventually(t, func() bool { return fb.seen("desk.channel.mute") != nil })
+	if d := fb.seen("desk.channel.mute"); d["strip"] != 0 || d["label"] != "Fader 1" || d["muted"] != !cur.Truth() {
+		t.Errorf("mute event %v", d)
+	}
+	set(l.Path("PADBUTTON", 2), "padButtonPressed", rcproto.Bool(true))
+	eventually(t, func() bool { return fb.seen("desk.pad.pressed") != nil })
+	if d := fb.seen("desk.pad.pressed"); d["pad"] != 2 {
+		t.Errorf("pad event %v", d)
+	}
+	// Meters and other properties make no events.
+	fb.mu.Lock()
+	n := len(fb.events)
+	fb.mu.Unlock()
+	set(l.Path("FADER", 5), "faderLevel", rcproto.Int(33))
+	time.Sleep(150 * time.Millisecond)
+	fb.mu.Lock()
+	defer fb.mu.Unlock()
+	if len(fb.events) != n {
+		t.Errorf("unexpected events %v", fb.events[n:])
+	}
+}

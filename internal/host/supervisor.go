@@ -134,8 +134,17 @@ func (p *Plugin) status() Status {
 
 func (p *Plugin) setState(s string, pid int) {
 	p.mu.Lock()
+	changed := p.state != s
 	p.state, p.pid = s, pid
+	name, lastErr := p.manifest.Name, p.lastErr
 	p.mu.Unlock()
+	if changed && s != StateStarting {
+		data := map[string]interface{}{"name": name, "state": s}
+		if s == StateBackoff && lastErr != "" {
+			data["error"] = lastErr
+		}
+		p.host.hostEvent("host.plugin.state", data)
+	}
 }
 
 // start launches the supervision loop, which keeps the plugin process alive
@@ -248,6 +257,9 @@ func (p *Plugin) command(ctx context.Context) (*exec.Cmd, []string, error) {
 		"RCPLUG_HOST_URL="+h.HostURL,
 		"RCPLUG_VERSION="+h.Version,
 	)
+	if h.Events != nil {
+		cmd.Env = append(cmd.Env, "RCPLUG_TOKEN="+h.Events.Token(m.Name))
+	}
 	cmd.Env = append(cmd.Env, optEnv...)
 	for k, v := range cfg.Env {
 		cmd.Env = append(cmd.Env, k+"="+v)

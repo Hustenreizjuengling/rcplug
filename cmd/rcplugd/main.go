@@ -89,7 +89,9 @@ func main() {
 	m := host.NewManager(*root, *basePort)
 	m.HostURL, m.Version = loopbackURL(*addr), version
 	dash, _ := fs.Sub(webFS, "web")
+	m.Events = host.NewBus()
 	srv := host.NewServer(m, dash, version)
+	srv.Events = m.Events
 	srv.Access = host.NewAccess(*root)
 	srv.Access.Presence = host.PresenceViaConsole(m)
 	if *allow != "" {

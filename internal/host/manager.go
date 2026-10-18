@@ -30,6 +30,8 @@ type Manager struct {
 	// HostURL and Version are passed to plugins (RCPLUG_HOST_URL, RCPLUG_VERSION).
 	HostURL string
 	Version string
+	// Events is the event bus; plugins get a token for it (RCPLUG_TOKEN).
+	Events *Bus
 
 	mu       sync.Mutex
 	plugins  map[string]*Plugin

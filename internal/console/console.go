@@ -36,6 +36,8 @@ type Options struct {
 	// in shared memory (hw.Meters), which never travel over the control
 	// port; nil = not available.
 	Meters MeterSource
+	// Publish puts desk events on the host's bus (nil: sdk.Publish).
+	Publish func(ctx context.Context, typ string, data interface{}) error
 	// AllowUntested offers control on models without a verified profile.
 	AllowUntested bool
 	// LegacyPIN is a PIN from the old --pin flag or RCPLUG_CONSOLE_PIN. It is
@@ -73,6 +75,7 @@ type Console struct {
 	meters        meterState
 	reset         pinReset
 	presence      presenceState
+	desk          *deskEvents
 }
 
 // New creates the console and loads persisted settings.
@@ -80,7 +83,7 @@ func New(o Options) *Console {
 	if o.Logf == nil {
 		o.Logf = func(string, ...interface{}) {}
 	}
-	c := &Console{opts: o, client: o.Client, mirror: o.Client.Mirror(), pin: newPinStore(o.DataDir)}
+	c := &Console{opts: o, client: o.Client, mirror: o.Client.Mirror(), pin: newPinStore(o.DataDir), desk: newDeskEvents(o.Publish)}
 	if o.DataDir != "" {
 		if err := sdk.LoadJSON(c.settingsPath(), &c.settings); err != nil {
 			o.Logf("console: settings: %v", err)
@@ -104,9 +107,11 @@ func New(o Options) *Console {
 	}
 	c.mirror.Watch(c.watchPinReset)
 	c.mirror.Watch(c.watchPresence)
+	c.mirror.Watch(c.watchDesk)
 	c.client.OnStatus(func(st desk.Status) {
 		data, _ := json.Marshal(st)
 		c.mirror.Notify("status", data)
+		c.connectionEvent(st)
 	})
 	return c
 }
@@ -146,6 +151,7 @@ func (c *Console) Level() (Level, string) {
 // Run broadcasts coalesced changes to live clients until ctx ends.
 func (c *Console) Run(ctx context.Context) {
 	go c.runMeters(ctx)
+	go c.runDeskEvents(ctx)
 	t := time.NewTicker(60 * time.Millisecond)
 	defer t.Stop()
 	for {

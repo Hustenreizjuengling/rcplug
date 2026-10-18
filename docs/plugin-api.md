@@ -120,6 +120,7 @@ The host's own environment, plus:
 | `RCPLUG_DATA_DIR` | `<root>/data/<name>/`, created before the start and kept across updates |
 | `RCPLUG_HOST_URL` | the host on loopback, e.g. `http://127.0.0.1:8080`. Other plugins are at `$RCPLUG_HOST_URL/plugins/<name>/`. |
 | `RCPLUG_VERSION` | the host's version |
+| `RCPLUG_TOKEN` | proves the plugin to the host when it publishes [events](#events); new at every start, never logged |
 
 `env` from the operator settings comes last and wins over everything above.
 
@@ -436,6 +437,66 @@ The dashboard's API, open to plugins (`$RCPLUG_HOST_URL`) and scripts. POSTs nee
 | `GET /api/system` | Host name, version, uptimes, load, memory, CPU temperature, free storage |
 | `GET /api/diagnostics` | The diagnostics bundle |
 | `GET /api/updates`, `POST /api/updates/check`, `POST /api/updates/install?target=` | Updates, see [updates.md](updates.md) |
+| `GET /api/events`, `GET /api/events/stream`, `POST /api/events` | The event bus, see [Events](#events) |
+
+## Events
+
+Plugins work together through the host's event bus without knowing each other's
+APIs: the console reports what happens on the desk, the host reports its own
+changes, and any plugin can publish what it does (a segment started, a guest joined)
+and follow what others publish.
+
+```go
+for e := range sdk.Events(ctx, "desk.recording.") { // reconnects and catches up by itself
+	if e.Source == "console" && e.Type == "desk.recording.started" {
+		_ = sdk.Publish(ctx, "onair.lamp", map[string]bool{"on": true})
+	}
+}
+```
+
+An event is `{"id", "time", "type", "source", "data"}`:
+
+- `type` has two to six dot-separated parts of `a-z`, `0-9`, `-` and `_`. Start your own
+  with your plugin's name (`onair.lamp`); `host.` is reserved for the host.
+- `source` is set by the host: `host`, or the plugin that published it, proven by its
+  `RCPLUG_TOKEN`. Check it before you act on an event (`desk.*` comes from `console`).
+- `data` is a JSON object of at most 16 KB, or absent.
+
+The host keeps the last 200 events in memory (nothing on disk; a restart of rcplug
+starts over). Publishing needs the plugin's token, so browsers and the network can
+only read.
+
+| Request | Effect |
+|---|---|
+| `POST /api/events` `{"type", "data"}` with `X-Rcplug-Token: $RCPLUG_TOKEN` | Publish; answers `{"id"}` |
+| `GET /api/events/stream?type=desk.,onair.` | Server-sent events (`event: rcplug`, the event as JSON in `data`, its `id` as the event id) whose type starts with one of the prefixes (all without `type`). With `Last-Event-ID` (or `?since=<id>`) the kept events after that id come first. A stream that does not keep up is closed; reconnect with `Last-Event-ID`. At most 32 streams |
+| `GET /api/events?since=<id>&type=…` | `{"events": [...]}`: the kept events after `id` |
+
+The Go SDK has `sdk.Publish(ctx, type, data)` and `sdk.Events(ctx, prefixes...)`.
+
+**Events of the desk** (source `console`, while it has the desk's state):
+
+| Type | Data | When |
+|---|---|---|
+| `desk.recording.started`, `.paused`, `.resumed`, `.stopped` | `state`, `label`, `timeMs` | The recorder changes state (0 ready, 1 paused, 2 recording, 3 no destination) |
+| `desk.recording.state` | the same | Any other change of the recorder state |
+| `desk.recording.marker` | `timeMs` | A marker is dropped |
+| `desk.recording.saved` | `id` | A recording is finished and saved (`lastRecordingID`) |
+| `desk.channel.mute`, `desk.channel.listen` | `strip`, `label`, `source`, `muted` / `listening` | A channel is muted or unmuted, listen switched |
+| `desk.pad.pressed` | `pad`, `bank` | A SMART pad button is pressed |
+| `desk.show.changed` | `name` | Another show is loaded |
+| `desk.connection.live`, `desk.connection.lost` | `mode`, `code` | The console gets or loses the desk's state |
+
+**Events of the host** (source `host`):
+
+| Type | Data | When |
+|---|---|---|
+| `host.plugin.state` | `name`, `state` (`running`, `backoff`, `stopped`), `error` | A plugin starts, crashes or stops |
+| `host.update.available` | `updates`: `target`, `name`, `current`, `latest` | A check finds updates (once per new set) |
+| `host.update.installed`, `.restarting`, `.failed` | `target`, `version`, `error` | An update ends; rcplug itself restarts to finish |
+
+Desk events are best effort: a plugin that must not miss a state (a lamp that has to
+be right after its own restart) reads it from the console as well (`api/summary`).
 
 ## The desk
 
@@ -486,6 +547,9 @@ To work on the SDK and a plugin together, use a workspace:
 | `NewError(status, code, msg)`, `WriteError(w, err)` | Errors as `{"error": "…", "code": "…"}`; other errors become 500 `internal` |
 | `Error(w, status, msg)` | A plain error with the code `error` |
 | `LowPriority()` | Lowers all threads to nice 19 (the host has done that already) |
+| `Publish(ctx, type, data)` | Puts an event on the host's bus, with this plugin as source; `ErrStandalone` without the host |
+| `Events(ctx, prefixes...)` | A channel of the host's events whose type starts with one of the prefixes; reconnects and catches up by itself, closes when `ctx` ends |
+| `Event` | `ID`, `Time`, `Type`, `Source`, `Data` (raw JSON) |
 
 ### Package `sdk/console`
 

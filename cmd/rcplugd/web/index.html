@@ -77,6 +77,10 @@
   .opts .check{display:flex;gap:8px;align-items:center}
   .opts .linkbtn{justify-self:start}
   .opts[hidden]{display:none}
+  .evlist{max-height:320px;overflow:auto;font-size:12px}
+  .ev{padding:4px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+  .ev:first-child{border-top:0}
+  .ev code{font:11px ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
   @media (max-width:700px){ .vitals{margin-left:0;width:100%} }
 </style>
 </head>
@@ -112,6 +116,7 @@ const T = {
     updInstall: 'Install {v}', updNotes: 'Release notes', updRelease: 'release page ↗', updNoTargets: 'Nothing to check.',
     updConfirmHost: 'Update rcplug to {v}?\n\nrcplug and all plugins restart (about half a minute). The RØDECaster itself and its audio keep running. If the new version does not start, the previous one comes back automatically.',
     updConfirmPlugin: 'Update the plugin “{name}” to {v}?\n\nThe plugin restarts; its settings and data are kept.',
+    evTitle: 'Events', evDesc: 'What the desk, the host and the plugins report on the event bus, live (the last 30).', evNone: 'No events yet.',
     accTitle: 'Access', accDesc: 'An optional password for the dashboard and every plugin page. Without one, everyone on the network can use them.',
     accOn: 'A password is set.', accOff: 'No password: everyone on the network can use the dashboard.', accCurrent: 'Current password', accNew: 'New password', accRepeat: 'Repeat',
     accSet: 'Set password', accChange: 'Change password', accRemove: 'Remove password', accLogout: 'Log out', accMismatch: 'The two new passwords differ.',
@@ -147,6 +152,7 @@ const T = {
     updInstall: '{v} installieren', updNotes: 'Versionshinweise', updRelease: 'Release-Seite ↗', updNoTargets: 'Nichts zu prüfen.',
     updConfirmHost: 'rcplug auf {v} aktualisieren?\n\nrcplug und alle Plugins starten neu (etwa eine halbe Minute). Der RØDECaster selbst und sein Audio laufen weiter. Startet die neue Version nicht, kommt automatisch die vorherige zurück.',
     updConfirmPlugin: 'Das Plugin „{name}“ auf {v} aktualisieren?\n\nDas Plugin startet neu; seine Einstellungen und Daten bleiben erhalten.',
+    evTitle: 'Ereignisse', evDesc: 'Was Pult, Host und Plugins auf dem Ereignis-Bus melden, live (die letzten 30).', evNone: 'Noch keine Ereignisse.',
     accTitle: 'Zugang', accDesc: 'Ein optionales Passwort für das Dashboard und alle Plugin-Seiten. Ohne Passwort kann jeder im Netzwerk sie benutzen.',
     accOn: 'Ein Passwort ist gesetzt.', accOff: 'Kein Passwort: Jeder im Netzwerk kann das Dashboard benutzen.', accCurrent: 'Aktuelles Passwort', accNew: 'Neues Passwort', accRepeat: 'Wiederholen',
     accSet: 'Passwort setzen', accChange: 'Passwort ändern', accRemove: 'Passwort entfernen', accLogout: 'Abmelden', accMismatch: 'Die beiden neuen Passwörter sind verschieden.',
@@ -276,6 +282,7 @@ function go() {
   }
   renderNav();
   pageSig = '';
+  if (route !== 'system') stopEvents();
   if (route.startsWith('p/')) { const f = frameRoute(); renderFrame(f.name, f.sub); }
   else if (route === 'system') renderSystem();
   else renderPlugins();
@@ -493,11 +500,13 @@ function renderSystem() {
     $('#view').innerHTML = `<div class="page"><div class="card" id="sysCard"></div>
       <div class="card" id="updCard" style="margin-top:14px"></div>
       <div class="card" id="accCard" style="margin-top:14px"></div>
+      <div class="card" id="evCard" style="margin-top:14px"><h2>${esc(t('evTitle'))}</h2><p class="desc">${esc(t('evDesc'))}</p><div id="evList" class="evlist"></div></div>
       <div class="card" style="margin-top:14px"><h2>${esc(t('diagTitle'))}</h2><p class="desc">${esc(t('diagText'))}</p>
         <a class="btn primary" href="api/diagnostics" download>${esc(t('diagButton'))}</a></div>
       <p class="note">${esc(t('disclaimer'))}</p></div>`;
     updSig = '';
     renderAccess();
+    startEvents();
   }
   const mem = sys.memTotalKB ? `${esc(t('memUsed', { used: Math.round((sys.memTotalKB - sys.memAvailableKB) / 1024), total: Math.round(sys.memTotalKB / 1024) }))}<div class="bar"><i style="width:${((1 - sys.memAvailableKB / sys.memTotalKB) * 100).toFixed(0)}%"></i></div>` : '—';
   const disk = sys.diskTotalMB ? `${esc(t('diskFree', { free: sys.diskFreeMB, total: sys.diskTotalMB }))}<div class="bar"><i style="width:${((1 - sys.diskFreeMB / sys.diskTotalMB) * 100).toFixed(0)}%"></i></div>` : '—';
@@ -510,6 +519,30 @@ function renderSystem() {
     ${row('version', esc(sys.version))}${row('clock', esc(new Date(sys.time).toLocaleString(lang)))}
   </dl>`;
   renderUpdates();
+}
+
+// ---- the event bus, live on the System page
+let evSource = null;
+const evKept = [];
+function startEvents() {
+  stopEvents();
+  evKept.length = 0;
+  renderEvents();
+  try {
+    evSource = new EventSource('api/events/stream?since=0');
+    evSource.addEventListener('rcplug', (m) => {
+      try { evKept.unshift(JSON.parse(m.data)); } catch (e) { return; }
+      evKept.splice(30);
+      renderEvents();
+    });
+  } catch (e) { /* no event bus (older host) */ }
+}
+function stopEvents() { if (evSource) { evSource.close(); evSource = null; } }
+function renderEvents() {
+  const el = $('#evList');
+  if (!el) return;
+  if (!evKept.length) { el.innerHTML = `<p class="muted">${esc(t('evNone'))}</p>`; return; }
+  el.innerHTML = evKept.map((e) => `<div class="ev"><span class="muted">${esc(new Date(e.time).toLocaleTimeString(lang))}</span> <b>${esc(e.type)}</b> <span class="tag">${esc(e.source)}</span> <code>${esc(e.data ? JSON.stringify(e.data) : '')}</code></div>`).join('');
 }
 
 // ---- dashboard access (optional password)
