@@ -60,7 +60,6 @@ every plugin builds on them.
 
 | Topic | What | Why |
 |---|---|---|
-| **Survive firmware updates** | The toolkit saves `config/` and `data/` before a firmware flash and offers "reinstall with my settings" afterwards; it notices on connect that rcplug is gone. | A firmware update wipes rcplug today, which users will hit with every RØDE release. |
 | **Plugin catalog** | A signed index of known plugins: install from the dashboard, not only update. Shows author, source, size and what the plugin may do. Other catalogs can be added with their key. | Installing a plugin should not need a computer and SSH. |
 | **Plugin permissions** | The manifest declares what a plugin needs (`desk:write`, `audio`, `network`, `storage`); the dashboard shows it before installing; the console accepts writes only from plugins granted `desk:write` (a token per plugin instead of one control level for all). | With third-party plugins, "everything runs as root and may write" is too coarse. |
 | **Uninstall from the dashboard** | The last step that needs a computer: removing rcplug (the toolkit's setup window can do it today). Everything else works without SSH since 0.6.4: plugin settings in the dashboard, the console's write protection and PIN reset at the device, stopping rcplug in the setup window. | Users of a desk are podcasters, not Linux admins; no step may need a shell on the device. |
@@ -115,5 +114,8 @@ How to build any of them: [plugin-guide.md](plugin-guide.md), [cookbook.md](cook
 - Read-only by default; anything that changes the desk or touches the audio graph is
   opt-in and says so.
 - Nothing in the firmware is changed except the one-time SSH key.
+- A firmware update removes rcplug completely and is the way back to the stock device
+  in an emergency. rcplug does not try to survive it; reinstalling afterwards stays a
+  deliberate step with the toolkit.
 - Go standard library only; small, static binaries; no background network traffic
   unless a user switches it on (update notices).
