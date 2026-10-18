@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.6.8 - Unreleased
+## 0.6.8 - 2026-10-18
 
 ### Added
 - **Update notices:** *Look for updates every day* (dashboard → System → Updates, off
