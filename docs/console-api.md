@@ -37,7 +37,7 @@ Responses are JSON, except the screen images. Errors look like `{"error": "human
 
 | Field | Meaning |
 |---|---|
-| `connection.state` | `waiting` (boot grace; or, reading along, waiting for a full sync: `code` `tap_waiting` or `tap_lost`), `connecting`, `syncing`, `live`, `backoff` (retrying; `tap_failed` if reading along is impossible, e.g. without root), `conflict` (the GUI guard stepped back, see [safety.md](safety.md)), `stopped` |
+| `connection.state` | `waiting` (boot grace; or, reading along, waiting for a full sync: `code` `tap_waiting` or `tap_lost`), `connecting`, `syncing`, `live` (`code` `resumed`: going on with the state kept at its last stop; changes made in between may be missing), `backoff` (retrying; `tap_failed` if reading along is impossible, e.g. without root), `conflict` (the GUI guard stepped back, see [safety.md](safety.md)), `stopped` |
 | `connection.mode` | `tap` (reading along with the device's screen) or `connect` |
 | `passive` | `true` while reading along: the tree cannot be written (`meta.control.writable` is empty), the front panel can |
 | `control` | The current control level: `off`, `basic` or `expert` |

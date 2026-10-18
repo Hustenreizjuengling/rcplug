@@ -67,7 +67,7 @@ function strip(scope, i) {
     if (val(mp, 'meterStereo') !== false) fz.append(vMeter(scope, mp, 'R'));
   }
   const fmax = Number(val(fd, 'faderMax')) || 127;
-  const fs = vfader(scope, fd, 'faderLevel', { min: Number(val(fd, 'faderMin')) || 0, max: fmax, unity: unityFader(), label: name, fmt: (v) => `${v} · ≈${faderDb(v)} dB`, follow: physical ? sourceLevel(src, fmax) : null });
+  const fs = vfader(scope, fd, 'faderLevel', { min: Number(val(fd, 'faderMin')) || 0, max: fmax, unity: unityFader(), label: name, fmt: (v) => `${v} · ≈${faderDb(v)} dB`, follow: physical ? sourceLevel(src, fmax) : null, hint: physical && store.meta.passive ? t('fader.panelHint') : null });
   fz.append(fs.el);
   el.append(fz, h('div', { class: 'db', title: t('mixer.faderHint', { max: fmax }) }, fs.out));
   el.append(h('div', { class: 'btns' }, toggle(scope, ch, 'channelOutputMute', t('mute'), 'mute'), toggle(scope, ch, 'channelCueEnable', t('listen'), 'cue')));

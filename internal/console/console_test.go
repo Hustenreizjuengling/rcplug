@@ -509,10 +509,17 @@ func TestResyncRestartsTheScreenWhileReadingAlong(t *testing.T) {
 	}
 }
 
-type fakePanel struct{ pressed []string }
+type fakePanel struct {
+	pressed []string
+	values  []int
+}
 
-func (f *fakePanel) Do(id string, value int) error { f.pressed = append(f.pressed, id); return nil }
-func (f *fakePanel) Available() error              { return nil }
+func (f *fakePanel) Do(id string, value int) error {
+	f.pressed = append(f.pressed, id)
+	f.values = append(f.values, value)
+	return nil
+}
+func (f *fakePanel) Available() error { return nil }
 
 // Reading along, mute and listen of the physical channels are pressed on the
 // front panel (when the device buttons are switched on); everything else is
@@ -555,8 +562,18 @@ func TestReadingAlongWritesThroughTheFrontPanel(t *testing.T) {
 	}
 	tree := r.do(t, http.MethodGet, "/api/tree", nil)
 	meta := tree.body["meta"].(map[string]interface{})
-	if w, _ := json.Marshal(meta["control"].(map[string]interface{})["writable"]); string(w) != `{"CHANNEL":["channelOutputMute","channelCueEnable"]}` && string(w) != `{"CHANNEL":["channelCueEnable","channelOutputMute"]}` {
-		t.Fatalf("writable while reading along: %s", w)
+	// Only what the panel can do: the channel buttons and (where the level
+	// allows faders) the fader position.
+	writable := meta["control"].(map[string]interface{})["writable"].(map[string]interface{})
+	for typ, props := range writable {
+		for _, p := range props.([]interface{}) {
+			if _, ok := panelProps[typ][p.(string)]; !ok {
+				t.Fatalf("writable while reading along: %s.%s", typ, p)
+			}
+		}
+	}
+	if len(writable["CHANNEL"].([]interface{})) != 2 {
+		t.Fatalf("writable while reading along: %v", writable)
 	}
 	if res := set(ch0, "channelOutputMute", !muted); res.code != 200 {
 		t.Fatalf("mute: %d %s", res.code, res.raw)
@@ -580,6 +597,25 @@ func TestReadingAlongWritesThroughTheFrontPanel(t *testing.T) {
 	mirror.View(func(s desk.Snapshot) { v, _ := s.Root.At(ch0).Get("channelOutputMute"); muted2 = v.Truth() })
 	if muted2 != muted {
 		t.Fatal("the mirror was changed without the device reporting it")
+	}
+
+	// A physical fader's position is set on the panel, at the expert level only.
+	var fd0, fd5 []int
+	mirror.View(func(s desk.Snapshot) { fd0, fd5 = s.Layout.Path("FADER", 0), s.Layout.Path("FADER", 5) })
+	if res := set(fd0, "faderLevel", 30); res.code != 403 {
+		t.Fatalf("physical fader at basic: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/control", map[string]string{"level": "expert"}); res.code != 200 {
+		t.Fatalf("expert: %d %s", res.code, res.raw)
+	}
+	if res := set(fd0, "faderLevel", 30); res.code != 200 {
+		t.Fatalf("physical fader at expert: %d %s", res.code, res.raw)
+	}
+	if res := set(fd5, "faderLevel", 30); res.code != 403 || res.body["code"] != "passive" {
+		t.Fatalf("virtual fader: %d %s", res.code, res.raw)
+	}
+	if got := strings.Join(fp.pressed, ","); got != "mute1,listen1,fader1" || fp.values[2] != 30 {
+		t.Fatalf("pressed %v, values %v", got, fp.values)
 	}
 }
 

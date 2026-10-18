@@ -119,3 +119,23 @@ esac
 		t.Errorf("without dbus-send: %q", out)
 	}
 }
+
+func TestDeviceLogsAreMasked(t *testing.T) {
+	in := "serial IR0012345 ok\n" +
+		"wifi password=hunter2 psk: \"my secret\" token=abc\n" +
+		"oauth Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9xyzxyzxyz\n" +
+		"bt 00:1a:7d:da:71:13 connected\n" +
+		"fetching https://user:pw@update.example.com/rcp2/os.tar.gz?key=1\n" +
+		"meter 0.5 channel 3 xrun at 12345\n"
+	out := string(maskDeviceLog([]byte(in)))
+	for _, leak := range []string{"0012345", "hunter2", "my secret", "abc", "eyJhbGciOiJIUzI1NiIsInR5cCI6", "da:71:13", "user:pw", "os.tar.gz"} {
+		if strings.Contains(out, leak) {
+			t.Errorf("%q not masked:\n%s", leak, out)
+		}
+	}
+	for _, keep := range []string{"IR00…", "00:1a:7d:xx:xx:xx", "update.example.com", "xrun at 12345", "channel 3"} {
+		if !strings.Contains(out, keep) {
+			t.Errorf("%q lost:\n%s", keep, out)
+		}
+	}
+}

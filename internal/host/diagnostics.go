@@ -100,6 +100,12 @@ func WriteDiagnostics(ctx context.Context, w io.Writer, in DiagnosticsInput) err
 	if out := commandOutput(ctx, 3*time.Second, "dmesg"); out != nil {
 		add("system/dmesg.txt", tailLines(out, 400))
 	}
+	// The device's own logs: RØDE's mixer and screen app (a RØDECaster only).
+	for _, l := range deviceLogs {
+		if b, err := readTail(l.path, 256<<10); err == nil {
+			add("device/"+l.name, maskDeviceLog(tailLines(b, 400)))
+		}
+	}
 
 	// Settings, with secrets masked.
 	if b, err := os.ReadFile(filepath.Join(in.Root, "state.json")); err == nil {
@@ -195,6 +201,8 @@ func diagReadme(now time.Time, in DiagnosticsInput) string {
   rcplug.json      versions, plugin states, device vitals
   system/          kernel, memory, mounts, processes, network and unix sockets
                    with their processes, D-Bus names, kernel log (dmesg)
+  device/          the device's own logs (RØDE's mixer and screen app; serial
+                   numbers, tokens, passwords and MAC addresses masked)
   config/          rcplug settings (passwords, PINs and keys masked)
   logs/            host and plugin logs (logs/memory: the host's in-memory copy)
   plugins/<name>/  what each running plugin reports about itself
@@ -495,4 +503,31 @@ func (s *Server) fetchPluginDiagnostics(ctx context.Context, name string) (strin
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, diagPluginLimit))
 	return resp.Header.Get("Content-Type"), body, err
+}
+
+// deviceLogs are the logs of RØDE's own programs on a RØDECaster (written by
+// its start scripts, audio-start.sh and display-start.sh).
+var deviceLogs = []struct{ name, path string }{
+	{"rc_audio_mixer.log", "/var/volatile/log/rc_audio_mixer"},
+	{"rc_gui_juce.log", "/var/log/rc_gui_juce"},
+}
+
+var (
+	deviceSerial = regexp.MustCompile(`\b([A-Z]{2}[0-9]{2})[0-9]{5}\b`)
+	deviceSecret = regexp.MustCompile(`(?i)\b(pass(word|phrase)?|psk|token|secret|api[_-]?key|auth[a-z]*)(["']?\s*[:=]\s*)("[^"]*"|\S+)`)
+	deviceToken  = regexp.MustCompile(`\b[A-Za-z0-9+/_-]{32,}={0,2}`)
+	deviceMAC    = regexp.MustCompile(`(?i)\b((?:[0-9a-f]{2}:){3})(?:[0-9a-f]{2}:){2}[0-9a-f]{2}\b`)
+)
+
+// maskDeviceLog hides what identifies the device or its owner in a log of
+// RØDE's programs: serial numbers keep their first four characters, values of
+// password/token-like keys and long token-like strings are replaced, MAC
+// addresses keep their vendor half, URLs keep scheme and host.
+func maskDeviceLog(b []byte) []byte {
+	s := string(b)
+	s = deviceSecret.ReplaceAllString(s, "${1}${3}***")
+	s = deviceToken.ReplaceAllStringFunc(s, func(t string) string { return t[:4] + "…" })
+	s = deviceSerial.ReplaceAllString(s, "${1}…")
+	s = deviceMAC.ReplaceAllString(s, "${1}xx:xx:xx")
+	return []byte(maskURLs(s))
 }

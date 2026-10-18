@@ -4,8 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"net"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug/internal/rcproto"
@@ -51,6 +56,9 @@ type tapStream struct {
 	aheadN  int
 	gapAt   time.Time
 	lost    bool
+	// aligning: joined mid-stream (resuming), the first bytes may be the
+	// middle of a message; skip to the next frame header.
+	aligning bool
 }
 
 // add takes a segment; it returns false once bytes are missing for good.
@@ -117,6 +125,82 @@ type tapConn struct {
 	late   bool // seen without its start: no full sync will come
 }
 
+// resumeState is kept across a restart of the console (an update, a restart
+// of the plugin): the mirrored tree and the screen's connection it belongs
+// to. If that connection is still there, reading along goes on from it.
+type resumeState struct {
+	Client string    `json:"client"`
+	Boot   string    `json:"boot"`
+	Saved  time.Time `json:"saved"`
+	tree   *rcproto.Node
+}
+
+// resumeMaxAge: a kept state older than this is not used.
+const resumeMaxAge = 10 * time.Minute
+
+// bootIDFile identifies this boot of the machine (tests replace it).
+var bootIDFile = "/proc/sys/kernel/random/boot_id"
+
+func bootID() string {
+	b, _ := os.ReadFile(bootIDFile)
+	return strings.TrimSpace(string(b))
+}
+
+// saveResume keeps the tree and the connection in path.json and path.frame
+// (root only: the tree is the whole device state).
+func saveResume(path, client string, root *rcproto.Node, now time.Time) error {
+	meta, err := json.Marshal(resumeState{Client: client, Boot: bootID(), Saved: now})
+	if err != nil {
+		return err
+	}
+	frame := rcproto.Frame((&rcproto.Change{Type: rcproto.FullSync, Tree: root}).Encode())
+	for name, data := range map[string][]byte{path + ".frame": frame, path + ".json": meta} {
+		tmp := name + ".tmp"
+		if err := os.WriteFile(tmp, data, 0o600); err != nil {
+			return err
+		}
+		if err := os.Rename(tmp, name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// loadResume reads a kept state once (the files are removed): only from this
+// boot and not older than resumeMaxAge.
+func loadResume(path string, now time.Time) (*resumeState, error) {
+	meta, err := os.ReadFile(path + ".json")
+	frame, ferr := os.ReadFile(path + ".frame")
+	os.Remove(path + ".json")
+	os.Remove(path + ".frame")
+	if err != nil {
+		return nil, err
+	}
+	if ferr != nil {
+		return nil, ferr
+	}
+	var r resumeState
+	if err := json.Unmarshal(meta, &r); err != nil {
+		return nil, err
+	}
+	if r.Boot == "" || r.Boot != bootID() {
+		return nil, errors.New("kept state is from another boot")
+	}
+	if age := now.Sub(r.Saved); age < 0 || age > resumeMaxAge {
+		return nil, fmt.Errorf("kept state is %s old", age.Round(time.Second))
+	}
+	body, _, err := rcproto.ParseFrame(frame)
+	if err != nil {
+		return nil, err
+	}
+	ch, err := rcproto.DecodeChange(body)
+	if err != nil || ch.Type != rcproto.FullSync || ch.Tree == nil {
+		return nil, errors.New("kept state is not a full sync")
+	}
+	r.tree = ch.Tree
+	return &r, nil
+}
+
 // tapEvent tells the client what the tapper saw.
 type tapEvent struct {
 	kind   string // "live", "ended", "lost"
@@ -134,6 +218,7 @@ type tapper struct {
 	current *tapConn // the connection the mirror follows
 	stats   *Stats
 	now     func() time.Time
+	resume  *resumeState // a kept state waiting for its connection
 }
 
 func newTapper(port int, m *Mirror, stats *Stats, event func(tapEvent)) *tapper {
@@ -196,6 +281,15 @@ func (t *tapper) segment(client string, dir tapDir, seq uint32, flags byte, payl
 		}
 		c = &tapConn{client: client, late: true}
 		t.conns[client] = c
+		if r := t.resume; r != nil && r.Client == client {
+			// The connection the kept state belongs to: go on from there.
+			t.resume = nil
+			if err := t.mirror.Ingest(&rcproto.Change{Type: rcproto.FullSync, Tree: r.tree}); err == nil {
+				c.late, c.synced, t.current = false, true, c
+				c.s[fromDesk].aligning, c.s[toDesk].aligning = true, true
+				t.event(tapEvent{kind: "resumed"})
+			}
+		}
 	}
 	if len(payload) > 0 {
 		if !c.s[dir].add(seq, payload, t.now()) {
@@ -226,7 +320,7 @@ func (t *tapper) frames(c *tapConn, dir tapDir) {
 			break
 		}
 		if err != nil { // lost the frame boundary: look for the next header
-			if c == t.current && c.synced {
+			if c == t.current && c.synced && !s.aligning {
 				t.lose(c, "lost the frame boundary")
 				return
 			}
@@ -239,6 +333,7 @@ func (t *tapper) frames(c *tapConn, dir tapDir) {
 			continue
 		}
 		s.buf = s.buf[n:]
+		s.aligning = false
 		t.message(c, dir, body)
 	}
 	if len(s.buf) == 0 {
@@ -321,6 +416,14 @@ func (c *Client) runTap(ctx context.Context) {
 		stats := c.stats
 		c.mu.Unlock()
 		tp := newTapper(c.Port(), c.mirror, &stats, c.tapEvent)
+		if c.cfg.ResumeFile != "" {
+			if r, err := loadResume(c.cfg.ResumeFile, time.Now()); err == nil {
+				tp.resume = r
+				c.cfg.Logf("desk: kept state found (from %s); going on when the screen's connection %s is seen", r.Saved.Format("15:04:05"), r.Client)
+			} else if !errors.Is(err, os.ErrNotExist) {
+				c.cfg.Logf("desk: kept state not used: %v", err)
+			}
+		}
 		for ctx.Err() == nil {
 			pkt, err := cp.next()
 			if err != nil {
@@ -336,6 +439,21 @@ func (c *Client) runTap(ctx context.Context) {
 			c.mu.Unlock()
 		}
 		cp.close()
+		if ctx.Err() != nil && c.cfg.ResumeFile != "" && tp.current != nil && tp.current.synced {
+			var root *rcproto.Node
+			c.mirror.View(func(s Snapshot) {
+				if s.Root != nil {
+					root = s.Root.Clone()
+				}
+			})
+			if root != nil {
+				if err := saveResume(c.cfg.ResumeFile, tp.current.client, root, time.Now()); err != nil {
+					c.cfg.Logf("desk: keeping the state for a restart: %v", err)
+				} else {
+					c.cfg.Logf("desk: state kept for a restart")
+				}
+			}
+		}
 		c.mirror.SetStale(true)
 		if ctx.Err() == nil && !c.sleepOrKick(ctx, 5*time.Second) {
 			return
@@ -350,6 +468,9 @@ func (c *Client) tapEvent(e tapEvent) {
 		nodes, props := 0, 0
 		c.mirror.View(func(s Snapshot) { nodes, props = s.Root.Count() })
 		c.cfg.Logf("desk: live (reading along), full sync %d bytes, %d nodes, %d properties", e.bytes, nodes, props)
+	case "resumed":
+		c.setState(StateLive, "resumed", "went on with the state kept at the last stop; changes made while the console was not running may be missing")
+		c.cfg.Logf("desk: live (reading along), went on with the state kept at the last stop")
 	case "ended":
 		c.setState(StateWaiting, "tap_waiting", e.detail+"; waiting for it to reconnect")
 		c.cfg.Logf("desk: %s; showing the last known state", e.detail)

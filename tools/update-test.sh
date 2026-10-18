@@ -80,6 +80,8 @@ EOF
   [ ! -e "$SB/rcplug/.update" ] || fail ".update left behind"
   api /api/updates | grep -q '"last":{"ok":true' || fail "the dashboard does not show the successful update"
   [ -f "$SB/rcplug/config/rcplugd.env" ] || fail "settings lost in the update"
+  grep -Eq 'rcplug: [0-9]{2}:[0-9]{2}:[0-9]{2} files in place, starting the new version \(free memory [0-9?]+ MB\)' "$SB/rcplug/logs/update.log" \
+    || fail "the installer's steps are not in the update log"
 
   echo "== 0.9.1 does not start: the installer goes back to 0.9.0"
   publish 0.9.1

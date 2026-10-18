@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -519,11 +520,11 @@ func (u *Updater) install(ctx context.Context, j *updateJob, fu *foundUpdate) (s
 		return "", fmt.Errorf("not enough free space: %d MB free", free)
 	}
 	pkg := filepath.Join(dir, fu.asset.Name)
-	j.logf("downloading %s (%d KB)", fu.asset.Name, fu.asset.Size>>10)
+	j.logf("downloading %s (%d KB; free memory %s)", fu.asset.Name, fu.asset.Size>>10, freeMemory())
 	if err := u.download(ctx, fu.url, pkg, fu.asset); err != nil {
 		return "", err
 	}
-	j.logf("signature and SHA-256 checked")
+	j.logf("signature and SHA-256 checked (free memory %s)", freeMemory())
 	if fu.target.Target == "rcplug" {
 		return u.installPlatform(j, fu, dir, pkg)
 	}
@@ -536,6 +537,7 @@ func (u *Updater) installPlatform(j *updateJob, fu *foundUpdate, dir, pkg string
 		return "", err
 	}
 	_ = os.Remove(pkg)
+	j.logf("unpacked (free memory %s)", freeMemory())
 	if _, err := os.Stat(filepath.Join(payload, "install.sh")); err != nil {
 		return "", errors.New("the device package has no install.sh")
 	}
@@ -605,4 +607,21 @@ func (u *Updater) installPlugin(j *updateJob, fu *foundUpdate, dir, pkg string) 
 	}
 	u.mu.Unlock()
 	return nil
+}
+
+// freeMemory is MemAvailable from /proc/meminfo ("?" where unknown): the
+// update log records it, since the device has little memory to spare.
+func freeMemory() string {
+	b, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		return "?"
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if f := strings.Fields(line); len(f) >= 2 && f[0] == "MemAvailable:" {
+			if kb, err := strconv.Atoi(f[1]); err == nil {
+				return strconv.Itoa(kb>>10) + " MB"
+			}
+		}
+	}
+	return "?"
 }

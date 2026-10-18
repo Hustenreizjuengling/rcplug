@@ -87,7 +87,7 @@ export function vfader(scope, path, name, opts = {}) {
   const el = h('div', {
     class: 'fader' + (can ? ' can' : ''), role: 'slider', tabindex: can ? 0 : -1,
     'aria-label': opts.label || name, 'aria-valuemin': min, 'aria-valuemax': max, 'aria-readonly': can ? null : 'true',
-    title: can ? t('fader.dragHint') : t('fader.physicalHint'),
+    title: can ? (opts.hint || t('fader.dragHint')) : t('fader.physicalHint'),
   }, h('div', { class: 'trk' }), fill,
   h('div', { class: 'unity', style: `bottom:calc(6px + (100% - 12px) * ${(opts.unity - min) / (max - min)})` }), cap);
   const out = h('span');

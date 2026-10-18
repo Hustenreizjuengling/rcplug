@@ -91,9 +91,11 @@ func (c *Console) handleTree(w http.ResponseWriter, r *http.Request) {
 		w := map[string][]string{}
 		if c.panelOn() {
 			if all, ok := caps["writable"].(map[string][]string); ok {
-				for _, p := range all["CHANNEL"] {
-					if _, ok := panelProps[p]; ok {
-						w["CHANNEL"] = append(w["CHANNEL"], p)
+				for typ, props := range panelProps {
+					for _, p := range all[typ] {
+						if _, ok := props[p]; ok {
+							w[typ] = append(w[typ], p)
+						}
 					}
 				}
 			}
@@ -310,14 +312,19 @@ func (c *Console) write(remote string, epoch uint64, path []int, name string, va
 	return ch, err
 }
 
-// panelProps are the properties that, while reading along, are changed by
-// pressing a channel's button on the front panel.
-var panelProps = map[string]string{"channelOutputMute": "mute", "channelCueEnable": "listen"}
+// panelProps are the properties that, while reading along, are changed on the
+// front panel: a channel's buttons, a physical fader's position.
+var panelProps = map[string]map[string]string{
+	"CHANNEL": {"channelOutputMute": "mute", "channelCueEnable": "listen"},
+	"FADER":   {"faderLevel": "fader"},
+}
 
 // writeByPanel handles a write while reading along: the console cannot write
 // to the mixer, but mute and listen of a channel with physical buttons are
-// pressed on the front panel. The device reports the result, which the
-// mirror then shows; nothing is applied here.
+// pressed on the front panel, and a physical fader's position is set there
+// (until the real fader moves; the policy allows it at the expert level
+// only). The device reports the result, which the mirror then shows; nothing
+// is applied here.
 func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name string, value interface{}) (*rcproto.Change, string, error) {
 	nodeType, button := "?", ""
 	var want, cur rcproto.Value
@@ -337,18 +344,26 @@ func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name strin
 			return
 		}
 		nodeType = n.Type
-		i := -1 // the strip with physical buttons this channel is
+		i := -1 // the strip with a physical fader and buttons
 		for j := 0; j < s.Layout.PhysicalFaders; j++ {
-			if slices.Equal(s.Layout.Path("CHANNEL", j), path) {
+			if slices.Equal(s.Layout.Path(n.Type, j), path) {
 				i = j
 			}
 		}
-		b, ok := panelProps[name]
-		if n.Type != "CHANNEL" || !ok || i < 0 {
+		b, ok := panelProps[n.Type][name]
+		if !ok || i < 0 {
 			err = desk.ErrPassive
 			return
 		}
-		if want, err = CheckWrite(level, s, path, name, value); err != nil {
+		if n.Type == "FADER" {
+			// The policy never lets a physical fader be written over the
+			// network (it is not motorised); on the panel it is set like
+			// the Display page does it, until the real fader moves.
+			want, err = panelFader(level, n, value)
+		} else {
+			want, err = CheckWrite(level, s, path, name, value)
+		}
+		if err != nil {
 			return
 		}
 		cur, _ = n.Get(name)
@@ -361,13 +376,33 @@ func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name strin
 		return nil, nodeType, errPanelOff
 	}
 	ch := &rcproto.Change{Type: rcproto.PropertyChanged, Path: append([]int(nil), path...), Name: name, Value: want}
-	if cur.Truth() == want.Truth() {
+	pos := 0
+	if nodeType == "FADER" {
+		pos = int(want.I) // a position, set as it is
+	} else if cur.Truth() == want.Truth() {
 		return ch, nodeType, nil // already so: pressing would toggle it back
 	}
-	if err := c.opts.Panel.Do(button, 0); err != nil {
+	if err := c.opts.Panel.Do(button, pos); err != nil {
 		return nil, nodeType, sdk.NewError(http.StatusServiceUnavailable, "panel_failed", "pressing "+button+" failed: "+err.Error())
 	}
 	return ch, nodeType, nil
+}
+
+// panelFader checks a physical fader position for the front panel: expert
+// level, a whole number within the fader's range.
+func panelFader(level Level, n *rcproto.Node, value interface{}) (rcproto.Value, error) {
+	if level != LevelExpert {
+		return rcproto.Value{}, sdk.NewError(http.StatusForbidden, "expert_required", "setting a physical fader on the front panel requires the expert control level")
+	}
+	f, ok := value.(float64)
+	if !ok || f != float64(int64(f)) {
+		return rcproto.Value{}, errBadRequest("faderLevel must be a whole number")
+	}
+	v := rcproto.Int(int64(f))
+	if err := intBounds(n, &v, "faderMin", "faderMax"); err != nil {
+		return rcproto.Value{}, errBadRequest("faderLevel " + err.Error())
+	}
+	return v, nil
 }
 
 var errPanelOff = sdk.NewError(http.StatusForbidden, "panel_off", "reading along, the console changes the desk through the device buttons: switch them on on the Display page")

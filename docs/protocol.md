@@ -61,7 +61,12 @@ a full sync from the screen's side is ignored). It never sends anything. Lost
 packets, a lost frame boundary or the end of the connection mark the mirror stale
 until the screen connects again; the console's *Read the state again* restarts the
 screen app for that (`rc_gui_juce`, which RØDE's `display-start.sh` starts again
-within about three seconds). Implemented in
+within about three seconds). When the console stops (an update, a restart of the
+plugin) it keeps the mirrored tree and the screen's connection in its data directory
+(root only); started again in the same boot within ten minutes, it goes on from there
+as soon as that connection carries anything (the Duo pings every few seconds),
+aligning on the next message header. Changes made while it was not running may be
+missing, which the console says. Implemented in
 [`internal/desk/tap.go`](../internal/desk/tap.go), tested against the simulator on the
 loopback interface (`make test-root`).
 

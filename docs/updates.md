@@ -19,7 +19,9 @@ plugin with an update also shows it on its card under **Plugins**.
   minute; the RØDECaster itself and its audio keep running. The dashboard reloads by
   itself when the new version answers. If the new version does not start, the
   installer puts the previous one back and starts it again. The System page shows the
-  outcome of the last update; the installer's output is in `logs/update.log`.
+  outcome of the last update; the installer's output is in `logs/update.log`, each step
+  with the time and the free memory (the Duo has little to spare), which the
+  diagnostics bundle includes.
 
 Settings, plugin data, logs, plugins you installed yourself and the SSH key are kept.
 

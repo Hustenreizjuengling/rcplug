@@ -17,6 +17,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -80,18 +81,22 @@ func main() {
 		log.Printf("console: simulated desk on %s", s.Addr())
 	}
 
-	client := desk.NewClient(desk.Config{
-		Addr: *deskAddr, Guard: *guard, BootGrace: *bootGrace, ReadOnly: *readOnly, Handshake: *handshake, Mode: *deskMode,
-	}, desk.NewMirror())
 	// Started by rcplugd, settings and the PIN live in the plugin's data
 	// directory. Run standalone (e.g. go run ./cmd/console --sim) they stay in
 	// memory, so nothing lands in the source tree.
 	dataDir := os.Getenv("RCPLUG_DATA_DIR")
+	resume := ""
 	if dataDir == "" {
 		log.Printf("console: RCPLUG_DATA_DIR not set, settings and PIN are kept in memory only")
 	} else if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		log.Fatalf("console: data directory: %v", err)
+	} else {
+		resume = filepath.Join(dataDir, "tap-resume")
 	}
+	client := desk.NewClient(desk.Config{
+		Addr: *deskAddr, Guard: *guard, BootGrace: *bootGrace, ReadOnly: *readOnly, Handshake: *handshake, Mode: *deskMode,
+		ResumeFile: resume,
+	}, desk.NewMirror())
 	opts := console.Options{
 		Client: client, DataDir: dataDir, AllowUntested: *untested, LegacyPIN: *legacyPIN, Version: version,
 		Panel: &hw.Panel{TTY: *tty}, PanelEnabled: *panel, Logf: log.Printf,
@@ -100,7 +105,8 @@ func main() {
 		opts.Screen = &hw.Screen{FB: *fbDev, DRM: *drmDev, Mode: *screenSrc, MaxFPS: *fps}
 	}
 	c := console.New(opts)
-	go client.Run(ctx)
+	clientDone := make(chan struct{})
+	go func() { client.Run(ctx); close(clientDone) }()
 	go c.Run(ctx)
 
 	log.Printf("console %s on %s, desk %s (guard=%v read-only=%v panel=%v)", version, *addr, *deskAddr, *guard, *readOnly, *panel)
@@ -110,6 +116,12 @@ func main() {
 	}
 	if err := sdk.Serve(ctx, *addr, h); err != nil {
 		log.Fatal(err)
+	}
+	// Reading along keeps the state for the next start (an update, a
+	// restart); give it a moment.
+	select {
+	case <-clientDone:
+	case <-time.After(2 * time.Second):
 	}
 }
 

@@ -73,6 +73,9 @@ function banners() {
   if (conn && conn.mode === 'tap' && conn.state === 'waiting') {
     out.push(h('div', { class: 'banner info' }, t('banner.tapWaiting'), ' ',
       h('button', { class: 'btn small', type: 'button', onclick: resyncNow }, t('banner.tapResync'))));
+  } else if (conn && conn.mode === 'tap' && conn.state === 'live' && conn.code === 'resumed') {
+    out.push(h('div', { class: 'banner info' }, t('banner.tapResumed'), ' ',
+      h('button', { class: 'btn small', type: 'button', onclick: resyncNow }, t('banner.tapResync'))));
   } else if (conn && conn.mode === 'tap' && conn.state === 'live' && current.id !== 'display') {
     out.push(h('div', { class: 'banner info' }, t('banner.tapLive'), ' ', h('a', { href: '#display' }, t('banner.busyLink'))));
   }

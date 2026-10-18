@@ -6,6 +6,19 @@ may break compatibility).
 
 ## 0.6.2 - Unreleased
 
+### Added
+- Reading along, the four physical faders can be moved from the console's mixer at the
+  expert level: the position is set on the front panel (as the *Display* page does)
+  until the real fader moves.
+- The console goes on reading along after its own restart (an update, a restart of
+  the plugin): it keeps the mirrored state and the screen's connection when it stops
+  and continues from them, so no *Read the state again* is needed. Changes made in the
+  seconds in between may be missing; the console says so.
+- Diagnostics include the device's own logs (RØDE's mixer and screen app, last 400
+  lines) with serial numbers, tokens, passwords and MAC addresses masked.
+- The update log records each step of an in-app update with the time and the free
+  memory, to find out what silences USB audio during an update.
+
 ## 0.6.1 - 2026-10-18
 
 ### Added

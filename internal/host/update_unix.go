@@ -28,6 +28,7 @@ func spawnInstaller(payload, logFile, resultFile string) error {
 	defer out.Close()
 	cmd := exec.Command("/bin/sh", "-c", installerScript, "rcplug-update", payload, logFile, resultFile)
 	cmd.Stdout, cmd.Stderr, cmd.Dir = out, out, "/"
+	cmd.Env = append(os.Environ(), "RCPLUG_STEPS=1") // install.sh logs each step with time and free memory
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
 		return err

@@ -33,6 +33,7 @@ export default {
   'banner.tapResync': 'Read the state again', 'banner.tapResyncOk': 'The device’s screen restarts …',
   'banner.tapResyncConfirm': 'The device’s screen restarts once for this (about 3 seconds). The mixer, and with it the audio, keeps running.',
   'banner.tapLive': 'The console reads along; to change something, use the device buttons.',
+  'banner.tapResumed': 'After its restart the console reads on where it stopped. Changes made in the seconds in between may be missing.',
   'code.boot_grace': 'device starting', 'code.connect_failed': 'mixer not reachable', 'code.desk_busy': 'busy – the mixer serves one client at a time and the device’s own screen holds it', 'code.no_full_sync': 'no device state received',
   'code.disconnected': 'connection closed', 'code.desync': 'out of sync, reloading', 'code.guard_conflict': 'protection active',
   'guard.active': 'active', 'guard.off': 'off', 'guard.remote': 'not needed (remote device)', 'guard.unavailable': 'unavailable',
@@ -59,7 +60,7 @@ export default {
   'pc.groupChannel': 'Channel {n}', 'pc.groupNavigation': 'Navigation', 'pc.groupPads': 'SMART Pads',
 
   'fader.physical': 'Fader {n}', 'fader.virtual': 'Virtual {n}', 'output.n': 'Bus {n}',
-  'fader.dragHint': 'drag or use the arrow keys', 'fader.physicalHint': 'physical fader – display only', 'meter.side': 'Level {side}',
+  'fader.dragHint': 'drag or use the arrow keys', 'fader.panelHint': 'Dragging sets the position through the device buttons – until the real fader is moved.', 'fader.physicalHint': 'physical fader – display only', 'meter.side': 'Level {side}',
 
   'rec.title': 'Recording', 'rec.none': 'no recorder in the device state', 'rec.record': 'Record', 'rec.recordHint': 'Start recording',
   'rec.pause': 'Pause', 'rec.stop': 'Stop', 'rec.marker': 'Marker', 'rec.markerHint': 'Drop a chapter marker',

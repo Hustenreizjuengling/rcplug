@@ -19,6 +19,12 @@ FORCE_DIR=""
 INITDIR="${RCPLUG_INITDIR:-/etc/init.d}"
 
 fail() { echo "rcplug: $*" >&2; exit 1; }
+# step: during an in-app update (RCPLUG_STEPS set by rcplugd), each step with
+# the time and the free memory, to see what an update does to the device.
+step() {
+  [ -n "${RCPLUG_STEPS:-}" ] || return 0
+  echo "rcplug: $(date +%H:%M:%S) $* (free memory $(awk '/^MemAvailable:/ {print int($2/1024)}' /proc/meminfo 2>/dev/null) MB)"
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -125,6 +131,7 @@ cleanup() {
   exit $rc
 }
 trap cleanup EXIT
+step "preparing the new files"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/plugins"
 cp "$SRC/rcplugd" "$STAGE/rcplugd" || fail "copying rcplugd failed"
@@ -139,7 +146,9 @@ grep -q "^RCPLUG_DIR=\"$DIR\"$" "$STAGE/initd" || fail "init script template not
 # Stop a running instance before replacing its files.
 if [ -x "$INITDIR/rcplug" ]; then
   STOPPED=1
+  step "stopping the running version"
   "$INITDIR/rcplug" stop >/dev/null 2>&1 || true
+  step "stopped"
 fi
 
 # Keep what this install replaces (see restore_previous).
@@ -198,6 +207,7 @@ if [ -z "${RCPLUG_INITDIR:-}" ] && command -v update-rc.d >/dev/null 2>&1; then
   update-rc.d rcplug defaults 05 20 >/dev/null 2>&1 || true
 fi
 
+step "files in place, starting the new version"
 if ! "$INITDIR/rcplug" start; then
   # The cleanup puts the previous version back and starts it.
   "$INITDIR/rcplug" stop >/dev/null 2>&1 || true
@@ -216,6 +226,7 @@ case "$ip" in
     [ -n "$ip" ] || ip="<device-ip>";;
 esac
 port="${ADDR##*:}"
+step "started"
 ver="$(cat "$SRC/VERSION" 2>/dev/null || echo '?')"
 echo ""
 echo "rcplug $ver installed and started."

@@ -3,8 +3,10 @@ package desk
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -264,10 +266,121 @@ func TestTapReadsAlongOnLoopback(t *testing.T) {
 	waitFor(t, "tap live again", func() bool { return tap.Status().Stats.FullSyncs >= 2 && tap.Status().State == StateLive })
 }
 
+// The console restarts (an update) while the screen stays connected: the
+// next one goes on with the kept state. Needs root (make test-root).
+func TestTapGoesOnAfterARestartOnLoopback(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("reading along needs root (make test-root)")
+	}
+	sim := startSim(t, rcsim.Options{})
+	keep := filepath.Join(t.TempDir(), "tap-resume")
+	first := NewClient(Config{Addr: sim.Addr(), Mode: "tap", ResumeFile: keep, Logf: quiet}, NewMirror())
+	ctx1, stop1 := context.WithCancel(context.Background())
+	done1 := make(chan struct{})
+	go func() { first.Run(ctx1); close(done1) }()
+	waitFor(t, "capture open", func() bool { return first.Status().Code == "tap_waiting" })
+	screen, _ := run(t, Config{Addr: sim.Addr()})
+	waitFor(t, "screen live", live(screen))
+	waitFor(t, "first live", live(first))
+	stop1()
+	<-done1
+	if _, err := os.Stat(keep + ".frame"); err != nil {
+		t.Fatalf("no state kept: %v", err)
+	}
+
+	mirror := NewMirror()
+	second := NewClient(Config{Addr: sim.Addr(), Mode: "tap", ResumeFile: keep, Logf: quiet}, mirror)
+	ctx2, stop2 := context.WithCancel(context.Background())
+	defer stop2()
+	go second.Run(ctx2)
+	waitFor(t, "second capture open", func() bool { return second.Status().Code == "tap_waiting" })
+	// The simulator stays silent until something changes (the Duo pings every
+	// few seconds); the change is the first traffic the second one sees.
+	_, root := duoFullSync(t)
+	probe := NewMirror()
+	_ = probe.Ingest(&rcproto.Change{Type: rcproto.FullSync, Tree: root})
+	var path []int
+	probe.View(func(s Snapshot) { path = s.Layout.Path("CHANNEL", 2) })
+	if err := sim.Inject(&rcproto.Change{Type: rcproto.PropertyChanged, Path: path, Name: "channelOutputMute", Value: rcproto.Bool(true)}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "second goes on", func() bool { st := second.Status(); return st.State == StateLive && st.Code == "resumed" })
+	waitFor(t, "a change after going on", func() bool { return muteOf(mirror, path) })
+}
+
 func TestPortIsAlwaysAValidPort(t *testing.T) {
 	for addr, want := range map[string]int{"127.0.0.1:2345": 2345, "127.0.0.1:99999": 2345, "127.0.0.1:-1": 2345, "127.0.0.1:0": 2345, "nonsense": 2345, "[::1]:65535": 65535} {
 		if got := NewClient(Config{Addr: addr, Logf: quiet}, NewMirror()).Port(); got != want {
 			t.Errorf("Port(%q) = %d, want %d", addr, got, want)
 		}
+	}
+}
+
+// A kept state is used once, only in the same boot and only while fresh.
+func TestKeptStateOnlyOnceAndOnlyFromThisBoot(t *testing.T) {
+	dir := t.TempDir()
+	old := bootIDFile
+	bootIDFile = filepath.Join(dir, "boot_id")
+	defer func() { bootIDFile = old }()
+	_ = os.WriteFile(bootIDFile, []byte("boot-a\n"), 0o644)
+	_, root := duoFullSync(t)
+	path := filepath.Join(dir, "tap-resume")
+	now := time.Unix(5000, 0)
+
+	if err := saveResume(path, "127.0.0.1:45572", root, now); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := os.Stat(path + ".frame"); st == nil || st.Mode().Perm() != 0o600 {
+		t.Fatalf("kept state not root-only: %v", st)
+	}
+	r, err := loadResume(path, now.Add(time.Minute))
+	if err != nil || r.Client != "127.0.0.1:45572" || r.tree == nil {
+		t.Fatalf("load: %+v %v", r, err)
+	}
+	if _, err := loadResume(path, now.Add(time.Minute)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("used twice: %v", err)
+	}
+
+	_ = saveResume(path, "127.0.0.1:45572", root, now)
+	_ = os.WriteFile(bootIDFile, []byte("boot-b\n"), 0o644)
+	if _, err := loadResume(path, now.Add(time.Minute)); err == nil {
+		t.Fatal("used a state from another boot")
+	}
+	_ = os.WriteFile(bootIDFile, []byte("boot-a\n"), 0o644)
+	_ = saveResume(path, "127.0.0.1:45572", root, now)
+	if _, err := loadResume(path, now.Add(11*time.Minute)); err == nil {
+		t.Fatal("used a stale state")
+	}
+}
+
+// After a restart the tapper goes on with the kept state as soon as it sees
+// the screen's connection again, even if the first bytes are the middle of a
+// message; another connection does not get it.
+func TestTapGoesOnWithAKeptState(t *testing.T) {
+	tp, m, events := newTestTapper()
+	_, root := duoFullSync(t)
+	tp.resume = &resumeState{Client: "127.0.0.1:45572", tree: root}
+	other := &fakeConn{t: tp, port: 45999, cseq: 1, dseq: 1}
+	other.desk(setMute([]int{1}, true))
+	if len(*events) != 0 || m.Ready() {
+		t.Fatalf("another connection used the kept state: %+v", *events)
+	}
+
+	f := &fakeConn{t: tp, port: 45572, cseq: 1000, dseq: 900000}
+	var path []int
+	probe := NewMirror()
+	_ = probe.Ingest(&rcproto.Change{Type: rcproto.FullSync, Tree: root})
+	probe.View(func(s Snapshot) { path = s.Layout.Path("CHANNEL", 1) })
+	msg := setMute(path, true)
+	f.desk(msg[8:]) // the body of a message whose header went by before the restart
+	if len(*events) != 1 || (*events)[0].kind != "resumed" || !m.Ready() {
+		t.Fatalf("not resumed: %+v", *events)
+	}
+	f.desk(msg) // a whole message
+	if !muteOf(m, path) {
+		t.Fatal("a change after resuming was not mirrored")
+	}
+	if tp.stats.Desyncs != 0 {
+		t.Fatalf("lost track while aligning: %d", tp.stats.Desyncs)
 	}
 }

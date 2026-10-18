@@ -20,8 +20,8 @@ export function canWrite(path, name) {
   if (!n || !(name in n.p) || typeOf(n, name) === 'r') return false;
   if (!writable[n.t] || !writable[n.t].has(name)) return false;
   if (level === 'basic' && n.t === 'FADER' && name === 'faderLevel' && famIndex('FADER', path) < store.L.physicalFaders) return false;
-  // Reading along, the server writes by pressing a channel's own buttons,
-  // which only the physical channels have.
-  if (store.meta.passive && !(n.t === 'CHANNEL' && famIndex('CHANNEL', path) < store.L.physicalFaders)) return false;
+  // Reading along, the server writes on the front panel: the buttons and
+  // faders of the physical channels.
+  if (store.meta.passive && !((n.t === 'CHANNEL' || n.t === 'FADER') && famIndex(n.t, path) < store.L.physicalFaders)) return false;
   return true;
 }

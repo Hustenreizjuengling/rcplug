@@ -33,6 +33,7 @@ export default {
   'banner.tapResync': 'Zustand neu einlesen', 'banner.tapResyncOk': 'Der Bildschirm des Geräts startet neu …',
   'banner.tapResyncConfirm': 'Der Bildschirm des Geräts startet dazu einmal neu (etwa 3 Sekunden). Das Mischpult und damit das Audio laufen dabei weiter.',
   'banner.tapLive': 'Die Konsole liest mit; ändern kannst du über die Gerätetasten.',
+  'banner.tapResumed': 'Nach dem Neustart der Konsole liest sie dort weiter, wo sie aufgehört hat. Änderungen aus den Sekunden dazwischen können fehlen.',
   'code.boot_grace': 'Gerät startet', 'code.connect_failed': 'Mischpult nicht erreichbar', 'code.desk_busy': 'belegt – das Mischpult bedient nur einen Client, und die Oberfläche am Gerät hält ihn', 'code.no_full_sync': 'kein Gerätezustand empfangen',
   'code.disconnected': 'Verbindung beendet', 'code.desync': 'Abweichung erkannt, lade neu', 'code.guard_conflict': 'Schutz aktiv',
   'guard.active': 'aktiv', 'guard.off': 'aus', 'guard.remote': 'nicht nötig (entferntes Gerät)', 'guard.unavailable': 'nicht verfügbar',
@@ -59,7 +60,7 @@ export default {
   'pc.groupChannel': 'Kanal {n}', 'pc.groupNavigation': 'Navigation', 'pc.groupPads': 'SMART Pads',
 
   'fader.physical': 'Fader {n}', 'fader.virtual': 'Virtuell {n}', 'output.n': 'Bus {n}',
-  'fader.dragHint': 'ziehen oder Pfeiltasten', 'fader.physicalHint': 'physischer Fader – nur Anzeige', 'meter.side': 'Pegel {side}',
+  'fader.dragHint': 'ziehen oder Pfeiltasten', 'fader.panelHint': 'Ziehen setzt die Stellung über die Gerätetasten – bis der echte Fader bewegt wird.', 'fader.physicalHint': 'physischer Fader – nur Anzeige', 'meter.side': 'Pegel {side}',
 
   'src.combo1': 'Mic 1', 'src.combo2': 'Mic 2', 'src.combo3': 'Mic 3', 'src.combo4': 'Mic 4', 'src.virtuala': 'Virtuell A', 'src.virtualb': 'Virtuell B',
   'out.headphone1': 'Kopfhörer 1', 'out.headphone2': 'Kopfhörer 2', 'out.headphone3': 'Kopfhörer 3', 'out.headphone4': 'Kopfhörer 4',

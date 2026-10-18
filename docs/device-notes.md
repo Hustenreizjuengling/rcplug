@@ -96,7 +96,8 @@ from Windows to a patched 1.7.6):
   device arrive as described in [protocol.md](protocol.md#what-a-running-duo-sends).
   Since 0.6.1 physical faders follow (from the mix levels), and mute and listen of the
   four physical channels can be switched from the console's pages (pressed on the
-  front panel).
+  front panel); since 0.6.2 also the physical faders (at the expert level), and after
+  an update the console goes on without *Read the state again*.
 - **Diagnostics** now include the network and unix sockets with their processes and
   the names on the D-Bus system bus, which is what this needed.
 

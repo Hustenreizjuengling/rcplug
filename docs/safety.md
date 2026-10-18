@@ -25,7 +25,8 @@ therefore **does not connect at all**: it reads along with the screen's connecti
 disturb it, and changes the desk only through the front panel. *Read the state
 again* restarts the screen app once (about three seconds; RØDE's own scripts restart
 it the same way, and the mixer keeps running); it is rate-limited and needs the PIN
-if one is set. Where the console does connect (`--desk-mode connect`, e.g. through a
+if one is set. To go on after its own restart, the console keeps the mirrored tree in
+its data directory, readable by root only, and uses it once. Where the console does connect (`--desk-mode connect`, e.g. through a
 tunnel), it:
 
 1. **never retries a busy desk by itself**: when the port refuses connections while

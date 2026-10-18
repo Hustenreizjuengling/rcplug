@@ -55,7 +55,10 @@ type Config struct {
 	// screen), connect anywhere else (the simulator, an SSH tunnel). Empty is
 	// "connect".
 	Mode string
-	Logf func(format string, args ...interface{})
+	// ResumeFile (reading along) keeps the state across a restart of the
+	// console, as ResumeFile.json and .frame; "" keeps nothing.
+	ResumeFile string
+	Logf       func(format string, args ...interface{})
 }
 
 // rodeMixer is the mixer's binary on a RØDECaster; "auto" reads along where it
