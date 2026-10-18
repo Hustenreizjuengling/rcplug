@@ -15,7 +15,6 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -43,6 +42,9 @@ type DiagnosticsInput struct {
 	Memory  map[string][]string
 	Fetch   func(ctx context.Context, name string) (contentType string, body []byte, err error)
 	Note    string
+	// Resources and Processes describe the device now (ResourceReport;
+	// made here if empty), History is the host's minute history.
+	Resources, Processes, History string
 }
 
 // WriteDiagnostics writes a zip with everything needed to analyse a problem:
@@ -92,7 +94,18 @@ func WriteDiagnostics(ctx context.Context, w io.Writer, in DiagnosticsInput) err
 			add(name, limit(b, 64<<10))
 		}
 	}
-	add("system/processes.txt", []byte(processTable()))
+	if in.Resources == "" {
+		var names []string
+		for _, p := range in.Plugins {
+			names = append(names, p.Name)
+		}
+		in.Resources, in.Processes = ResourceReport(ctx, in.Root, names, nil)
+	}
+	add("system/resources.txt", []byte(in.Resources))
+	add("system/processes.txt", []byte(in.Processes))
+	if in.History != "" {
+		add("system/resources-history.txt", []byte(in.History))
+	}
 	add("system/sockets.txt", []byte(socketTable()))
 	if t := soundState("/"); t != "" {
 		add("system/sound.txt", []byte(t))
@@ -202,8 +215,11 @@ func diagReadme(now time.Time, in DiagnosticsInput) string {
 	b.WriteString(`Contents
   problems.txt     crashes, panics and restarts found in the logs (start here)
   rcplug.json      versions, plugin states, device vitals
-  system/          kernel, memory, mounts, processes, network and unix sockets
-                   with their processes, D-Bus names, input devices, kernel log (dmesg)
+  system/          kernel, memory, mounts, network and unix sockets with their
+                   processes, D-Bus names, kernel log (dmesg); resources.txt: CPU,
+                   RAM and storage now, also per plugin; processes.txt: every
+                   process with its CPU and RAM; resources-history.txt: the same
+                   once a minute for the last three hours
   device/          the device's own logs (RØDE's mixer and screen app; serial
                    numbers, tokens, passwords and MAC addresses masked)
   config/          rcplug settings (passwords, PINs and keys masked)
@@ -360,53 +376,6 @@ func maskEnvFile(raw []byte) []byte {
 	return []byte(strings.TrimSuffix(b.String(), "\n"))
 }
 
-// processTable lists all processes with their state, CPU time, threads,
-// memory and command line (secret-looking arguments masked).
-func processTable() string {
-	ents, err := os.ReadDir("/proc")
-	if err != nil {
-		return "(no /proc)\n"
-	}
-	tick := 100.0 // USER_HZ on Linux
-	var b strings.Builder
-	fmt.Fprintf(&b, "%-7s %-5s %-4s %8s %7s %9s  %s\n", "PID", "STATE", "NICE", "CPU s", "THREADS", "RSS KiB", "COMMAND")
-	for _, e := range ents {
-		pid, err := strconv.Atoi(e.Name())
-		if err != nil {
-			continue
-		}
-		stat, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
-		if err != nil {
-			continue
-		}
-		// The command name is in parentheses and may contain spaces.
-		s := string(stat)
-		end := strings.LastIndexByte(s, ')')
-		if end < 0 {
-			continue
-		}
-		f := strings.Fields(s[end+1:])
-		if len(f) < 22 {
-			continue
-		}
-		ut, _ := strconv.ParseFloat(f[11], 64)
-		st, _ := strconv.ParseFloat(f[12], 64)
-		rss, _ := strconv.Atoi(f[21])
-		cmd := ""
-		if raw, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid)); err == nil && len(raw) > 0 {
-			cmd = strings.Join(maskArgs(strings.Split(strings.TrimRight(string(raw), "\x00"), "\x00")), " ")
-		}
-		if cmd == "" {
-			cmd = "[" + s[strings.IndexByte(s, '(')+1:end] + "]"
-		}
-		if len(cmd) > 200 {
-			cmd = cmd[:200] + "…"
-		}
-		fmt.Fprintf(&b, "%-7d %-5s %-4s %8.1f %7s %9d  %s\n", pid, f[0], f[16], (ut+st)/tick, f[17], rss*os.Getpagesize()/1024, cmd)
-	}
-	return b.String()
-}
-
 func commandOutput(ctx context.Context, timeout time.Duration, name string, args ...string) []byte {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -462,6 +431,14 @@ func (s *Server) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 	}
 	in := DiagnosticsInput{Root: s.m.Root(), Version: s.version, Started: s.started, Plugins: plugins,
 		Invalid: invalid, Memory: mem, Fetch: s.fetchPluginDiagnostics}
+	names := make([]string, 0, len(plugins))
+	for _, p := range plugins {
+		names = append(names, p.Name)
+	}
+	in.Resources, in.Processes = ResourceReport(r.Context(), s.m.Root(), names, s.procGroups())
+	if s.Resources != nil {
+		in.History = s.Resources.History()
+	}
 	var buf bytes.Buffer
 	if err := WriteDiagnostics(r.Context(), &buf, in); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -6,6 +6,28 @@ may break compatibility).
 
 ## 0.7.2 - Unreleased
 
+### Changed
+- **Processes** (System page): the numbers add up now. CPU is the share of the whole
+  device, with the device's total above the list (programs, kernel, interrupts,
+  waiting for storage) and a line for the kernel threads, where the RT kernel runs the
+  audio interrupts. Memory per process is split into its own RAM (RssAnon), which
+  together is about the "programs" part of the device's memory, and shared RAM
+  (program files, shared memory), which counts in every process that maps it. The
+  system card breaks the memory down into programs, shared memory, kernel, file cache
+  and free. Only counters are read, never a process's page tables, so the mixer's
+  audio threads are never held up.
+
+### Added
+- **Resources in the diagnostics bundle:** `system/resources.txt` (CPU, RAM and
+  storage now, what rcplug and RØDE's programs take, rcplug's files per plugin),
+  `system/processes.txt` (every process with its CPU, own and shared RAM, threads)
+  and `system/resources-history.txt` (the same once a minute for the last three
+  hours, with the busiest processes).
+
+### Fixed
+- A test helper of the full-control relay could hang when a test ended while its fake
+  screen was connecting (seen once in a release build).
+
 ## 0.7.1 - 2026-10-18
 
 ### Added

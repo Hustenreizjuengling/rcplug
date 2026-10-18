@@ -1,7 +1,7 @@
 package host
 
 import (
-	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -44,6 +44,8 @@ type Server struct {
 	Rescan func() ([]string, error)
 
 	procs procSampler
+	// Resources keeps the minute history for the diagnostics bundle.
+	Resources *ResourceLog
 
 	mu      sync.Mutex
 	proxies map[string]*httputil.ReverseProxy // key: name@target
@@ -53,8 +55,12 @@ type Server struct {
 // NewServer creates the HTTP front end. dashboard may be nil.
 func NewServer(m *Manager, dashboard fs.FS, version string) *Server {
 	return &Server{m: m, dashboard: dashboard, version: version, started: time.Now(),
-		proxies: map[string]*httputil.ReverseProxy{}}
+		proxies: map[string]*httputil.ReverseProxy{}, Resources: &ResourceLog{}}
 }
+
+// RunResources notes the device's resources once a minute for the
+// diagnostics bundle until ctx ends (resources.go).
+func (s *Server) RunResources(ctx context.Context) { s.Resources.Run(ctx, s.procGroups) }
 
 // localSuffixes are DNS suffixes only a home network's own resolver answers
 // for, so an attacker cannot point them at the device (DNS rebinding).
@@ -243,21 +249,9 @@ func health(root string) map[string]interface{} {
 			out["load"] = f[:3]
 		}
 	}
-	if f, err := os.Open("/proc/meminfo"); err == nil {
-		sc := bufio.NewScanner(f)
-		mem := map[string]int{}
-		for sc.Scan() {
-			parts := strings.Fields(sc.Text())
-			if len(parts) >= 2 {
-				if v, err := strconv.Atoi(parts[1]); err == nil {
-					mem[strings.TrimSuffix(parts[0], ":")] = v
-				}
-			}
-		}
-		f.Close()
-		if mem["MemTotal"] > 0 {
-			out["memTotalKB"], out["memAvailableKB"] = mem["MemTotal"], mem["MemAvailable"]
-		}
+	if m := memUsage(readMeminfo("/proc/meminfo")); m.TotalKB > 0 {
+		out["memTotalKB"], out["memAvailableKB"] = m.TotalKB, m.AvailableKB
+		out["memory"] = m // the same breakdown as api/processes
 	}
 	// Highest thermal zone reading (millidegrees).
 	best := -1

@@ -125,6 +125,9 @@ func main() {
 		defer stopAuto()
 		go srv.Updates.RunAutoCheck(autoCtx)
 	}
+	resCtx, stopResources := context.WithCancel(context.Background())
+	defer stopResources()
+	go srv.RunResources(resCtx)
 	// Before any plugin starts: a signal handled here reaches plugins with
 	// its default action even if rcplugd was started with it ignored (as by
 	// a background job of a shell), so plugins can trap SIGINT and stop

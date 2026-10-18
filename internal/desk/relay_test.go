@@ -67,6 +67,13 @@ func (f *fakeScreen) run() {
 			continue
 		}
 		f.mu.Lock()
+		select {
+		case <-f.stop: // the cleanup ran while we dialled: it did not see this connection
+			f.mu.Unlock()
+			conn.Close()
+			return
+		default:
+		}
 		f.conn = conn
 		f.sessions++
 		f.mu.Unlock()
