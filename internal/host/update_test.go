@@ -457,3 +457,47 @@ func TestUpdateProgress(t *testing.T) {
 		t.Fatalf("unpack: %+v", st)
 	}
 }
+
+func TestDailyCheckIsOptIn(t *testing.T) {
+	oldTick, oldFirst, oldEvery := autoTick, autoFirst, autoEvery
+	autoTick, autoFirst, autoEvery = 20*time.Millisecond, 20*time.Millisecond, time.Hour
+	t.Cleanup(func() { autoTick, autoFirst, autoEvery = oldTick, oldFirst, oldEvery })
+	root := t.TempDir()
+	writePlugin(t, root, "echoer", strings.Replace(loopPlugin, "%s", "old", 1), pluginManifest("0.1.0"))
+	pub, priv := testKey(t)
+	fg := newFakeGitHub(t)
+	pkg := tarGz(t, map[string]string{"plugin.json": pluginManifest("0.2.0"), "run.sh": loopPlugin}, map[string]int64{"run.sh": 0o755})
+	fg.publish(t, "tester/rcplug-plugins", "0.2.0", priv, map[string][]byte{"echoer-0.2.0-aarch64.tar.gz": pkg}, nil)
+	m, u := newTestUpdater(t, root, fg, pub)
+	srv := NewServer(m, nil, "0.5.0")
+	srv.Updates = u
+	h := srv.Handler()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { u.RunAutoCheck(ctx); close(done) }()
+	t.Cleanup(func() { cancel(); <-done })
+
+	time.Sleep(150 * time.Millisecond)
+	if st := u.Status(); st.CheckedAt != nil || st.AutoCheck {
+		t.Fatalf("checked without being switched on: %+v", st)
+	}
+	req := httptest.NewRequest("POST", "http://127.0.0.1/api/updates/auto?on=true", nil)
+	req.Header.Set("X-Rcplug", "1")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !m.AutoCheck() {
+		t.Fatalf("switch on: %d %s", rec.Code, rec.Body.String())
+	}
+	waitFor(t, "the daily check", 5*time.Second, func() bool { return u.Status().CheckedAt != nil })
+	if st := u.Status(); !st.AutoCheck || st.Available != 1 {
+		t.Fatalf("after the check: autoCheck %v, available %d", st.AutoCheck, st.Available)
+	}
+	if u.Status().Job != nil {
+		t.Fatal("the daily check installed something")
+	}
+	// The choice survives a restart of the host.
+	if !NewManager(root, 19400).AutoCheck() {
+		t.Fatal("the choice was not kept")
+	}
+}

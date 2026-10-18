@@ -41,6 +41,8 @@ type Manager struct {
 
 type persistState struct {
 	Enabled map[string]bool `json:"enabled"`
+	// AutoCheck: the user switched on the daily check for updates.
+	AutoCheck bool `json:"autoCheck,omitempty"`
 }
 
 // NewManager creates a manager rooted at root. basePort is the first loopback
@@ -85,6 +87,18 @@ func (m *Manager) saveState(name string, enabled bool) {
 	defer m.saveMu.Unlock()
 	ps := m.loadState()
 	ps.Enabled[name] = enabled
+	_ = sdk.SaveJSON(m.stateFile(), ps)
+}
+
+// AutoCheck reports whether the user switched on the daily update check.
+func (m *Manager) AutoCheck() bool { return m.loadState().AutoCheck }
+
+// SetAutoCheck records the user's choice for the daily update check.
+func (m *Manager) SetAutoCheck(on bool) {
+	m.saveMu.Lock()
+	defer m.saveMu.Unlock()
+	ps := m.loadState()
+	ps.AutoCheck = on
 	_ = sdk.SaveJSON(m.stateFile(), ps)
 }
 

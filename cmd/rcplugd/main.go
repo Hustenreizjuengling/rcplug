@@ -116,6 +116,9 @@ func main() {
 			cfg.ExtraKeys = append(cfg.ExtraKeys, pk)
 		}
 		srv.Updates = host.NewUpdater(m, version, cfg)
+		autoCtx, stopAuto := context.WithCancel(context.Background())
+		defer stopAuto()
+		go srv.Updates.RunAutoCheck(autoCtx)
 	}
 	// Before any plugin starts: a signal handled here reaches plugins with
 	// its default action even if rcplugd was started with it ignored (as by

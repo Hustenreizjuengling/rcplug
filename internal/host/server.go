@@ -101,6 +101,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/updates", s.handleUpdates)
 	mux.Handle("POST /api/updates/check", sdk.CSRF(http.HandlerFunc(s.handleUpdateCheck)))
 	mux.Handle("POST /api/updates/install", sdk.CSRF(http.HandlerFunc(s.handleUpdateInstall)))
+	mux.Handle("POST /api/updates/auto", sdk.CSRF(http.HandlerFunc(s.handleUpdateAuto)))
 	mux.HandleFunc("/plugins/{name}", s.handleProxy)
 	mux.HandleFunc("/plugins/{name}/", s.handleProxy)
 	if s.dashboard != nil {
@@ -325,6 +326,21 @@ func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, s.Updates.Check(r.Context()))
+}
+
+// handleUpdateAuto switches the daily check on or off: ?on=true|false.
+func (s *Server) handleUpdateAuto(w http.ResponseWriter, r *http.Request) {
+	if s.Updates == nil {
+		sdk.WriteError(w, sdk.NewError(http.StatusNotFound, "updates_off", "updates are switched off"))
+		return
+	}
+	on, err := strconv.ParseBool(r.URL.Query().Get("on"))
+	if err != nil {
+		sdk.WriteError(w, sdk.NewError(http.StatusBadRequest, "bad_request", "on must be true or false"))
+		return
+	}
+	s.m.SetAutoCheck(on)
+	writeJSON(w, s.Updates.Status())
 }
 
 // handleUpdateInstall installs what the last check found for ?target=

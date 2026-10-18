@@ -6,6 +6,16 @@ may break compatibility).
 
 ## 0.6.8 - Unreleased
 
+### Added
+- **Update notices:** *Look for updates every day* (dashboard → System → Updates, off
+  by default) asks GitHub a few minutes after the start and then once a day; found
+  updates show as a badge on *System* in the navigation. Nothing is installed without
+  a click. `POST api/updates/auto?on=true|false`; `api/updates` reports `autoCheck`
+  and `available`.
+
+### Fixed
+- The dashboard's plugin cards showed an empty divider below their buttons.
+
 ## 0.6.7 - 2026-10-18
 
 ### Added

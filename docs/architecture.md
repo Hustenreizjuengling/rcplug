@@ -75,8 +75,9 @@ something need the header `X-Rcplug: 1`.
 | `POST /api/reload` | Rescan the plugins directory |
 | `GET /api/system` | Host name, version, uptime, load, memory, CPU temperature, free storage |
 | `GET /api/diagnostics` | The diagnostics bundle (zip) |
-| `GET /api/updates` | The last update check: `targets` (`rcplug` and `plugin:<name>`, each with `current`, `latest`, `available`, `notes`, `error`), the running install (`job`), the outcome of the last update of rcplug (`last`) and the trusted key ids. No network access |
+| `GET /api/updates` | The last update check: `targets` (`rcplug` and `plugin:<name>`, each with `current`, `latest`, `available`, `notes`, `error`), the running install (`job`), the outcome of the last update of rcplug (`last`), the trusted key ids, whether the daily check is on (`autoCheck`) and how many updates it found (`available`); while an install runs, `job` has `phase`, `done`, `total` and `eta`. No network access |
 | `POST /api/updates/check` | Ask GitHub for the latest releases (a second check within 20 s returns the first) |
+| `POST /api/updates/auto?on=true\|false` | Switch the daily update check on or off |
 | `POST /api/updates/install?target=<target>` | Install what the last check found for `rcplug` or `plugin:<name>`; 409 while another install runs. See [updates.md](updates.md) |
 | `/plugins/<name>/…` | The plugin's own web UI and API, proxied |
 

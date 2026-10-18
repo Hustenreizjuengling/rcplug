@@ -87,6 +87,10 @@ type UpdateStatus struct {
 	Job       *JobStatus     `json:"job,omitempty"`
 	Last      *LastUpdate    `json:"last,omitempty"`
 	KeyIDs    []string       `json:"keyIds"`
+	// AutoCheck: the daily check is switched on; Available counts the
+	// updates the last check found (for a badge in the navigation).
+	AutoCheck bool `json:"autoCheck"`
+	Available int  `json:"available"`
 }
 
 // UpdateTarget is rcplug itself ("rcplug") or one plugin ("plugin:<name>").
@@ -254,12 +258,55 @@ func (u *Updater) Status() UpdateStatus {
 	}
 	u.mu.Unlock()
 	st.Enabled, st.Current = !u.cfg.Disabled, u.version
+	st.AutoCheck = st.Enabled && u.m.AutoCheck()
+	for _, t := range st.Targets {
+		if t.Available {
+			st.Available++
+		}
+	}
 	st.Last = u.lastUpdate()
 	st.KeyIDs = nil
 	for _, k := range u.keys {
 		st.KeyIDs = append(st.KeyIDs, release.KeyID(k))
 	}
 	return st
+}
+
+// The daily check (update notices): opt-in, a few small requests to the
+// GitHub API once a day and a few minutes after rcplug starts; nothing is
+// downloaded or installed by it.
+var (
+	autoTick  = time.Hour
+	autoEvery = 24 * time.Hour
+	autoFirst = 3 * time.Minute
+)
+
+// RunAutoCheck checks for updates once a day while the user has the daily
+// check switched on, until ctx ends.
+func (u *Updater) RunAutoCheck(ctx context.Context) {
+	if u.cfg.Disabled {
+		return
+	}
+	started := time.Now()
+	t := time.NewTimer(autoFirst)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		t.Reset(autoTick)
+		if !u.m.AutoCheck() || time.Since(started) < autoFirst {
+			continue
+		}
+		u.mu.Lock()
+		due := u.checked.IsZero() || time.Since(u.checked) >= autoEvery
+		u.mu.Unlock()
+		if due {
+			u.Check(ctx)
+		}
+	}
 }
 
 // lastUpdate reads what the installer recorded about the last update of

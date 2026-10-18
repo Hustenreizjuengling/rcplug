@@ -38,6 +38,12 @@ in small pieces at the lowest I/O priority. On a Duo, a download at full speed
 disturbed the USB audio to the computer, which then lost the Duo as a sound device
 until it was unplugged (`RCPLUG_UPDATE_RATE` changes the rate).
 
+**Update notices:** with *Look for updates every day* switched on (System → Updates;
+off by default), rcplug asks GitHub for new releases a few minutes after it starts and
+then once a day: a few small requests, nothing is downloaded or installed. What it
+finds shows as a badge on *System* in the navigation and on the plugin cards;
+installing stays a click. The choice is kept in `state.json`.
+
 To switch updates off, put `RCPLUG_UPDATES=off` into `config/rcplugd.env` and restart
 rcplug (see [configuration.md](configuration.md)). The dashboard then offers none, and
 rcplug never contacts GitHub.
