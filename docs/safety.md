@@ -11,8 +11,6 @@ This page explains each safeguard and its limits.
   starts any plugin, and plugins inherit it.
 - The console never blocks the desk: it reads the control port in its own loop and
   hands changes to browsers in batches every 60 ms, dropping intermediate values.
-- The screen mirror captures at most 2 frames per second, shared by all viewers, with
-  at most 2 MJPEG streams at once. It is off until a user switches it on.
 
 ## The device's own screen: the GUI guard
 
@@ -56,7 +54,7 @@ recommended.
 
 | Level | Allows |
 |---|---|
-| **Read only** (default) | No change to the desk. The console's own switches stay available: the screen mirror and reconnecting (both protected by the PIN, if one is set). |
+| **Read only** (default) | No change to the desk. The console's own switches stay available: reconnecting and the like (protected by the PIN, if one is set). |
 | **Control** | A curated list of everyday controls, each with a type and a valid range (see below). |
 | **Expert** | Every existing property that is not on the deny list, with type checks and the node's own limits (such as a fader's min and max) but without the curated ranges. |
 
@@ -123,7 +121,7 @@ was loaded. It can therefore never hit the wrong node.
 ### Audit log
 
 Every write to the desk, allowed or refused, and every change to the console itself
-(control level, screen mirror, PIN, reconnect, front panel) is listed on the console's
+(control level, PIN, reconnect, device buttons, full control) is listed on the console's
 *Log* tab with time, node, property, value and client address; PINs are never
 recorded. Requests refused before they reach the console's checks (a missing
 `X-Rcplug` header) are not listed. The log keeps the last 300 entries in memory and
@@ -179,7 +177,7 @@ arguments. Review a bundle before you post it anyway.
   device, without a shell: *Forgot the PIN?* on the *System* page opens a minute in
   which pressing channel 1's Listen button four times within four seconds removes the
   PIN and sets the level to *Read only*. Over the network those buttons can only be
-  pressed with the PIN (front panel, touchscreen, writes), and four presses in so
+  pressed with the PIN (device buttons, writes), and four presses in so
   short a time do not happen by chance; every reset is in the console's log.
   (Without the console running, deleting `<install dir>/data/console/pin` and
   restarting the console still works.)
@@ -189,36 +187,24 @@ arguments. Review a bundle before you post it anyway.
 There are **no user accounts**. The PIN protects changes to the desk, nothing else:
 everyone who can reach the device on the network can read the whole state (including
 the serial number, network addresses and the names of paired devices), watch the
-screen mirror once it is switched on, start, stop or restart plugins on the
+start, stop or restart plugins on the
 dashboard, and install the latest signed release of rcplug or a plugin (never
 anything unsigned or older, see [updates.md](updates.md)). The traffic is plain HTTP. rcplug is made for a home or studio network you
 trust. Do not expose port 8080 to the internet.
 
 ## Experimental features
 
-- **Front-panel emulation** injects the same messages that the panel's microcontroller
-  sends into the input queue of its serial line (`/dev/ttyAML3`, with `TIOCSTI`), so
-  buttons, the encoder and faders can be operated remotely. It is off until a user
-  switches it on (*Display* page, with a confirmation) or the console runs with
-  `--panel`, and it works only at the *Expert* level. Every press is in the console's
-  log. An emulated fader jumps back when the real one moves.
-- **Operating the screen** from the mirror writes taps and swipes into the
-  touchscreen's input device (`/dev/input/event*`), which RØDE's screen app reads
-  directly, exactly as a finger's would arrive. It is off until a user switches it on
-  (*Display* page, with a warning), needs the screen mirror on and the *Expert* level,
-  allows one gesture every 80 ms, and every gesture is in the console's log. A tap
-  that lands beside its target triggers whatever is there: try it on a harmless spot
-  first; *Touch correction* mirrors an axis if taps land mirrored.
-- **Screen mirror** reads the DRM scanout buffer the GUI draws into (`/dev/dri/card0`)
-  or, if that cannot be read or is black, `/dev/fb0` (on the Duo that only holds the
-  boot splash). The Duo's GUI draws its landscape screen into a portrait buffer, so
-  the mirror turns such a picture by 90° (the orientation can be changed on the
-  *Display* page). It only reads, never draws. A user must switch it on (*Display* tab), since the
-  screen can show private information.
+- **Device buttons** (front-panel emulation): reading along, the console changes mute,
+  listen and the physical faders by injecting the same messages that the panel's
+  microcontroller sends into the input queue of its serial line (`/dev/ttyAML3`, with
+  `TIOCSTI`). It is off until a user switches it on (*System* page, with a
+  confirmation) or the console runs with `--panel`; the control levels apply as to
+  every write (a physical fader needs *Expert*). Every press is in the console's log.
+  A fader set this way jumps back when the real one moves.
 - **Full control** lets the console take the mixer's one connection and serve the
   device's screen through itself, so every setting can be changed
   ([protocol.md](protocol.md#full-control)). It is off until a user switches it on at
-  the *Expert* level (*Display* page, with a warning); switching it on restarts the
+  the *Expert* level (*System* page, with a warning); switching it on restarts the
   screen app once. The console always closes its own listener before it lets go of the
   mixer, also when it crashes, so the mixer can listen again, and then restarts the
   screen app so it connects to the mixer afresh;

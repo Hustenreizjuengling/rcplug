@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug/internal/desk"
-	"github.com/Hustenreizjuengling/rcplug/internal/hw"
 	"github.com/Hustenreizjuengling/rcplug/internal/rcproto"
 	"github.com/Hustenreizjuengling/rcplug/sdk"
 )
@@ -28,16 +27,11 @@ type Options struct {
 	Client *desk.Client
 	// DataDir keeps settings.json and the PIN file ("" = in memory only).
 	DataDir string
-	// Screen is the display mirror (nil = not available).
-	Screen *hw.Screen
 	// Panel emulates front-panel input (hw.Panel). It is used when
 	// PanelEnabled is set (--panel) or the user switched it on
 	// (Settings.Panel).
 	Panel        FrontPanel
 	PanelEnabled bool
-	// Touch taps the device's touchscreen (hw.Touch), for clicks on the
-	// screen mirror; nil = not available.
-	Touch TouchScreen
 	// Meters reads the levels and hardware fader positions the mixer keeps
 	// in shared memory (hw.Meters), which never travel over the control
 	// port; nil = not available.
@@ -74,7 +68,6 @@ type Console struct {
 	settings      Settings
 	audit         []AuditEntry
 	lastReconnect time.Time
-	lastTouch     time.Time
 	clientsAt     time.Time
 	clientsDoc    interface{}
 	meters        meterState
@@ -104,12 +97,6 @@ func New(o Options) *Console {
 	}
 	if _, err := ParseLevel(c.settings.Control); err != nil {
 		c.settings.Control = "off"
-	}
-	if _, ok := rotations[c.settings.ScreenRotate]; !ok {
-		c.settings.ScreenRotate = ""
-	}
-	if o.Screen != nil {
-		o.Screen.SetRotation(screenRotation(c.settings.ScreenRotate))
 	}
 	if c.settings.FullControl {
 		c.client.SetFullControl(true)
@@ -190,12 +177,6 @@ type FrontPanel interface {
 	Available() error
 }
 
-// TouchScreen taps and swipes on the device's touchscreen (hw.Touch).
-type TouchScreen interface {
-	Info() (hw.TouchInfo, error)
-	Do(hw.Gesture) error
-}
-
 // readOnly: --read-only or the user's switch.
 func (c *Console) readOnly() bool {
 	if c.client.ReadOnly() {
@@ -222,7 +203,6 @@ func (c *Console) panelOnLocked() bool {
 func (c *Console) statusDoc() map[string]interface{} {
 	level, limit := c.Level()
 	c.mu.Lock()
-	screen := c.settings.Screen && c.opts.Screen != nil
 	panel := c.panelOnLocked()
 	c.mu.Unlock()
 	doc := map[string]interface{}{
@@ -233,7 +213,6 @@ func (c *Console) statusDoc() map[string]interface{} {
 		"readOnlyFlag": c.client.ReadOnly(),
 		"pinReset":     c.pinResetState(),
 		"pinRequired":  c.pin.set(),
-		"screen":       screen,
 		"panel":        panel,
 		"passive":      c.client.Passive(),
 		"meters":       c.metersLive(),

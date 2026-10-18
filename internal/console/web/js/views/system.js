@@ -1,12 +1,15 @@
-// System: device, updates, versions, audio engine, network, Bluetooth,
-// wireless mics, CallMe, shows, display & buttons, connection and console
-// settings (PIN).
+// System: connection, console settings (PIN, write protection), the device
+// buttons the console uses while reading along, full control, and the
+// device: updates, versions, audio engine, network, Bluetooth, wireless mics,
+// CallMe, shows, display & buttons. The first cards work without the device
+// state.
 import { h } from '../dom.js';
 import { t } from '../i18n.js';
 import { single, run, runPath } from '../store.js';
 import { slider, kv, card, valueText } from '../controls.js';
 import { request, reconnect, setPin, report, forgetPin, pinReset, setSettings } from '../api.js';
 import { confirmDialog } from '../dialogs.js';
+import { controlLevel } from '../policy.js';
 import { liveState } from '../live.js';
 
 function connectionCard(scope) {
@@ -92,12 +95,78 @@ function consoleCard(scope, rerender) {
     /\/plugins\/[^/]+\//.test(location.pathname) ? h('a', { class: 'btn', href: '../../api/diagnostics', download: '' }, t('console.diagnostics')) : null);
 }
 
+// panelCard switches the front-panel emulation: reading along, the console
+// changes mute, listen and the physical faders by sending what the device's
+// buttons send.
+function panelCard(hw, rerender) {
+  const p = hw.panel || {};
+  const c = h('section', { class: 'card' }, h('h3', null, t('panel.title'), ' ', h('span', { class: 'tag amber' }, t('experimental'))));
+  c.append(h('p', null, t('panel.intro')));
+  if (p.error) c.append(h('div', { class: 'banner bad' }, p.error));
+  if (!p.enabled) {
+    c.append(h('button', { class: 'btn primary', type: 'button', onclick: async () => {
+      if (await confirmDialog(t('panel.enableConfirm'), t('panel.enable')) && await setSettings({ panel: true })) rerender();
+    } }, t('panel.enable')));
+    return c;
+  }
+  c.append(h('p', null, h('b', null, t('panel.isOn')), ' ', controlLevel() === 'expert' ? '' : t('panel.levelNote')));
+  if (p.forced) c.append(h('p', { class: 'muted small' }, t('panel.forced')));
+  else c.append(h('button', { class: 'btn', type: 'button', onclick: async () => { if (await setSettings({ panel: false })) rerender(); } }, t('panel.disable')));
+  return c;
+}
+
+// fullControlCard switches relay mode (the console takes the mixer's one
+// connection and serves the device's screen through itself); only where the
+// console works with the device's screen.
+function fullControlCard(conn, rerender) {
+  if (conn.mode !== 'tap' && conn.mode !== 'relay') return null;
+  const c = h('section', { class: 'card' }, h('h3', null, t('full.title'), ' ', h('span', { class: 'tag amber' }, t('experimental'))));
+  const expert = controlLevel() === 'expert';
+  const on = async () => {
+    if (await confirmDialog(t('full.enableConfirm'), t('full.enable')) && await setSettings({ fullControl: true })) setTimeout(rerender, 1500);
+  };
+  const off = async () => { if (await setSettings({ fullControl: false })) setTimeout(rerender, 800); };
+  if (!conn.fullControl) {
+    c.append(h('p', null, t('full.intro')),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', disabled: !expert, onclick: on }, t('full.enable')),
+        expert ? null : h('span', { class: 'muted small' }, t('full.expertOnly'))));
+    if (conn.relayError) c.append(h('p', { class: 'muted small' }, t('full.lastEnd', { err: relayText(conn) })));
+    return c;
+  }
+  const r = conn.relay;
+  let text;
+  if (conn.mode === 'relay' && r && r.screen) text = t('full.active', { time: new Date(r.screenSince).toLocaleTimeString() });
+  else if (conn.mode === 'relay' && conn.state === 'live') text = t('full.noScreen');
+  else if (conn.mode === 'relay') text = t('full.starting');
+  else text = conn.relayError ? t('full.failed', { err: relayText(conn) }) : t('full.starting');
+  c.append(h('p', { role: 'status' }, text));
+  const row = h('div', { class: 'row' });
+  if (conn.mode !== 'relay' && conn.relayError) row.append(h('button', { class: 'btn primary', type: 'button', disabled: !expert, onclick: on }, t('full.retry')));
+  row.append(h('button', { class: 'btn', type: 'button', onclick: off }, t('full.disable')),
+    h('button', { class: 'btn', type: 'button', onclick: rerender }, t('full.refresh')));
+  c.append(row, h('p', { class: 'muted small' }, t('full.note')));
+  return c;
+}
+
+function relayText(conn) {
+  const k = 'code.' + conn.relayCode;
+  const s = t(k);
+  return s === k ? conn.relayError : s;
+}
+
 export const system = {
   id: 'system',
   title: 'tab.system',
+  noTree: true, // the connection, console, button and full control cards work without the device state
   render(scope, rerender) {
     const sys = single('SYSTEM'), b = single('BUILD'), a = single('AUDIO'), net = single('NETWORK'), gui = single('GUI');
-    const cards = [connectionCard(scope), consoleCard(scope, rerender)];
+    const control = h('section', { class: 'card' }, h('p', { class: 'muted' }, t('loading')));
+    const cards = [connectionCard(scope), consoleCard(scope, rerender), control];
+    Promise.all([request('api/hw'), request('api/status')]).then(([hw, st]) => {
+      if (scope.dead) return;
+      const fc = fullControlCard(st.connection || {}, rerender);
+      control.replaceWith(...[panelCard(hw, rerender), fc].filter(Boolean));
+    }).catch(report);
     if (sys) cards.push(card(t('sys.device'), kv(scope, [
       [t('sys.name'), sys, 'systemName'], [t('sys.serial'), sys, 'systemSerialNumber'], [t('sys.firmware'), sys, 'systemFirmwareVersion'],
       [t('sys.board'), sys, 'boardType', (v) => (v === 1 ? 'Duo (1)' : v === 0 ? 'Pro II (0)' : String(v))], [t('sys.engine'), sys, 'engineMode'],

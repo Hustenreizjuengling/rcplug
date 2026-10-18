@@ -110,6 +110,13 @@ type JobStatus struct {
 	Log     []string  `json:"log"`
 	Error   string    `json:"error,omitempty"`
 	Started time.Time `json:"started"`
+	// Progress of the running step: Phase is download, unpack or install;
+	// Done and Total count bytes (of the package, also while unpacking);
+	// ETA is the estimated seconds left of the phase.
+	Phase string `json:"phase,omitempty"`
+	Done  int64  `json:"done,omitempty"`
+	Total int64  `json:"total,omitempty"`
+	ETA   int    `json:"eta,omitempty"`
 }
 
 // LastUpdate is the outcome of the last update of rcplug itself, as its
@@ -132,8 +139,36 @@ type foundUpdate struct {
 }
 
 type updateJob struct {
-	mu sync.Mutex
-	st JobStatus
+	mu         sync.Mutex
+	st         JobStatus
+	phaseStart time.Time
+}
+
+// progress records how far the running phase is.
+func (j *updateJob) progress(phase string, done, total int64) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.st.Phase != phase {
+		j.st.Phase, j.phaseStart = phase, time.Now()
+	}
+	j.st.Done, j.st.Total, j.st.ETA = done, total, 0
+	if el := time.Since(j.phaseStart).Seconds(); done > 0 && total > done && el > 1 {
+		j.st.ETA = int(el/float64(done)*float64(total-done) + 0.5)
+	}
+}
+
+// counter reports the bytes read through it.
+type counter struct {
+	r      io.Reader
+	n      int64
+	report func(n int64)
+}
+
+func (c *counter) Read(b []byte) (int, error) {
+	n, err := c.r.Read(b)
+	c.n += int64(n)
+	c.report(c.n)
+	return n, err
 }
 
 func (j *updateJob) logf(format string, args ...interface{}) {
@@ -459,7 +494,7 @@ func (u *Updater) getSmall(ctx context.Context, raw string) ([]byte, error) {
 
 // download saves an asset to dst and checks its size and SHA-256 against
 // the signed manifest.
-func (u *Updater) download(ctx context.Context, raw, dst string, a release.Asset) error {
+func (u *Updater) download(ctx context.Context, raw, dst string, a release.Asset, report func(n int64)) error {
 	if a.Size > maxPackage {
 		return fmt.Errorf("%s is larger than %d MB", a.Name, maxPackage>>20)
 	}
@@ -473,7 +508,10 @@ func (u *Updater) download(ctx context.Context, raw, dst string, a release.Asset
 		return err
 	}
 	h := sha256.New()
-	body := &pacedReader{r: io.LimitReader(resp.Body, a.Size+1), p: newPacer(u.cfg.Rate)}
+	body := io.Reader(&pacedReader{r: io.LimitReader(resp.Body, a.Size+1), p: newPacer(u.cfg.Rate)})
+	if report != nil {
+		body = &counter{r: body, report: report}
+	}
 	n, err := io.Copy(io.MultiWriter(&pacedFile{f: out, p: newPacer(0), syncEvery: 256 << 10}, h), body)
 	if cerr := out.Close(); err == nil {
 		err = cerr
@@ -546,7 +584,7 @@ func (u *Updater) install(ctx context.Context, j *updateJob, fu *foundUpdate) (s
 	}
 	pkg := filepath.Join(dir, fu.asset.Name)
 	j.logf("downloading %s (%d KB; free memory %s)", fu.asset.Name, fu.asset.Size>>10, freeMemory())
-	if err := u.download(ctx, fu.url, pkg, fu.asset); err != nil {
+	if err := u.download(ctx, fu.url, pkg, fu.asset, func(n int64) { j.progress("download", n, fu.asset.Size) }); err != nil {
 		return "", err
 	}
 	j.logf("signature and SHA-256 checked (free memory %s)", freeMemory())
@@ -558,10 +596,12 @@ func (u *Updater) install(ctx context.Context, j *updateJob, fu *foundUpdate) (s
 
 func (u *Updater) installPlatform(j *updateJob, fu *foundUpdate, dir, pkg string) (string, error) {
 	payload := filepath.Join(dir, "payload")
-	if err := extractTarGz(pkg, payload, maxUnpacked, 4*u.cfg.Rate); err != nil {
+	j.progress("unpack", 0, fu.asset.Size)
+	if err := extractTarGz(pkg, payload, maxUnpacked, 4*u.cfg.Rate, func(n int64) { j.progress("unpack", n, fu.asset.Size) }); err != nil {
 		return "", err
 	}
 	_ = os.Remove(pkg)
+	j.progress("install", 0, 0)
 	j.logf("unpacked (free memory %s)", freeMemory())
 	if _, err := os.Stat(filepath.Join(payload, "install.sh")); err != nil {
 		return "", errors.New("the device package has no install.sh")
@@ -591,7 +631,8 @@ func (u *Updater) installPlugin(j *updateJob, fu *foundUpdate, dir, pkg string) 
 	if err := os.MkdirAll(filepath.Dir(staged), 0o755); err != nil {
 		return err
 	}
-	if err := extractTarGz(pkg, staged, maxUnpacked, 4*u.cfg.Rate); err != nil {
+	j.progress("unpack", 0, fu.asset.Size)
+	if err := extractTarGz(pkg, staged, maxUnpacked, 4*u.cfg.Rate, func(n int64) { j.progress("unpack", n, fu.asset.Size) }); err != nil {
 		return err
 	}
 	man, err := LoadManifest(staged)
@@ -612,6 +653,7 @@ func (u *Updater) installPlugin(j *updateJob, fu *foundUpdate, dir, pkg string) 
 	if man.Version != fu.asset.Version {
 		return fmt.Errorf("the package's plugin.json says version %s, the manifest %s", man.Version, fu.asset.Version)
 	}
+	j.progress("install", 0, 0)
 	j.logf("replacing %s %s with %s", name, fu.target.Current, man.Version)
 	started, err := u.m.ReplacePlugin(name, staged)
 	if err != nil {

@@ -6,6 +6,20 @@ may break compatibility).
 
 ## 0.6.7 - Unreleased
 
+### Added
+- Updates show a **progress bar** with the amount and the time left while they
+  download and unpack (in the dashboard's update card, and on the plugin card for a
+  plugin update); the job reports `phase`, `done`, `total` and `eta`.
+
+### Removed
+- The console's **Display page**: the screen mirror, operating the device's screen by
+  touch from it, and the grid of device buttons. The console's mixer shows and
+  changes the desk itself, and full control covers the settings without a button.
+  The switches for the device buttons and full control are on the *System* page now.
+  `api/screen.*`, `api/touch` and `api/panel` are gone, `api/hw` reports the device
+  buttons and the meters only; `--screen`, `--fb`, `--drm`, `--fps` and `--touch` are
+  still accepted but do nothing. The diagnostics no longer list the input devices.
+
 ## 0.6.6 - 2026-10-18
 
 ### Changed

@@ -9,8 +9,7 @@ import { effects } from './effects.js';
 import { pads } from './pads.js';
 import { recorder } from './recorder.js';
 import { system } from './system.js';
-import { display } from './display.js';
 import { explorer } from './explorer.js';
 import { audit } from './audit.js';
 
-export const views = [mixer, routing, inputs, outputsView, effects, pads, recorder, system, display, explorer, audit];
+export const views = [mixer, routing, inputs, outputsView, effects, pads, recorder, system, explorer, audit];

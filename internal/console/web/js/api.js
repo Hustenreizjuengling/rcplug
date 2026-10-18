@@ -113,6 +113,4 @@ export const setPin = (current, next) => post('api/pin', { current, new: next })
 export const pinReset = () => post('api/pin/reset', {});
 export const reconnect = (okMsg) => post('api/reconnect', {}, okMsg);
 export const resync = (okMsg) => post('api/resync', {}, okMsg);
-export const panel = (control, value) => post('api/panel', { control, value: value || 0 });
-export const touch = (g) => post('api/touch', g);
 export function forgetPin() { pin = ''; try { sessionStorage.removeItem('rcplug-pin'); } catch (e) { /* ignore */ } }

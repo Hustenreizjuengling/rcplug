@@ -26,7 +26,7 @@ var (
 	ErrStaleEpoch = sdk.NewError(http.StatusConflict, "stale_epoch", "the device state changed structurally; reload it and retry")
 	ErrOffline    = sdk.NewError(http.StatusServiceUnavailable, "offline", "not connected to the desk")
 	ErrReadOnly   = sdk.NewError(http.StatusForbidden, "read_only", "writes are disabled (--read-only)")
-	ErrPassive    = sdk.NewError(http.StatusForbidden, "passive", "the console reads along with the device's screen and cannot change the desk; use the device buttons (Display page)")
+	ErrPassive    = sdk.NewError(http.StatusForbidden, "passive", "the console reads along with the device's screen and cannot change the desk; switch on the device buttons (System page) or full control")
 	ErrTooMany    = sdk.NewError(http.StatusServiceUnavailable, "too_many_clients", "too many live connections, try again later")
 )
 

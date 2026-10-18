@@ -16,14 +16,18 @@ import (
 // stay inside dst, and the unpacked size is bounded: a package is checked
 // against its signed SHA-256 before, but this keeps a mistake in a release
 // from writing anywhere else.
-func extractTarGz(file, dst string, maxTotal, rate int64) error {
+func extractTarGz(file, dst string, maxTotal, rate int64, report func(n int64)) error {
 	p := newPacer(rate)
 	f, err := os.Open(file)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	gz, err := gzip.NewReader(f)
+	var src io.Reader = f
+	if report != nil {
+		src = &counter{r: f, report: report} // progress in package bytes
+	}
+	gz, err := gzip.NewReader(src)
 	if err != nil {
 		return err
 	}

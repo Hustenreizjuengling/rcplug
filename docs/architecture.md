@@ -16,7 +16,7 @@ statically linked Go programs that are copied there and started as a service.
                                     │ console  127.0.0.1:91xx ──TCP 2345──▶ rc_audio_mixer
                                     │   mirror of the state tree        (the device's  │
                                     │   write policy, audit log          own screen is │
-                                    │   screen mirror                    a client too) │
+                                    │   meters (shared memory)           a client too) │
                                     │ sonar    127.0.0.1:91xx ◀── JACK via loopback    │
                                     │ your plugin …                                    │
                                     └─────────────────────────────────────────────────┘
@@ -107,7 +107,7 @@ something need the header `X-Rcplug: 1`.
 | `internal/rcproto` | Pure protocol code: `juce::var` values, ValueTree nodes, change messages, TCP framing, discovery of the node families (layout), model detection, sanitizing |
 | `internal/desk` | The connection to the desk: session handling with full sync and reconnects, the GUI guard, the mirror (a local copy of the tree with epoch and sequence numbers), batched change fan-out to subscribers, JSON encoding with redaction |
 | `internal/console` | HTTP API, write policy (levels, deny list, value ranges), PIN, settings, audit log, summary, embedded web UI |
-| `internal/hw` | Screen mirror (DRM, or the framebuffer) and the experimental front-panel emulation |
+| `internal/hw` | The mixer's meter memory (read-only) and the experimental front-panel emulation |
 | `internal/rcsim` | Simulator of the control port for development and tests |
 
 ![The console's explorer](img/console-explorer.png)

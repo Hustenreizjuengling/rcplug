@@ -214,15 +214,6 @@ table.props{width:100%;border-collapse:collapse;font-size:13px}
 .props td.v{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
 .props input{width:100%}
 
-/* display */
-.screen{max-width:100%;border-radius:10px;border:1px solid var(--line);background:#000;display:block}
-.screenwrap{position:relative;display:inline-block;max-width:100%}
-.screenwrap.touch{cursor:crosshair;touch-action:none;user-select:none}
-.screenwrap.touch img{pointer-events:none}
-.tapdot{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;border:2px solid var(--accent);background:rgba(255,255,255,.25);pointer-events:none;animation:tapfade .6s ease-out forwards}
-@keyframes tapfade{to{opacity:0;transform:scale(1.8)}}
-.panelgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-
 /* toasts & dialogs */
 #toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:20;max-width:min(420px,calc(100vw - 32px))}
 .toast{background:var(--panel3);border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:10px;padding:10px 14px;font-size:13px;box-shadow:0 8px 30px #0008}

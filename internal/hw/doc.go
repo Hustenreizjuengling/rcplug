@@ -1,7 +1,7 @@
-// Package hw gives the console optional, read-mostly access to the desk's
-// hardware: a screenshot of the touchscreen (legacy framebuffer or DRM/KMS
-// scanout buffer) and, opt-in, emulation of front-panel inputs.
+// Package hw gives the console the device hardware it uses besides the
+// mixer's control port: the levels and fader positions in the mixer's meter
+// memory (read-only) and, opt-in, emulation of front-panel inputs.
 //
-// Capture and input injection are Linux-only; on other systems the functions
-// return errors so development builds still compile.
+// Both are Linux-only; on other systems the functions return errors so
+// development builds still compile.
 package hw

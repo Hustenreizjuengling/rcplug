@@ -66,12 +66,7 @@ flashing from Windows (below). What is still open:
    the interface again; the computer reset it about 45 seconds later (`ep_stop_xfr:
    timeout`, then a new enumeration), as after the earlier updates. To confirm with the
    first update installed *by* 0.6.5.
-6. **Operating the screen** (0.6.2, experimental). RØDE's screen app reads its
-   touchscreen from `/dev/input/event0`/`event1` (evdev, no libinput); which one is the
-   touchscreen, its axis ranges and orientation are in the diagnostics
-   (`system/input-devices.txt`). Whether taps land where clicked is to be confirmed
-   on the device.
-7. **Full control** (0.6.4, experimental). Built on what the analysis of the binaries
+6. **Full control** (0.6.4, experimental). Built on what the analysis of the binaries
    says (the mixer closes its listener while it has a client and opens it again when
    the client leaves; the screen app connects to `127.0.0.1:2345`) and tested against
    the simulator. To confirm on the device: that the screen app connects through the
@@ -101,14 +96,15 @@ from Windows to a patched 1.7.6):
 - **The front-panel emulation works**: injecting *Listen 1* (`b0 19 00`, 50 ms,
   `b0 19 01` into `/dev/ttyAML3` with `TIOCSTI`) toggled it exactly like the button,
   LED included, and a second press turned it off again. It needs no connection to the
-  mixer, so the console's *Display* page (front panel and screen mirror) can operate
-  the desk although the screen holds the mixer's port: on the console's *Display*
-  page choose *Switch on the device buttons* and the *Expert* level (since 0.5.2; 0.5.1
-  needed `--panel`). Every button of the device, the wheel and the pads worked from
-  the browser.
-- **The screen mirror works next to the GUI** (DRM, 2 frames per second). The GUI
-  draws its 1280×720 landscape screen into a 720×1280 buffer whose top is on the
-  right; since 0.5.2 the mirror turns it.
+  mixer, so the console could operate the desk from its *Display* page although the
+  screen holds the mixer's port (since 0.5.2; 0.5.1 needed `--panel`). Every button of
+  the device, the wheel and the pads worked from the browser. (The *Display* page,
+  with a screen mirror and operating the screen by touch, was removed in 0.6.7; the
+  console now presses mute and listen and sets the physical faders right from its
+  mixer, and the switch for the device buttons is on its *System* page.)
+- **The screen mirror worked next to the GUI** (DRM, 2 frames per second; removed in
+  0.6.7). The GUI draws its 1280×720 landscape screen into a 720×1280 buffer whose top
+  is on the right.
 - **Reading along works** (0.6.0): after *Read the state again* (the screen app
   restarted, about three seconds) the console mirrored the whole desk; changes on the
   device arrive as described in [protocol.md](protocol.md#what-a-running-duo-sends).

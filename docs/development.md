@@ -39,7 +39,7 @@ internal/host/       manifests, supervisor, HTTP server and proxy
 internal/rcproto/    protocol: values, trees, changes, frames, layout, models, sanitizing
 internal/desk/       connection to the desk, mirror, GUI guard, JSON encoding
 internal/console/    console API, write policy, PIN, settings, web UI (web/)
-internal/hw/         screen mirror, front-panel emulation
+internal/hw/         meter memory, front-panel emulation
 internal/rcsim/      simulator and the Duo fixture
 cmd/rcplug-release/  signs and verifies releases (docs/updates.md)
 sdk/                 public helpers for Go plugins; sdk/console is the console client,

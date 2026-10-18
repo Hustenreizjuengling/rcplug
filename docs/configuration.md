@@ -49,18 +49,14 @@ saved as `config/console.json`, then restart the console.
 | `--desk-mode` | `auto` | How the console gets the state: `tap` reads along with the device's screen (needs root; no writes, control through the front panel), `connect` is a client of the mixer's port, `auto` reads along on a RØDECaster (where `/usr/bin/rc_audio_mixer` exists and the mixer is local) and connects anywhere else (the simulator, an SSH tunnel) |
 | `--boot-grace` | `75s` | Wait until the system has been up this long before connecting (only with the guard on and a desk on this machine, where the device's own screen may still be connecting) |
 | `--handshake` | `auto` | Session-open message: `auto` (only if no full sync arrives within 3 s), `always`, `never` |
-| `--screen` | `auto` | Screen mirror source: `auto`, `fb`, `drm` or `off`. Users still have to switch it on. |
-| `--fb`, `--drm` | `/dev/fb0`, `/dev/dri/card0` | Devices for the screen mirror |
-| `--fps` | `2` | Maximum screen mirror frames per second |
-| `--panel` | off | Switches the experimental front-panel emulation on for good. Without it, users switch it on and off on the console's *Display* page; either way it works only at the expert level. |
+| `--panel` | off | Switches the experimental front-panel emulation on for good. Without it, users switch it on and off on the console's *System* page. The control levels apply as to every write: mute and listen from *Control* on, the physical faders at *Expert*. |
 | `--tty` | `/dev/ttyAML3` | Serial line of the front panel |
 | `--meters` | `auto` | Reads the level meters and the hardware faders' positions from the mixer's shared memory (read-only), where the Duo keeps them instead of sending them; `off` switches that off. |
-| `--touch` | `auto` | Touchscreen event device for operating the screen from the mirror: `auto` (found by its axes), `off`, or `/dev/input/eventN`. Users still have to switch it on. |
 | `--sim` | off | Start a built-in simulated Duo and connect to it |
 | `--addr` | `127.0.0.1:8082` | Listen address when run standalone (the host passes its own) |
 | `--pin` (env `RCPLUG_CONSOLE_PIN`) | | Deprecated. Taken over once as the PIN if none is stored; set the PIN in the UI instead |
 
-The control level, the screen mirror switch and the PIN are set in the web UI and
+The control level, the switches and the PIN are set in the web UI and
 stored in the console's data directory (`data/console/settings.json` and
 `data/console/pin`). Run standalone without `RCPLUG_DATA_DIR`, the console keeps them
 in memory only.

@@ -6,7 +6,7 @@ bündelt. Die Firmware fasst er nie an.**
 
 Mit dabei ist die **Konsole**: das ganze Mischpult im Browser. Kanäle mit
 Live-Pegeln, Fader, Mute und Listen, Bearbeitung, Routing-Matrix, Eingänge, Ausgänge,
-Effekte, SMART Pads, Aufnahme, Systeminfos, ein Bildschirmspiegel und ein Explorer für
+Effekte, SMART Pads, Aufnahme, Systeminfos und ein Explorer für
 den kompletten Gerätezustand. Nach der Installation ist sie **nur lesend**; Steuerung
 lässt sich stufenweise zuschalten.
 
@@ -23,12 +23,13 @@ dazu ein [Kochbuch](docs/cookbook.md) und die [Schnittstellen-Referenz](docs/plu
 > Simulator, der einen echten Duo-Gerätezustand (Firmware 1.7.4) abspielt, mit den
 > arm64-Programmen unter QEMU und installiert in die Original-Firmware 1.7.6 und 1.7.3.
 > **Erster Test an einem echten Duo (Firmware 1.7.6):** Flashen, SSH, Installer,
-> In-App-Updates, Dashboard und Plugins funktionieren, und die Konsole bedient das
-> Pult über seine Tasten und zeigt seinen Bildschirm. Das Mischpult bedient nur einen
-> Client gleichzeitig, und den belegt der Bildschirm des Geräts; seit 0.6 liest die
-> Konsole diese Verbindung mit, um das ganze Pult abzubilden (am Gerät noch zu
-> bestätigen; [docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo), Englisch). Die
-> Konsole nimmt dem Bildschirm nie den Platz weg. Nach der Installation ist sie nur lesend.
+> In-App-Updates, Dashboard und Plugins funktionieren. Das Mischpult bedient nur einen
+> Client gleichzeitig, und den belegt der Bildschirm des Geräts; die Konsole liest diese
+> Verbindung mit und zeigt das ganze Pult mit Live-Pegeln. Mute, Listen und die
+> physischen Fader ändert sie über die Tasten des Geräts, die experimentelle *volle
+> Steuerung* jede Einstellung
+> ([docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo), Englisch).
+> Nach der Installation ist sie nur lesend.
 >
 > rcplug steht in keiner Verbindung zu RØDE. Nutzung auf eigene Gefahr; bitte den
 > Haftungsausschluss unten lesen.
@@ -52,7 +53,7 @@ einsetzen, die nicht ausfallen darf.
 
 | Gerät | Stand |
 |---|---|
-| RØDECaster Duo, Firmware 1.7.x | Läuft auf einem echten Duo (1.7.6): Host, Dashboard, In-App-Updates und Plugins; die Konsole bedient die Tasten des Geräts und spiegelt seinen Bildschirm. Seit 0.6 liest die Konsole mit, was der Bildschirm des Geräts bekommt, und zeigt das ganze Pult (am Gerät noch zu bestätigen). |
+| RØDECaster Duo, Firmware 1.7.x | Läuft auf einem echten Duo (1.7.6): Host, Dashboard, In-App-Updates und Plugins; die Konsole liest beim Bildschirm des Geräts mit, zeigt das ganze Pult mit Live-Pegeln und ändert es über die Tasten des Geräts; die volle Steuerung (experimentell) ist am Gerät noch zu bestätigen. |
 | RØDECaster Pro II | Wird erkannt und **nur lesend** angezeigt. Steuerung braucht ein geprüftes Profil, siehe [docs/adding-a-model.md](docs/adding-a-model.md). |
 | Andere / unbekannt | Nur lesend. |
 

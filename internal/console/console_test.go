@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"image"
 	"io"
-	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -48,7 +46,7 @@ func newRig(t *testing.T, opts rcsim.Options, mutate ...func(*Options)) *rig {
 	t.Cleanup(sim.Close)
 	client := desk.NewClient(desk.Config{Addr: sim.Addr(), BootGrace: time.Nanosecond, Logf: quiet}, desk.NewMirror())
 	dir := t.TempDir()
-	o := Options{Client: client, DataDir: dir, Logf: quiet, Screen: &hw.Screen{FB: "/nonexistent", Mode: "fb"}}
+	o := Options{Client: client, DataDir: dir, Logf: quiet}
 	for _, m := range mutate {
 		m(&o)
 	}
@@ -419,32 +417,12 @@ func TestLinkPressAndTrigger(t *testing.T) {
 	}
 }
 
-func TestScreenMirrorIsOptIn(t *testing.T) {
-	r := newRig(t, rcsim.Options{})
-	if res := r.do(t, http.MethodGet, "/api/screen.jpg", nil); res.code != 403 || res.body["code"] != "screen_disabled" {
-		t.Fatalf("screen without opt-in: %d %s", res.code, res.raw)
-	}
-	if res := r.post(t, "/api/settings", map[string]bool{"screen": true}); res.code != 200 {
-		t.Fatalf("enable screen: %d %s", res.code, res.raw)
-	}
-	// Enabled, but the device has no framebuffer here: a capture error, not 403.
-	if res := r.do(t, http.MethodGet, "/api/screen.jpg", nil); res.code != 503 || res.body["code"] != "capture_failed" {
-		t.Fatalf("screen enabled: %d %s", res.code, res.raw)
-	}
-	if res := r.do(t, http.MethodGet, "/api/screen.mjpg", nil); res.code != 503 || res.body["code"] != "capture_failed" {
-		t.Fatalf("screen enabled: %d %s", res.code, res.raw)
-	}
-}
-
 // The front panel is switched on in the UI (no --panel needed) and stays on
 // across a restart; the picture's rotation is a setting as well.
-func TestPanelAndScreenRotationAreSettings(t *testing.T) {
+func TestPanelIsASetting(t *testing.T) {
 	r := newRig(t, rcsim.Options{}, func(o *Options) { o.Panel = &hw.Panel{TTY: "/dev/null"} })
 	if res := r.post(t, "/api/control", map[string]string{"level": "expert"}); res.code != 200 {
 		t.Fatalf("expert: %d %s", res.code, res.raw)
-	}
-	if res := r.post(t, "/api/panel", map[string]string{"control": "listen1"}); res.code != 403 || res.body["code"] != "panel_disabled" {
-		t.Fatalf("panel before switching it on: %d %s", res.code, res.raw)
 	}
 	if res := r.post(t, "/api/settings", map[string]bool{"panel": true}); res.code != 200 {
 		t.Fatalf("switch panel on: %d %s", res.code, res.raw)
@@ -453,32 +431,22 @@ func TestPanelAndScreenRotationAreSettings(t *testing.T) {
 	if hwDoc["enabled"] != true || hwDoc["forced"] != false {
 		t.Fatalf("hw panel: %v", hwDoc)
 	}
-	// Switched on: the press reaches the tty (/dev/null refuses TIOCSTI).
-	if res := r.post(t, "/api/panel", map[string]string{"control": "listen1"}); res.code != 400 || !strings.Contains(string(res.raw), "TIOCSTI") {
-		t.Fatalf("panel when on: %d %s", res.code, res.raw)
-	}
-	if res := r.post(t, "/api/settings", map[string]string{"screenRotate": "90"}); res.code != 200 {
-		t.Fatalf("rotate: %d %s", res.code, res.raw)
-	}
-	if res := r.post(t, "/api/settings", map[string]string{"screenRotate": "45"}); res.code != 400 {
-		t.Fatalf("bad rotation accepted: %d %s", res.code, res.raw)
-	}
 	var saved Settings
 	if err := sdk.LoadJSON(filepath.Join(r.dir, "settings.json"), &saved); err != nil {
 		t.Fatal(err)
 	}
-	if !saved.Panel || saved.ScreenRotate != "90" {
+	if !saved.Panel {
 		t.Fatalf("saved %+v", saved)
 	}
 	again := New(Options{Client: r.client, DataDir: r.dir, Logf: quiet, Panel: &hw.Panel{TTY: "/dev/null"}})
 	if !again.panelOn() {
 		t.Fatal("the panel switch did not survive a restart")
 	}
-	if res := r.post(t, "/api/settings", map[string]interface{}{"panel": false, "screenRotate": "auto"}); res.code != 200 {
+	if res := r.post(t, "/api/settings", map[string]interface{}{"panel": false}); res.code != 200 {
 		t.Fatalf("switch off: %d %s", res.code, res.raw)
 	}
-	if r.console.panelOn() || r.console.settings.ScreenRotate != "" {
-		t.Fatalf("after switching off: panel %v, rotate %q", r.console.panelOn(), r.console.settings.ScreenRotate)
+	if r.console.panelOn() {
+		t.Fatal("panel still on after switching it off")
 	}
 }
 
@@ -620,67 +588,6 @@ func TestReadingAlongWritesThroughTheFrontPanel(t *testing.T) {
 	}
 	if got := strings.Join(fp.pressed, ","); got != "mute1,listen1,fader1" || fp.values[2] != 30 {
 		t.Fatalf("pressed %v, values %v", got, fp.values)
-	}
-}
-
-type fakeTouch struct{ gestures []hw.Gesture }
-
-func (f *fakeTouch) Info() (hw.TouchInfo, error) {
-	return hw.TouchInfo{Device: "/dev/input/event0", Name: "Goodix Capacitive TouchScreen", XMax: 719, YMax: 1279, MT: true}, nil
-}
-func (f *fakeTouch) Do(g hw.Gesture) error { f.gestures = append(f.gestures, g); return nil }
-
-// Clicks on the mirror tap the touchscreen where the device shows that spot:
-// only switched on, at the expert level, one gesture at a time.
-func TestTouchOnTheMirror(t *testing.T) {
-	ft := &fakeTouch{}
-	r := newRig(t, rcsim.Options{}, func(o *Options) {
-		o.Screen = hw.StillScreen(image.NewRGBA(image.Rect(0, 0, 720, 1280))) // like the Duo: portrait, shown turned
-		o.Touch = ft
-	})
-	tap := map[string]float64{"x": 0.1, "y": 0.1}
-	if res := r.post(t, "/api/touch", tap); res.code != 403 || res.body["code"] != "screen_disabled" {
-		t.Fatalf("mirror off: %d %s", res.code, res.raw)
-	}
-	r.post(t, "/api/settings", map[string]bool{"screen": true})
-	if res := r.post(t, "/api/touch", tap); res.code != 403 || res.body["code"] != "touch_disabled" {
-		t.Fatalf("screen control off: %d %s", res.code, res.raw)
-	}
-	r.post(t, "/api/settings", map[string]bool{"screenControl": true})
-	if res := r.post(t, "/api/touch", tap); res.code != 403 || res.body["code"] != "expert_required" {
-		t.Fatalf("not expert: %d %s", res.code, res.raw)
-	}
-	r.post(t, "/api/control", map[string]string{"level": "expert"})
-	old := touchInterval
-	defer func() { touchInterval = old }()
-	touchInterval = time.Hour // the next gesture is always "too soon"
-	if res := r.post(t, "/api/touch", tap); res.code != 200 {
-		t.Fatalf("tap: %d %s", res.code, res.raw)
-	}
-	if res := r.post(t, "/api/touch", tap); res.code != 429 {
-		t.Fatalf("two at once: %d %s", res.code, res.raw)
-	}
-	touchInterval = 0
-	swipe := map[string]float64{"x": 0.1, "y": 0.5, "toX": 0.9, "toY": 0.5, "ms": 300}
-	if res := r.post(t, "/api/touch", swipe); res.code != 200 {
-		t.Fatalf("swipe: %d %s", res.code, res.raw)
-	}
-	if len(ft.gestures) != 2 {
-		t.Fatalf("gestures %+v", ft.gestures)
-	}
-	g := ft.gestures[0]
-	if len(g.Points) != 1 || !g.Portrait || math.Abs(g.Points[0].X-0.9) > 1e-9 || math.Abs(g.Points[0].Y-0.1) > 1e-9 {
-		t.Fatalf("tap at the top left of the picture: %+v (want the top right of the portrait buffer)", g)
-	}
-	if s := ft.gestures[1]; len(s.Points) != 2 || s.Duration != 300*time.Millisecond {
-		t.Fatalf("swipe %+v", s)
-	}
-	doc := r.do(t, http.MethodGet, "/api/hw", nil).body["touch"].(map[string]interface{})
-	if doc["available"] != true || doc["enabled"] != true || doc["device"] != "/dev/input/event0" {
-		t.Fatalf("hw touch %v", doc)
-	}
-	if res := r.post(t, "/api/touch", map[string]float64{"x": 1.5, "y": 0}); res.code != 400 {
-		t.Fatalf("outside the picture: %d %s", res.code, res.raw)
 	}
 }
 

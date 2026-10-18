@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Hustenreizjuengling/rcplug/internal/hw"
 	"github.com/Hustenreizjuengling/rcplug/sdk"
 )
 
@@ -17,19 +16,8 @@ import (
 // plugin's data directory, kept across reinstalls).
 type Settings struct {
 	Control string `json:"control"` // off | basic | expert
-	// Screen enables the display mirror. Off by default: the mirror shows
-	// everything on the device screen, including secrets being typed there.
-	Screen bool `json:"screen"`
-	// ScreenRotate turns the mirrored picture: "" (auto: a portrait buffer,
-	// as on the Duo, becomes landscape), "0", "90", "180" or "270" degrees
-	// clockwise.
-	ScreenRotate string `json:"screenRotate,omitempty"`
 	// Panel switches the front-panel emulation on (--panel does it for good).
 	Panel bool `json:"panel,omitempty"`
-	// ScreenControl lets clicks on the screen mirror tap the device's
-	// touchscreen; TouchFlip corrects its orientation ("", "x", "y", "xy").
-	ScreenControl bool   `json:"screenControl,omitempty"`
-	TouchFlip     string `json:"touchFlip,omitempty"`
 	// FullControl (experimental, reading along only): the console takes the
 	// mixer's one place and serves the device's screen in turn, so every
 	// setting can be written (see desk/relay.go).
@@ -37,17 +25,6 @@ type Settings struct {
 	// ReadOnly refuses every write, like --read-only, but switchable in the
 	// UI (behind the PIN, if one is set).
 	ReadOnly bool `json:"readOnly,omitempty"`
-}
-
-// rotations are the valid ScreenRotate values besides "" (auto).
-var rotations = map[string]int{"0": 0, "90": 90, "180": 180, "270": 270}
-
-// screenRotation turns a ScreenRotate setting into degrees or hw.RotateAuto.
-func screenRotation(s string) int {
-	if deg, ok := rotations[s]; ok {
-		return deg
-	}
-	return hw.RotateAuto
 }
 
 // pinStore keeps the optional write PIN in a root-only file (never on a

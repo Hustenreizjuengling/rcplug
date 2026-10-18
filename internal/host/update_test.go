@@ -195,6 +195,9 @@ func TestUpdatePlugin(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitJob(t, u, "done")
+	if j := u.Status().Job; j == nil || j.Phase != "install" {
+		t.Fatalf("job after the update: %+v", j)
+	}
 
 	man, err := LoadManifest(filepath.Join(root, "plugins", "echoer"))
 	if err != nil || man.Version != "0.2.0" {
@@ -400,7 +403,7 @@ func TestExtractRejectsEscapes(t *testing.T) {
 		gz.Close()
 		file := filepath.Join(t.TempDir(), "p.tar.gz")
 		os.WriteFile(file, buf.Bytes(), 0o644)
-		if err := extractTarGz(file, filepath.Join(t.TempDir(), "out"), 1<<20, 0); err == nil {
+		if err := extractTarGz(file, filepath.Join(t.TempDir(), "out"), 1<<20, 0, nil); err == nil {
 			t.Errorf("%s: extracted", name)
 		}
 	}
@@ -433,5 +436,24 @@ func TestUpdateAPI(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("install without a check = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUpdateProgress(t *testing.T) {
+	j := &updateJob{}
+	j.progress("download", 0, 1000)
+	if st := j.snapshot(); st.Phase != "download" || st.Total != 1000 || st.ETA != 0 {
+		t.Fatalf("start: %+v", st)
+	}
+	j.mu.Lock()
+	j.phaseStart = time.Now().Add(-2 * time.Second)
+	j.mu.Unlock()
+	j.progress("download", 500, 1000) // half in 2 s: about 2 s left
+	if st := j.snapshot(); st.Done != 500 || st.ETA != 2 {
+		t.Fatalf("half way: %+v", st)
+	}
+	j.progress("unpack", 10, 1000) // a new phase starts its own clock
+	if st := j.snapshot(); st.Phase != "unpack" || st.ETA != 0 {
+		t.Fatalf("unpack: %+v", st)
 	}
 }

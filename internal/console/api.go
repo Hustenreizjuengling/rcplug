@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug/internal/desk"
-	"github.com/Hustenreizjuengling/rcplug/internal/hw"
 	"github.com/Hustenreizjuengling/rcplug/internal/rcproto"
 	"github.com/Hustenreizjuengling/rcplug/sdk"
 )
@@ -29,9 +28,6 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/audit", c.handleAudit)
 	mux.HandleFunc("GET /api/diagnostics", c.handleDiagnostics)
 	mux.HandleFunc("GET /api/hw", c.handleHW)
-	mux.HandleFunc("GET /api/screen.jpg", c.handleJPEG)
-	mux.HandleFunc("GET /api/screen.png", c.handlePNG)
-	mux.HandleFunc("GET /api/screen.mjpg", c.handleMJPEG)
 	mux.HandleFunc("POST /api/set", c.withPIN(c.handleSet))
 	mux.HandleFunc("POST /api/press", c.withPIN(c.handlePress))
 	mux.HandleFunc("POST /api/trigger", c.withPIN(c.handleTrigger))
@@ -41,8 +37,6 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/settings", c.withPIN(c.handleSettings))
 	mux.HandleFunc("POST /api/reconnect", c.withPIN(c.handleReconnect))
 	mux.HandleFunc("POST /api/resync", c.withPIN(c.handleResync))
-	mux.HandleFunc("POST /api/panel", c.withPIN(c.handlePanel))
-	mux.HandleFunc("POST /api/touch", c.withPIN(c.handleTouch))
 	mux.HandleFunc("POST /api/pin", c.handlePIN)            // verifies the current PIN itself
 	mux.HandleFunc("POST /api/pin/reset", c.handlePinReset) // proven at the device, see pinreset.go
 	// Everything else under api/ is an error in the API's own format.
@@ -89,7 +83,7 @@ func (c *Console) handleTree(w http.ResponseWriter, r *http.Request) {
 	if c.client.Passive() {
 		// Reading along cannot write to the mixer; with the device buttons
 		// switched on, mute and listen of the physical channels are pressed
-		// there (the level still counts, also for the Display page).
+		// there (the level still counts).
 		w := map[string][]string{}
 		if c.panelOn() {
 			if all, ok := caps["writable"].(map[string][]string); ok {
@@ -209,25 +203,20 @@ func (c *Console) handleAudit(w http.ResponseWriter, r *http.Request) {
 
 // writeReq is the body of every write endpoint.
 type writeReq struct {
-	Epoch     uint64      `json:"epoch"`
-	Path      []int       `json:"path"`
-	Name      string      `json:"name"`
-	Value     interface{} `json:"value"`
-	Ms        int         `json:"ms"`
-	Source    int         `json:"source"`
-	Output    int         `json:"output"`
-	Link      bool        `json:"link"`
-	Level     string      `json:"level"`
-	Screen    *bool       `json:"screen"`
-	Rotate    *string     `json:"screenRotate"`
-	Panel     *bool       `json:"panel"`
-	ScreenCtl *bool       `json:"screenControl"`
-	FullCtl   *bool       `json:"fullControl"`
-	ReadOnly  *bool       `json:"readOnly"`
-	Flip      *string     `json:"touchFlip"`
-	Current   string      `json:"current"`
-	New       string      `json:"new"`
-	Control   string      `json:"control"` // panel control id
+	Epoch    uint64      `json:"epoch"`
+	Path     []int       `json:"path"`
+	Name     string      `json:"name"`
+	Value    interface{} `json:"value"`
+	Ms       int         `json:"ms"`
+	Source   int         `json:"source"`
+	Output   int         `json:"output"`
+	Link     bool        `json:"link"`
+	Level    string      `json:"level"`
+	Panel    *bool       `json:"panel"`
+	FullCtl  *bool       `json:"fullControl"`
+	ReadOnly *bool       `json:"readOnly"`
+	Current  string      `json:"current"`
+	New      string      `json:"new"`
 }
 
 func errBadRequest(msg string) error { return sdk.NewError(http.StatusBadRequest, "bad_request", msg) }
@@ -369,8 +358,8 @@ func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name strin
 		}
 		if n.Type == "FADER" {
 			// The policy never lets a physical fader be written over the
-			// network (it is not motorised); on the panel it is set like
-			// the Display page does it, until the real fader moves.
+			// network (it is not motorised); on the panel it is set as
+			// the hardware reports it, until the real fader moves.
 			want, err = panelFader(level, n, value)
 		} else {
 			want, err = CheckWrite(level, s, path, name, value)
@@ -428,7 +417,7 @@ func panelFader(level Level, n *rcproto.Node, value interface{}) (rcproto.Value,
 	return v, nil
 }
 
-var errPanelOff = sdk.NewError(http.StatusForbidden, "panel_off", "reading along, the console changes the desk through the device buttons: switch them on on the Display page")
+var errPanelOff = sdk.NewError(http.StatusForbidden, "panel_off", "reading along, the console changes the desk through the device buttons: switch them on on the System page")
 
 func (c *Console) appendAudit(e AuditEntry) {
 	c.mu.Lock()
@@ -667,58 +656,14 @@ func (c *Console) notifyControl() {
 	c.mirror.Notify("control", data)
 }
 
-// handleSettings switches the screen mirror, turns its picture and switches
-// the front-panel emulation.
+// handleSettings switches write protection, the front-panel emulation and
+// full control.
 func (c *Console) handleSettings(w http.ResponseWriter, r *http.Request) {
 	req, ok := decode(w, r)
 	if !ok {
 		return
 	}
-	if req.Rotate != nil {
-		v := *req.Rotate
-		if v == "auto" {
-			v = ""
-		}
-		if _, ok := rotations[v]; !ok && v != "" {
-			sdk.WriteError(w, errBadRequest(`screenRotate must be "auto", "0", "90", "180" or "270"`))
-			return
-		}
-		c.mu.Lock()
-		c.settings.ScreenRotate = v
-		c.saveSettingsLocked()
-		c.mu.Unlock()
-		if c.opts.Screen != nil {
-			c.opts.Screen.SetRotation(screenRotation(v))
-		}
-		c.auditAction(r, "screen rotate", *req.Rotate, nil)
-	}
-	if req.ScreenCtl != nil {
-		if *req.ScreenCtl && c.opts.Touch == nil {
-			err := sdk.NewError(http.StatusConflict, "touch_unavailable", "operating the device's screen is not available here")
-			c.auditAction(r, "screen control", "true", err)
-			sdk.WriteError(w, err)
-			return
-		}
-		c.mu.Lock()
-		c.settings.ScreenControl = *req.ScreenCtl
-		c.saveSettingsLocked()
-		c.mu.Unlock()
-		c.opts.Logf("console: screen control %v by %s", *req.ScreenCtl, remoteOf(r))
-		c.auditAction(r, "screen control", strconv.FormatBool(*req.ScreenCtl), nil)
-	}
-	if req.Flip != nil {
-		switch *req.Flip {
-		case "", "x", "y", "xy":
-		default:
-			sdk.WriteError(w, errBadRequest(`touchFlip must be "", "x", "y" or "xy"`))
-			return
-		}
-		c.mu.Lock()
-		c.settings.TouchFlip = *req.Flip
-		c.saveSettingsLocked()
-		c.mu.Unlock()
-		c.auditAction(r, "touch flip", *req.Flip, nil)
-	}
+
 	if req.Panel != nil {
 		if *req.Panel && c.opts.Panel == nil {
 			err := sdk.NewError(http.StatusConflict, "panel_unavailable", "front-panel emulation is not available here")
@@ -769,20 +714,7 @@ func (c *Console) handleSettings(w http.ResponseWriter, r *http.Request) {
 		c.opts.Logf("console: full control %v by %s", on, remoteOf(r))
 		c.auditAction(r, "full control", strconv.FormatBool(on), nil)
 	}
-	if req.Screen != nil {
-		if *req.Screen && c.opts.Screen == nil {
-			err := sdk.NewError(http.StatusConflict, "screen_unavailable", "the screen mirror is disabled (--screen off)")
-			c.auditAction(r, "screen", "true", err)
-			sdk.WriteError(w, err)
-			return
-		}
-		c.mu.Lock()
-		c.settings.Screen = *req.Screen
-		c.saveSettingsLocked()
-		c.mu.Unlock()
-		c.opts.Logf("console: screen mirror %v by %s", *req.Screen, remoteOf(r))
-		c.auditAction(r, "screen", strconv.FormatBool(*req.Screen), nil)
-	}
+
 	c.notifyControl()
 	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
@@ -867,238 +799,18 @@ func (c *Console) handleResync(w http.ResponseWriter, r *http.Request) {
 // restartScreen is desk.RestartScreen; tests replace it.
 var restartScreen = desk.RestartScreen
 
-// --- display mirror and front panel
+// --- device hardware the console uses
 
-var errScreenOff = sdk.NewError(http.StatusForbidden, "screen_disabled", "the screen mirror is turned off")
-
-func (c *Console) screen() (*hw.Screen, error) {
-	if c.opts.Screen == nil {
-		return nil, sdk.NewError(http.StatusNotFound, "screen_unavailable", "the screen mirror is disabled (--screen off)")
-	}
-	c.mu.Lock()
-	on := c.settings.Screen
-	c.mu.Unlock()
-	if !on {
-		return nil, errScreenOff
-	}
-	return c.opts.Screen, nil
-}
-
+// handleHW reports the front-panel emulation and the meter memory.
 func (c *Console) handleHW(w http.ResponseWriter, r *http.Request) {
-	doc := map[string]interface{}{}
-	switch s, err := c.screen(); {
-	case err == nil:
-		st := s.Status()
-		doc["screen"] = map[string]interface{}{"enabled": true, "status": st}
-	case c.opts.Screen == nil:
-		doc["screen"] = map[string]interface{}{"enabled": false, "available": false}
-	default:
-		doc["screen"] = map[string]interface{}{"enabled": false, "available": true}
-	}
-	p := map[string]interface{}{"enabled": c.panelOn(), "forced": c.opts.PanelEnabled, "controls": hw.PanelControls}
+	p := map[string]interface{}{"enabled": c.panelOn(), "forced": c.opts.PanelEnabled}
 	if c.opts.Panel != nil {
 		if err := c.opts.Panel.Available(); err != nil {
 			p["error"] = err.Error()
 		}
 	}
-	doc["panel"] = p
-	c.mu.Lock()
-	tc := map[string]interface{}{"enabled": c.settings.ScreenControl, "flip": c.settings.TouchFlip}
-	c.mu.Unlock()
-	if c.opts.Touch == nil {
-		tc["available"] = false
-	} else if info, err := c.opts.Touch.Info(); err != nil {
-		tc["available"], tc["error"] = false, err.Error()
-	} else {
-		tc["available"], tc["device"], tc["name"] = true, info.Device, info.Name
-	}
-	doc["touch"] = tc
-	doc["meters"] = map[string]interface{}{"available": c.opts.Meters != nil, "live": c.metersLive()}
-	sdk.WriteJSON(w, http.StatusOK, doc)
-}
-
-func (c *Console) handleJPEG(w http.ResponseWriter, r *http.Request) {
-	s, err := c.screen()
-	if err != nil {
-		sdk.WriteError(w, err)
-		return
-	}
-	b, err := s.JPEG()
-	if err != nil {
-		sdk.WriteError(w, sdk.NewError(http.StatusServiceUnavailable, "capture_failed", err.Error()))
-		return
-	}
-	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write(b)
-}
-
-func (c *Console) handlePNG(w http.ResponseWriter, r *http.Request) {
-	s, err := c.screen()
-	if err != nil {
-		sdk.WriteError(w, err)
-		return
-	}
-	b, err := s.PNG()
-	if err != nil {
-		sdk.WriteError(w, sdk.NewError(http.StatusServiceUnavailable, "capture_failed", err.Error()))
-		return
-	}
-	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Content-Disposition", `attachment; filename="rodecaster-`+time.Now().Format("20060102-150405")+`.png"`)
-	_, _ = w.Write(b)
-}
-
-// handleMJPEG streams frames as multipart/x-mixed-replace (an <img> plays it).
-func (c *Console) handleMJPEG(w http.ResponseWriter, r *http.Request) {
-	s, err := c.screen()
-	if err != nil {
-		sdk.WriteError(w, err)
-		return
-	}
-	release, err := s.Acquire()
-	if err != nil {
-		sdk.WriteError(w, sdk.NewError(http.StatusServiceUnavailable, "busy", "too many screen streams open"))
-		return
-	}
-	defer release()
-	fl, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-	// The first frame before the headers, so a screen that cannot be read
-	// gets an error answer instead of an empty stream.
-	b, err := s.JPEG()
-	if err != nil {
-		sdk.WriteError(w, sdk.NewError(http.StatusServiceUnavailable, "capture_failed", err.Error()))
-		return
-	}
-	const boundary = "rcplugframe"
-	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary="+boundary)
-	w.Header().Set("Cache-Control", "no-store")
-	t := time.NewTicker(s.Interval())
-	defer t.Stop()
-	for first := true; ; first = false {
-		if !first {
-			if _, err := c.screen(); err != nil {
-				return // turned off meanwhile
-			}
-			if b, err = s.JPEG(); err != nil {
-				return
-			}
-		}
-		if _, err := fmt.Fprintf(w, "--%s\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", boundary, len(b)); err != nil {
-			return
-		}
-		if _, err := w.Write(b); err != nil {
-			return
-		}
-		_, _ = w.Write([]byte("\r\n"))
-		fl.Flush()
-		select {
-		case <-r.Context().Done():
-			return
-		case <-t.C:
-		}
-	}
-}
-
-// touchInterval is the least time between two gestures (tests change it).
-var touchInterval = 80 * time.Millisecond
-
-// handleTouch taps or swipes on the device's touchscreen at a point of the
-// screen mirror: {"x","y"} (0..1 from the picture's top left), for a swipe
-// also {"toX","toY","ms"}. Needs the mirror and screen control switched on,
-// the expert level, and at most one gesture every 80 ms.
-func (c *Console) handleTouch(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		X, Y     float64
-		ToX, ToY *float64
-		Ms       int
-	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&req); err != nil {
-		sdk.WriteError(w, errBadRequest("invalid body"))
-		return
-	}
-	what := fmt.Sprintf("%.3f,%.3f", req.X, req.Y)
-	if req.ToX != nil && req.ToY != nil {
-		what += fmt.Sprintf(" to %.3f,%.3f in %d ms", *req.ToX, *req.ToY, req.Ms)
-	}
-	fail := func(err error) {
-		c.auditAction(r, "touch", what, err)
-		sdk.WriteError(w, err)
-	}
-	s, err := c.screen()
-	if err != nil {
-		fail(err)
-		return
-	}
-	c.mu.Lock()
-	on, flip := c.settings.ScreenControl, c.settings.TouchFlip
-	c.mu.Unlock()
-	if c.opts.Touch == nil || !on {
-		fail(sdk.NewError(http.StatusForbidden, "touch_disabled", "operating the device's screen is switched off (Display page)"))
-		return
-	}
-	if lv, _ := c.Level(); lv != LevelExpert {
-		fail(sdk.NewError(http.StatusForbidden, "expert_required", "operating the device's screen requires the expert control level"))
-		return
-	}
-	inRange := func(v float64) bool { return v >= 0 && v <= 1 }
-	if !inRange(req.X) || !inRange(req.Y) || (req.ToX != nil && (!inRange(*req.ToX) || req.ToY == nil || !inRange(*req.ToY))) {
-		fail(errBadRequest("x, y, toX and toY must be between 0 and 1"))
-		return
-	}
-	c.mu.Lock()
-	soon := time.Since(c.lastTouch) < touchInterval
-	if !soon {
-		c.lastTouch = time.Now()
-	}
-	c.mu.Unlock()
-	if soon {
-		fail(sdk.NewError(http.StatusTooManyRequests, "rate_limited", "one gesture at a time"))
-		return
-	}
-	turn, portrait, err := s.Orientation()
-	if err != nil {
-		fail(sdk.NewError(http.StatusServiceUnavailable, "capture_failed", err.Error()))
-		return
-	}
-	g := hw.Gesture{Points: []hw.Point{hw.BufferPoint(hw.Point{X: req.X, Y: req.Y}, turn)}, Portrait: portrait, Flip: hw.TouchFlip(flip)}
-	if req.ToX != nil {
-		g.Points = append(g.Points, hw.BufferPoint(hw.Point{X: *req.ToX, Y: *req.ToY}, turn))
-		g.Duration = time.Duration(min(max(req.Ms, 80), 2000)) * time.Millisecond
-	}
-	if err := c.opts.Touch.Do(g); err != nil {
-		fail(sdk.NewError(http.StatusServiceUnavailable, "touch_failed", err.Error()))
-		return
-	}
-	c.opts.Logf("console: touch %s (from %s)", what, remoteOf(r))
-	c.auditAction(r, "touch", what, nil)
-	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
-}
-
-func (c *Console) handlePanel(w http.ResponseWriter, r *http.Request) {
-	if !c.panelOn() {
-		sdk.WriteError(w, sdk.NewError(http.StatusForbidden, "panel_disabled", "front-panel emulation is switched off (switch it on on the console's Display page)"))
-		return
-	}
-	if lv, _ := c.Level(); lv != LevelExpert {
-		sdk.WriteError(w, sdk.NewError(http.StatusForbidden, "expert_required", "front-panel emulation requires the expert control level"))
-		return
-	}
-	req, ok := decode(w, r)
-	if !ok {
-		return
-	}
-	val, _ := req.Value.(float64)
-	if err := c.opts.Panel.Do(req.Control, int(val)); err != nil {
-		c.auditAction(r, "panel "+req.Control, fmt.Sprint(val), errBadRequest(err.Error()))
-		sdk.WriteError(w, errBadRequest(err.Error()))
-		return
-	}
-	c.opts.Logf("console: panel %s value=%v (from %s)", req.Control, val, remoteOf(r))
-	c.auditAction(r, "panel "+req.Control, fmt.Sprint(val), nil)
-	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	sdk.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"panel":  p,
+		"meters": map[string]interface{}{"available": c.opts.Meters != nil, "live": c.metersLive()},
+	})
 }

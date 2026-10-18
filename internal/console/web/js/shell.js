@@ -76,11 +76,11 @@ function banners() {
   } else if (conn && conn.mode === 'tap' && conn.state === 'live' && conn.code === 'resumed') {
     out.push(h('div', { class: 'banner info' }, t('banner.tapResumed'), ' ',
       h('button', { class: 'btn small', type: 'button', onclick: resyncNow }, t('banner.tapResync'))));
-  } else if (conn && conn.mode === 'tap' && conn.state === 'live' && current.id !== 'display') {
-    out.push(h('div', { class: 'banner info' }, t('banner.tapLive'), ' ', h('a', { href: '#display' }, t('banner.busyLink'))));
+  } else if (conn && conn.mode === 'tap' && conn.state === 'live' && current.id !== 'system') {
+    out.push(h('div', { class: 'banner info' }, t('banner.tapLive'), ' ', h('a', { href: '#system' }, t('banner.busyLink'))));
   }
   // Busy: the device's screen holds the mixer, but its buttons still work.
-  if (conn && conn.code === 'desk_busy' && current.id !== 'display') out.push(h('div', { class: 'banner info' }, t('banner.busyHint'), ' ', h('a', { href: '#display' }, t('banner.busyLink'))));
+  if (conn && conn.code === 'desk_busy' && current.id !== 'system') out.push(h('div', { class: 'banner info' }, t('banner.busyHint'), ' ', h('a', { href: '#system' }, t('banner.busyLink'))));
   else if (store.stale) out.push(h('div', { class: 'banner', role: 'status' }, t('banner.lastKnown')));
   const limit = store.loaded ? store.meta.controlLimit : st && st.controlLimit;
   if (limit === 'untested_model' && store.loaded) out.push(h('div', { class: 'banner info' }, t('banner.untested', { model: store.L.modelName })));
@@ -119,8 +119,8 @@ export function renderHeader() {
     const show = val(single('CURRENTSHOW'), 'currentShowName');
     $('#devSub').textContent = [store.L.modelName, store.L.firmware && t('header.firmware', { v: store.L.firmware }), show && t('header.show', { name: show })].filter(Boolean).join(' · ');
   }
-  // Without the device state the level comes from the status (the Display
-  // page's front panel needs it).
+  // Without the device state the level comes from the status (the System
+  // page's switches need it).
   if (!store.loaded && st && st.control !== controlLevel()) {
     setCapabilities({ level: st.control });
     if (current && current.noTree) render();

@@ -6,8 +6,8 @@ browser. It never touches the firmware.**
 
 rcplug ships with the **console**: the whole mixer in the browser. Channels with live
 meters, faders, mute and listen, processing, the routing matrix, inputs, outputs,
-effects, SMART pads, the recorder, system information, a screen mirror and an
-explorer for the complete device state. A fresh install is **read-only**; you can
+effects, SMART pads, the recorder, system information and an explorer for the
+complete device state. A fresh install is **read-only**; you can
 switch on control in steps.
 
 More plugins, such as **Sonar** (which direction does a sound come from?), live in
@@ -21,12 +21,13 @@ this repository. Start with the [plugin guide](docs/plugin-guide.md).
 > simulator that replays a real Duo state capture (firmware 1.7.4), with the arm64
 > binaries under QEMU, and installed into the stock firmware images 1.7.6 and 1.7.3.
 > **First test on a real Duo (firmware 1.7.6):** flashing, SSH, the installer, in-app
-> updates, the dashboard and the plugins work, and the console operates the desk
-> through its buttons and shows its screen. The mixer serves one client at a time and
-> the device's own screen holds it, so since 0.6 the console reads that connection
-> along to mirror the whole desk (still to be confirmed on hardware;
-> [docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo)).
-> The console never takes the screen's place. A fresh install is read-only.
+> updates, the dashboard and the plugins work. The mixer serves one client at a time
+> and the device's own screen holds it, so the console reads that connection along and
+> shows the whole desk with live meters; it changes mute, listen and the physical
+> faders through the device's buttons, and the experimental *full control* changes
+> every setting
+> ([docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo)).
+> A fresh install is read-only.
 >
 > rcplug is not affiliated with or endorsed by RØDE. Use it at your own risk; read the
 > disclaimer below.
@@ -48,7 +49,7 @@ data or your productions. Do not use it during a show that must not fail.
 
 | Device | Status |
 |---|---|
-| RØDECaster Duo, firmware 1.7.x | Runs on a real Duo (1.7.6): host, dashboard, in-app updates and plugins; the console operates the device's buttons and mirrors its screen. Since 0.6 the console reads along with the device's screen to show the whole desk (to be confirmed on hardware). |
+| RØDECaster Duo, firmware 1.7.x | Runs on a real Duo (1.7.6): host, dashboard, in-app updates and plugins; the console reads along with the device's screen, shows the whole desk with live meters and changes it through the device's buttons; full control (experimental) is still to be confirmed on hardware. |
 | RØDECaster Pro II | Recognised and shown **read-only**. Control needs a verified profile; see [docs/adding-a-model.md](docs/adding-a-model.md). |
 | Other / unknown | Shown read-only. |
 

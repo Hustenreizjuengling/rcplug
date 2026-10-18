@@ -40,25 +40,25 @@ func main() {
 		handshake = flag.String("handshake", "auto", "session-open handshake: auto (only if the desk stays silent) | always | never")
 		deskMode  = flag.String("desk-mode", "auto", "how to get the desk state: auto (read along with the device's screen on a RØDECaster, whose mixer serves one client; connect elsewhere) | tap | connect")
 		untested  = flag.Bool("allow-untested-model", false, "offer control on models without a verified profile (e.g. Pro II)")
-		screenSrc = flag.String("screen", "auto", "screen mirror source: auto (DRM first, then the framebuffer) | fb | drm | off (users must still enable it in the UI)")
-		fbDev     = flag.String("fb", "/dev/fb0", "framebuffer device for the screen mirror")
-		drmDev    = flag.String("drm", "/dev/dri/card0", "DRM card for the screen mirror when the GUI bypasses the framebuffer")
-		fps       = flag.Float64("fps", 2, "max screen mirror frames per second")
 		panel     = flag.Bool("panel", false, "EXPERIMENTAL: allow emulating front-panel buttons via TIOCSTI (expert level only)")
-		touchDev  = flag.String("touch", "auto", "touchscreen event device for operating the device's screen from the mirror: auto | off | /dev/input/eventN (users must still switch it on)")
 		meters    = flag.String("meters", "auto", "level meters and hardware fader positions from the mixer's shared memory (read-only): auto | off")
 		tty       = flag.String("tty", "/dev/ttyAML3", "front-panel serial tty")
 		sim       = flag.Bool("sim", false, "start a built-in simulated desk and connect to it (demo without hardware)")
 		legacyPIN = flag.String("pin", os.Getenv("RCPLUG_CONSOLE_PIN"), "deprecated: taken over once as the console PIN if none is set; set the PIN in the UI instead")
 		showVer   = flag.Bool("version", false, "print version and exit")
 	)
+	// The screen mirror and operating the screen from it are gone (0.6.7);
+	// their flags are still accepted, so an old configuration starts.
+	for _, name := range []string{"screen", "fb", "drm", "fps", "touch"} {
+		flag.String(name, "", "no longer used")
+	}
 	flag.Parse()
 	if *showVer {
 		fmt.Println(version)
 		return
 	}
 	for _, f := range []struct{ name, value, allowed string }{
-		{"screen", *screenSrc, "auto fb drm off"}, {"handshake", *handshake, "auto always never"},
+		{"handshake", *handshake, "auto always never"},
 		{"meters", *meters, "auto off"},
 	} {
 		if !strings.Contains(" "+f.allowed+" ", " "+f.value+" ") {
@@ -104,21 +104,13 @@ func main() {
 		Client: client, DataDir: dataDir, AllowUntested: *untested, LegacyPIN: *legacyPIN, Version: version,
 		Panel: &hw.Panel{TTY: *tty}, PanelEnabled: *panel, Logf: log.Printf,
 	}
-	if *touchDev != "off" {
-		dev := *touchDev
-		if dev == "auto" {
-			dev = ""
-		}
-		opts.Touch = &hw.Touch{Device: dev}
-	}
+
 	if *meters != "off" {
 		m := &hw.Meters{}
 		defer m.Close()
 		opts.Meters = m
 	}
-	if *screenSrc != "off" {
-		opts.Screen = &hw.Screen{FB: *fbDev, DRM: *drmDev, Mode: *screenSrc, MaxFPS: *fps}
-	}
+
 	c := console.New(opts)
 	clientDone := make(chan struct{})
 	go func() { client.Run(ctx); close(clientDone) }()

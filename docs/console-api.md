@@ -137,10 +137,9 @@ time.
 | Request | Content |
 |---|---|
 | `GET api/clients` | `{"port", "clients": [...]}`: connections to the desk's control port with the process behind each (`pid`, `comm`), e.g. the device's GUI and the console |
-| `GET api/audit` | `{"writes": [...]}`: the last 300 writes and changes to the console itself (node `console`: control level, screen mirror, PIN without its value, reconnect, panel), with time, node type, path, property, value, client address and, for refused ones, the error code |
+| `GET api/audit` | `{"writes": [...]}`: the last 300 writes and changes to the console itself (node `console`: control level, device buttons, PIN without its value, reconnect, panel), with time, node type, path, property, value, client address and, for refused ones, the error code |
 | `GET api/diagnostics` | A zip with the console's connection statistics, status, clients, audit log, summary, layout and a sanitized copy of the tree; the host adds it to its diagnostics bundle |
-| `GET api/hw` | Screen mirror, front-panel and touchscreen status (`touch`: `available`, `enabled`, `flip`, `device`, `name`) and the meter memory (`meters`: `available`, `live`) |
-| `GET api/screen.jpg`, `api/screen.png`, `api/screen.mjpg` | The device's screen, if the user switched the mirror on |
+| `GET api/hw` | The device buttons (`panel`: `enabled`, `forced`, `error`) and the meter memory (`meters`: `available`, `live`) |
 
 ## Writing
 
@@ -162,13 +161,11 @@ Every write:
 | `api/link` | `{"epoch", "source", "output", "link"}` | Links or unlinks a routing cell with the sequence the device expects |
 | `api/record` | `{"epoch", "value"}` | Recorder: 0 stop, 1 pause, 2 record |
 | `api/control` | `{"level": "off" \| "basic" \| "expert"}` | Changes the control level (refused with `read_only` or `untested_model` where control is not possible) |
-| `api/settings` | `{"readOnly": true}`, `{"screen": true}`, `{"screenRotate": "auto"}`, `{"panel": true}`, `{"screenControl": true}`, `{"touchFlip": ""}`, `{"fullControl": true}` | Switches write protection on or off (`read_only_forced` when started with `--read-only`); switches full control on or off (on the device only, `full_control_unavailable` elsewhere; switching on needs the expert level, see [protocol.md](protocol.md#full-control)); switches the screen mirror on or off; turns its picture (`auto`: a portrait buffer such as the Duo's becomes landscape, or `0`, `90`, `180`, `270` degrees clockwise); switches the front-panel emulation on or off; switches operating the screen from the mirror on or off, and corrects the touchscreen's orientation (`""`, `x`, `y`, `xy`). Saved across restarts. |
+| `api/settings` | `{"readOnly": true}`, `{"panel": true}`, `{"fullControl": true}` | Switches write protection on or off (`read_only_forced` when started with `--read-only`); switches full control on or off (on the device only, `full_control_unavailable` elsewhere; switching on needs the expert level, see [protocol.md](protocol.md#full-control)); switches the device buttons (front-panel emulation) on or off. Saved across restarts. |
 | `api/pin` | `{"current", "new"}` | Sets, changes (`current` required) or removes (`new: ""`) the PIN |
 | `api/pin/reset` | `{}` | No PIN needed: starts a minute in which four presses of channel 1's Listen (or Mute) button at the device within four seconds remove the PIN and set the level to `off`; progress in `api/status` → `pinReset` (`active`, `presses`, `need`, `seconds`, `done`). `no_pin` if none is set |
 | `api/reconnect` | `{}` | Reconnects to the desk, also after the GUI guard stepped back. At most every 10 s. |
 | `api/resync` | `{}` | Reading along only: restarts the device's screen app, whose new connection brings a full sync. At most every 10 s. |
-| `api/panel` | `{"control", "value"}` | Experimental front-panel emulation; needs it switched on (`api/settings` or `--panel`) and the expert level |
-| `api/touch` | `{"x", "y"}`, for a swipe also `{"toX", "toY", "ms"}` | Experimental: taps (or swipes) the device's touchscreen at a point of the screen mirror, 0..1 from the picture's top left; needs the mirror and screen control switched on and the expert level; one gesture every 80 ms |
 
 A **marker** is `api/set` on `RECORDER.requestDropMarker` with the current time in
 milliseconds (an int64), as the console's UI does.
@@ -247,7 +244,6 @@ if errors.As(err, &apiErr) && apiErr.Code == "control_off" {
 | `untested_model` | 403 | The model has no verified profile; control needs `--allow-untested-model` |
 | `expert_required` | 403 | Needs the expert level |
 | `panel_disabled`, `screen_disabled`, `touch_disabled` | 403 | Feature not switched on |
-| `touch_unavailable`, `touch_failed` | 409, 503 | No touchscreen found, or writing to it failed |
 | `csrf` | 403 | The `X-Rcplug` header is missing |
 | `screen_unavailable` | 404, 409 | No screen source found |
 | `stale_epoch` | 409 | The tree changed since you read the path. Reload and retry. |
@@ -258,4 +254,4 @@ if errors.As(err, &apiErr) && apiErr.Code == "control_off" {
 | `internal` | 500 | An unexpected error, for example the data directory cannot be written |
 | `offline` | 503 | The console is not connected to the desk |
 | `send_failed` | 503 | The connection broke while sending |
-| `busy`, `too_many_clients`, `capture_failed` | 503 | Limits of the screen mirror or the event stream |
+| `too_many_clients` | 503 | Too many live event streams |

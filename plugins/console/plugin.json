@@ -23,24 +23,6 @@
             "off": "Aus"
           }
         },
-        "screen": {
-          "title": "Quelle des Bildschirmspiegels",
-          "description": "Woher der Spiegel des Gerätebildschirms kommt. Aus entfernt ihn ganz; ein- und ausgeschaltet wird er auf der Seite Display.",
-          "choices": {
-            "auto": "Automatisch",
-            "drm": "DRM-Scanout-Puffer",
-            "fb": "Framebuffer",
-            "off": "Aus"
-          }
-        },
-        "touch": {
-          "title": "Bildschirm bedienen",
-          "description": "Aus entfernt das Tippen auf den Gerätebildschirm über den Spiegel ganz; sonst schalten Nutzer es auf der Seite Display ein.",
-          "choices": {
-            "auto": "Verfügbar",
-            "off": "Aus"
-          }
-        },
         "deskMode": {
           "title": "Verbindung zum Mixer",
           "description": "Automatisch liest auf einem RØDECaster beim Gerätebildschirm mit. Verbinden macht die Konsole zum Client des Mixer-Ports, den der Gerätebildschirm dann nicht nutzen kann: nur zur Fehlersuche.",
@@ -75,50 +57,6 @@
         }
       ],
       "arg": "--meters={value}"
-    },
-    {
-      "id": "screen",
-      "type": "choice",
-      "title": "Screen mirror source",
-      "description": "Where the mirror of the device's screen comes from. Off removes it entirely; users switch the mirror on and off on the Display page.",
-      "default": "auto",
-      "choices": [
-        {
-          "value": "auto",
-          "title": "Automatic"
-        },
-        {
-          "value": "drm",
-          "title": "DRM scanout buffer"
-        },
-        {
-          "value": "fb",
-          "title": "Framebuffer"
-        },
-        {
-          "value": "off",
-          "title": "Off"
-        }
-      ],
-      "arg": "--screen={value}"
-    },
-    {
-      "id": "touch",
-      "type": "choice",
-      "title": "Operating the screen",
-      "description": "Off removes tapping the device's screen from the mirror entirely; otherwise users switch it on on the Display page.",
-      "default": "auto",
-      "choices": [
-        {
-          "value": "auto",
-          "title": "Available"
-        },
-        {
-          "value": "off",
-          "title": "Off"
-        }
-      ],
-      "arg": "--touch={value}"
     },
     {
       "id": "deskMode",
