@@ -1,0 +1,51 @@
+name: Development build
+
+# Every push to main publishes the current state as the pre-release "dev",
+# replacing the previous one: rcplug-<version>-dev.<run>-aarch64.tar.gz and
+# the examples, signed like a release. Devices never install it by
+# themselves: the in-app update only looks at the latest real release.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dev-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and publish the pre-release "dev"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Build
+        run: |
+          v="$(cat VERSION)-dev.${GITHUB_RUN_NUMBER}"
+          echo "DEV_VERSION=$v" >> "$GITHUB_ENV"
+          make package VERSION="$v"
+      # Signing every build also proves, long before a release, that the
+      # secret is there and matches the keys built into rcplugd.
+      - name: Sign
+        env:
+          RCPLUG_SIGNING_KEY: ${{ secrets.RCPLUG_SIGNING_KEY }}
+        run: |
+          if [ -z "$RCPLUG_SIGNING_KEY" ]; then echo "::error::the repository secret RCPLUG_SIGNING_KEY is not set"; exit 1; fi
+          make sign VERSION="$DEV_VERSION"
+          go run ./cmd/rcplug-release verify dist
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Development build of commit ${GITHUB_SHA::7}, for testing. Use a release for anything else; devices never update to this by themselves."
+          gh release delete dev --cleanup-tag --yes 2>/dev/null || true
+          gh release create dev --prerelease --target "$GITHUB_SHA" --title "Development build $DEV_VERSION" --notes "$notes" \
+            dist/rcplug-*-aarch64.tar.gz dist/rcplug-examples-*-aarch64.tar.gz dist/SHA256SUMS \
+            dist/release.json dist/release.json.sig

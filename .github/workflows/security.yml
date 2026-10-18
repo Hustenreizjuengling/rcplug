@@ -1,0 +1,51 @@
+name: Security
+
+# Known vulnerabilities in the Go standard library and code the programs use
+# (govulncheck), on every push and weekly, since new ones are published all
+# the time. CodeQL code scanning is free for public repositories only, so it
+# starts once the repository is public.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: Known vulnerabilities (govulncheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [go, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        if: matrix.language == 'go'
+        with:
+          go-version: stable
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.language == 'go' && 'autobuild' || 'none' }}
+      - uses: github/codeql-action/analyze@v3

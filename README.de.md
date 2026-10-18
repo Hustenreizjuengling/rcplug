@@ -78,7 +78,8 @@ Englisch).
 Die [Releases](../../releases) dieses Repositorys enthalten das Gerätepaket, das das
 Toolkit installiert: `rcplug-<version>-aarch64.tar.gz` (Host, Konsole,
 Geräte-Installer) und die Beispiel-Plugins. Danach `http://<geräte-ip>:8080/` öffnen;
-die Konsole ist die Startseite.
+die Konsole ist die Startseite. Die Vorabversion *Development build* enthält den
+neuesten Stand des Codes, zum Testen.
 
 **Was wo landet:** Host, Plugins und deren Daten kommen in ein Verzeichnis,
 `/usr/local/rcplug`. Außerdem legt rcplug ein Startskript `/etc/init.d/rcplug` mit

@@ -14,14 +14,14 @@ GOBUILD   = CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) $(GO) build -trimpath -ldfla
 PLUGINS  := $(notdir $(patsubst %/,%,$(dir $(wildcard plugins/*/plugin.json))))
 # Example plugins carry code and manifest in examples/<name>/.
 EXAMPLES := $(notdir $(patsubst %/,%,$(dir $(wildcard examples/*/plugin.json))))
-SHELL_SCRIPTS := installer/install.sh installer/initd/rcplug examples/hello-sh/run.sh tools/update-test.sh tools/install-test.sh
+SHELL_SCRIPTS := installer/install.sh installer/initd/rcplug examples/hello-sh/run.sh tools/update-test.sh tools/install-test.sh tools/release-version.sh
 
 LOCAL_ADDR  ?= 127.0.0.1:8080
 LOCAL_MIXER ?= 127.0.0.1:2345
 # Extra plugin directories for run-local, e.g. EXTRA_PLUGINS=../my-plugin
 EXTRA_PLUGINS ?=
 
-.PHONY: help all check fmt fmt-check vet lint test test-race test-arm64 fuzz web-test update-test install-test sign \
+.PHONY: help all check fmt fmt-check vet lint test test-race test-arm64 fuzz web-test update-test install-test sign docs-check \
         build build-arm64 build-host examples package package-host run-local sim clean
 
 help: ## show this help
@@ -29,7 +29,7 @@ help: ## show this help
 
 all: check package ## run all checks and build the release package
 
-check: fmt-check vet test-race web-test lint ## everything CI runs (except arm64)
+check: fmt-check vet test-race web-test lint docs-check ## everything CI runs (except arm64)
 
 fmt: ## format the Go code
 	gofmt -w .
@@ -57,6 +57,9 @@ fuzz: ## fuzz the protocol decoder for 30 s
 
 web-test: ## unit tests of the web UIs (needs Node 18+)
 	node --test tools/webtest/*.test.mjs
+
+docs-check: ## every relative link and #anchor in the Markdown files resolves
+	$(GO) run ./tools/doclinks
 
 install-test: ## the device installer in a sandbox: install, reinstall, a failure halfway and a version that does not start
 	tools/install-test.sh

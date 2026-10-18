@@ -13,6 +13,15 @@ firmware, flashing, install tools) and
 Sonar is no longer part of the device package; install it from rcplug-plugins.
 
 ### Added
+- Automation on GitHub: every push to `main` publishes the pre-release *Development
+  build* (device package and examples, signed); releases can be made with one click
+  (*Actions → Release → Run workflow*, `tools/release-version.sh` dates the changelog,
+  sets the versions and starts the next one); `govulncheck` runs on every push and
+  weekly, CodeQL once the repository is public; Dependabot proposes new versions of
+  the GitHub Actions; `make docs-check` checks every link and anchor in the docs.
+- Release files are built with the current Go release instead of the minimum version
+  from `go.mod` (Go 1.22.0 has known vulnerabilities in `net/http` and `crypto/tls`);
+  CI still tests the minimum version.
 - In-app updates (dashboard → System → *Updates*, and an *Update* button on plugin
   cards): rcplug and plugins with an `update` source in plugin.json update from
   their latest GitHub release. Nothing is checked, downloaded or installed without a

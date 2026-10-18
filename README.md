@@ -73,6 +73,7 @@ box: you add your own key to the firmware once
 This repository's [releases](../../releases) contain the device package the toolkit
 installs: `rcplug-<version>-aarch64.tar.gz` (host, console, device installer) and the
 example plugins. Then open `http://<device-ip>:8080/`; the console is the start page.
+The pre-release *Development build* has the newest state of the code, for testing.
 
 **What gets installed where:** the host, its plugins and their data go into one
 directory, `/usr/local/rcplug`. Besides that, rcplug adds a start script

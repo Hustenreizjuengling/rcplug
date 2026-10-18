@@ -1,22 +1,76 @@
 name: Release
 
+# A release is published in one of two ways:
+#
+# - Push a tag v<version> that matches VERSION.
+# - Or click: Actions → Release → Run workflow (or `gh workflow run release.yml
+#   -f version=X.Y.Z`). That dates the newest "Unreleased" section of
+#   CHANGELOG.md as the version, sets VERSION and the built-in plugins'
+#   manifests, commits and tags; the same run then builds, signs and
+#   publishes, and finally starts the next patch version's "Unreleased"
+#   section. (A tag pushed by a workflow does not start other workflows,
+#   which is why one run does all of it.)
+#
+# Every release is signed with the repository secret RCPLUG_SIGNING_KEY and
+# checked against the keys built into rcplugd, so devices accept it as an
+# in-app update.
+
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, X.Y.Z (empty: the one in VERSION)'
+        required: false
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  release:
+  prepare:
+    name: Date the changelog, set the version, tag
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+      - id: tag
+        env:
+          WANT: ${{ inputs.version }}
+        run: |
+          v="${WANT:-$(cat VERSION)}"
+          tools/release-version.sh prepare "$v"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qam "Release $v"
+          git tag "v$v"
+          git push origin HEAD:main "v$v"
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: Build, sign and publish
+    needs: prepare
+    if: ${{ always() && (needs.prepare.result == 'success' || needs.prepare.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.prepare.outputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: stable
       - name: Tag must match VERSION
-        run: test "v$(cat VERSION)" = "${GITHUB_REF_NAME}"
+        run: test "v$(cat VERSION)" = "$TAG"
       - run: make test package
       # release.json lists every file with its SHA-256; the signature over it
       # is what rcplugd checks before it offers or installs an update. The
@@ -33,6 +87,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes="$(awk -v v="$(cat VERSION)" '$0 ~ "^## \\[?"v"\\]?" {p=1; next} /^## / && p {exit} p' CHANGELOG.md)"
-          gh release create "$GITHUB_REF_NAME" --title "rcplug $GITHUB_REF_NAME" --notes "$notes" \
+          gh release create "$TAG" --verify-tag --title "rcplug $TAG" --notes "$notes" \
             dist/rcplug-*-aarch64.tar.gz dist/rcplug-examples-*-aarch64.tar.gz dist/SHA256SUMS \
             dist/release.json dist/release.json.sig
+
+  next:
+    name: Start the next version
+    needs: release
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: |
+          tools/release-version.sh next
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qam "Start $(cat VERSION)"
+          git push origin HEAD:main

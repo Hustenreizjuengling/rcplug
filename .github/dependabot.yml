@@ -1,0 +1,10 @@
+# Pull requests for new versions of the GitHub Actions the workflows use.
+# rcplug has no Go dependencies besides the standard library.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "CI:"

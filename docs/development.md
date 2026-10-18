@@ -103,16 +103,36 @@ for the modules. To add a tab:
 `go run ./cmd/console --sim` serves the files from the binary, so restart it after
 changes. `window.__rcplug` in the browser console exposes the store for debugging.
 
+## Automation on GitHub
+
+| Workflow | When | What |
+|---|---|---|
+| CI | every push and pull request | `make check` (gofmt, vet, race tests, web tests, shellcheck, doc links), the tests with the minimum Go version, arm64 tests under qemu-user, the installer and update sandbox tests, the device package and builds for macOS and Windows |
+| Development build | every push to `main` | the pre-release **dev** ("Development build"): the device package and examples as `<version>-dev.<run>`, signed like a release, replaced by every push. Devices never update to it by themselves: the in-app update only looks at the latest real release |
+| Release | a tag `v<version>`, or a click | see below |
+| Security | every push, pull request and weekly | `govulncheck` (known vulnerabilities in the Go standard library and in code the programs use); CodeQL code scanning, once the repository is public |
+| Dependabot | weekly | pull requests for new versions of the GitHub Actions |
+
+Release files are built with the current Go release (`go-version: stable`); a CI job
+tests with the minimum version from `go.mod` as well.
+
 ## Releasing
 
-1. Update `VERSION` and the `version` of the manifests in `plugins/` (a test checks
-   they match), and add a section to `CHANGELOG.md`. Its text becomes the release
-   notes, which the dashboard shows next to the update.
-2. Commit, tag `v<version>` and push the tag. The release workflow checks that the tag
-   matches `VERSION`, runs the tests, builds the package, signs it with the repository
-   secret `RCPLUG_SIGNING_KEY`, checks the signature against the keys built into
-   rcplugd and publishes a GitHub release with the notes from the changelog.
-   Devices offer it as an update from then on (see [updates.md](updates.md)).
+Every change describes itself under the newest section of `CHANGELOG.md`,
+`## <version> - Unreleased`. Its text becomes the release notes, which the dashboard shows next to the update.
+
+**With one click:** *Actions → Release → Run workflow* (or
+`gh workflow run release.yml -f version=X.Y.Z`; without a version it takes the one in
+`VERSION`). The run dates the changelog's "Unreleased" section as that version, sets
+`VERSION` and the built-in plugins' manifests, commits and tags, then builds, signs with the repository secret `RCPLUG_SIGNING_KEY`, checks the signature against the keys built into rcplugd, publishes the GitHub release
+with the changelog section as notes, and finally starts the next patch version's
+"Unreleased" section.
+
+**By hand:** set the date and `VERSION` yourself (`tools/release-version.sh prepare
+X.Y.Z` does it), commit, tag `v<version>` and push the tag; the release workflow builds,
+signs with the repository secret `RCPLUG_SIGNING_KEY`, checks the signature against the keys built into rcplugd, and publishes.
+
+Devices offer a release as an update from then on (see [updates.md](updates.md)).
 
 ## The three repositories
 
