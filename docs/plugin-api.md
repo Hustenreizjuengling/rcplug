@@ -79,7 +79,7 @@ warning on the dashboard and in the host's log; the plugin still loads.
 | `primary` | bool | `false` | Open this plugin as the dashboard's start page (the first enabled one wins) |
 | `order` | int | `0` | Position in the navigation and the plugin list, lower first; ties by id |
 | `icon` | string | | A short glyph or emoji for the navigation (at most 8 characters) |
-| `needsAudio` | bool | `false` | Shows an "audio" badge in the plugin list (older form of the permission `audio`) |
+| `needsAudio` | bool | `false` | Shows an "audio" badge in the plugin list (older form of the permission `audio`, which it grants) |
 | `permissions` | string array | | What the plugin does beyond its own pages: `desk:write`, `audio`, `network`, `device`, see [Permissions](#permissions) |
 | `translations` | object | | Localised `title` and `description` per language code: `{"de": {"title": "…", "description": "…"}}` |
 | `actions` | array | | Entry points other UIs show, see [Actions](#actions). Needs `httpProxy`. |

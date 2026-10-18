@@ -206,6 +206,10 @@ func TestProxyNamesThePlugin(t *testing.T) {
 	if h.Get("X-Rcplug-Plugin") != "" || h.Get("X-Rcplug-Permissions") != "" || h.Get("X-Rcplug-Token") != "" {
 		t.Fatalf("forged by the network: %v", h)
 	}
+	writePlugin(t, root, "legacy", "#!/bin/sh\n", `{"exec":["./run.sh"],"needsAudio":true}`)
+	if m, err := LoadManifest(filepath.Join(root, "plugins", "legacy")); err != nil || !m.has("audio") {
+		t.Errorf("needsAudio is the permission audio: %v %v", m, err)
+	}
 	for _, bad := range []string{`["desk"]`, `["audio","audio"]`} {
 		writePlugin(t, root, "bad", "#!/bin/sh\n", `{"exec":["./run.sh"],"permissions":`+bad+`}`)
 		if _, err := LoadManifest(filepath.Join(root, "plugins", "bad")); err == nil {

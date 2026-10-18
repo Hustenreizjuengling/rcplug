@@ -14,7 +14,8 @@ may break compatibility).
   sends), at the *Control* level's rules without the PIN, whatever level the browsers
   have; write protection still stops it, and plugins can no longer change the
   console's settings, control level or PIN. The shared audio taps stream only to
-  plugins with `audio`. **Plugins that write to the desk or tap audio need the
+  plugins with `audio` (`"needsAudio": true` counts as `audio`, so Sonar 0.5.1 keeps
+  its sound). **Plugins that write to the desk or tap audio need the
   permission in their manifest**; a write from the device without a token answers 403
   `permission_desk_write`. The host tells plugins who calls them (`X-Rcplug-Plugin`,
   `X-Rcplug-Permissions`). See docs/plugin-api.md#permissions.

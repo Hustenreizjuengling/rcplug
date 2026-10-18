@@ -195,6 +195,9 @@ func LoadManifest(dir string) (*Manifest, error) {
 	if err := validatePermissions(&m); err != nil {
 		return nil, fmt.Errorf("plugin %q: %w", m.Name, err)
 	}
+	if m.NeedsAudio && !m.has("audio") {
+		m.Permissions = append(m.Permissions, "audio") // the older form, as plugins before 0.7.0 have it
+	}
 	return &m, nil
 }
 
