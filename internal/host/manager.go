@@ -45,6 +45,8 @@ type persistState struct {
 	Enabled map[string]bool `json:"enabled"`
 	// AutoCheck: the user switched on the daily check for updates.
 	AutoCheck bool `json:"autoCheck,omitempty"`
+	// AudioTaps: the user switched on the shared audio taps.
+	AudioTaps bool `json:"audioTaps,omitempty"`
 }
 
 // NewManager creates a manager rooted at root. basePort is the first loopback

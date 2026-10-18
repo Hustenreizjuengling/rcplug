@@ -227,6 +227,11 @@ network's traffic. Do not expose port 8080 to the internet.
   mixer; without the screen for 30 seconds the console steps back. Audio does not pass
   through this connection. Switching it off (or `--desk-mode connect`) returns to
   reading along.
+- **Audio taps** (dashboard → System, off by default) give plugins the desk's inputs
+  and outputs through one JACK client, `rcplug-taps`, which runs only while a plugin
+  listens ([plugin-api.md](plugin-api.md#audio)). It is a client in RØDE's audio graph
+  like any other, at the host's low priority; dropouts it reports show on the System
+  page. Only plugins get audio, never the network directly.
 - **Meters** come from the shared memory in which the mixer keeps them for its screen
   ([protocol.md](protocol.md#meters-and-fader-positions)). The console attaches it
   read-only, like the screen app, and only copies it; it is on by default because it

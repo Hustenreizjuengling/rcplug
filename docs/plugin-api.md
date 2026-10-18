@@ -439,6 +439,7 @@ The dashboard's API, open to plugins (`$RCPLUG_HOST_URL`) and scripts. POSTs nee
 | `GET /api/diagnostics` | The diagnostics bundle |
 | `GET /api/updates`, `POST /api/updates/check`, `POST /api/updates/install?target=` | Updates, see [updates.md](updates.md) |
 | `GET /api/events`, `GET /api/events/stream`, `POST /api/events` | The event bus, see [Events](#events) |
+| `GET /api/audio`, `GET /api/audio/stream`, `POST /api/audio/enable?on=` | The shared audio taps, see [Audio](#audio) |
 
 ## Events
 
@@ -499,6 +500,33 @@ The Go SDK has `sdk.Publish(ctx, type, data)` and `sdk.Events(ctx, prefixes...)`
 Desk events are best effort: a plugin that must not miss a state (a lamp that has to
 be right after its own restart) reads it from the console as well (`api/summary`).
 
+## Audio
+
+On the Duo the whole desk is a JACK graph: every input and output is a JACK port
+(`system:capture_*` for the inputs, `JUCEJack:out_*` for the mixer's outputs, …). A
+plugin that wants to hear some of them asks the host, which runs **one** bridge for all
+plugins: the JACK client `rcplug-taps` with 8 channels into an ALSA loopback, read
+with `arecord`. The bridge starts when the first plugin asks and stops ten seconds after
+the last one hangs up; a port that two plugins want takes one channel.
+
+```go
+on, ports, err := sdk.AudioPorts(ctx) // switched on? which ports?
+r, err := sdk.AudioTap(ctx, "system:capture_1", "system:capture_2")
+defer r.Close()
+// r: interleaved signed 16-bit little-endian samples at 48 kHz, here two channels
+```
+
+- The taps are **off** until a user switches them on (dashboard → System → *Audio
+  taps*), because the bridge adds a client to RØDE's audio graph. Without that,
+  `api/audio/stream` answers 403 `audio_taps_off`.
+- Only plugins get audio (`X-Rcplug-Token: $RCPLUG_TOKEN`); a plugin that sends it on
+  to the network (listen in a browser) does so itself.
+- Read without pause: a stream that falls a second behind is ended (open it again).
+- `GET /api/audio` shows the switch, whether the bridge runs, the channels and the
+  streams in use, and the dropouts the bridge reported (`problems`), with the ports
+  that can be tapped. The dashboard shows the same, and the process list marks the
+  bridge's programs.
+
 ## The desk
 
 Plugins never talk to the desk's control port (TCP 2345) themselves: the desk serves
@@ -551,6 +579,8 @@ To work on the SDK and a plugin together, use a workspace:
 | `Publish(ctx, type, data)` | Puts an event on the host's bus, with this plugin as source; `ErrStandalone` without the host |
 | `Events(ctx, prefixes...)` | A channel of the host's events whose type starts with one of the prefixes; reconnects and catches up by itself, closes when `ctx` ends |
 | `Event` | `ID`, `Time`, `Type`, `Source`, `Data` (raw JSON) |
+| `AudioPorts(ctx)` | Whether the shared audio taps are on, and the JACK ports they can hear |
+| `AudioTap(ctx, ports...)` | A stream of those ports (S16_LE, 48 kHz, interleaved in the given order); see [Audio](#audio) |
 
 ### Package `sdk/console`
 

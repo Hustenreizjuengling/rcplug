@@ -37,6 +37,8 @@ type Server struct {
 	Access *Access
 	// Events is the event bus; nil switches its API off.
 	Events *Bus
+	// Taps are the shared audio taps; nil switches their API off.
+	Taps *Taps
 	// Rescan reloads the plugins for POST /api/reload (and logs what it
 	// found); nil means Manager.Load.
 	Rescan func() ([]string, error)
@@ -122,6 +124,11 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("GET /api/events", s.handleEvents)
 		mux.HandleFunc("GET /api/events/stream", s.handleEventStream)
 		mux.Handle("POST /api/events", sdk.CSRF(http.HandlerFunc(s.handlePublish)))
+	}
+	if s.Taps != nil {
+		mux.HandleFunc("GET /api/audio", s.handleTaps)
+		mux.Handle("POST /api/audio/enable", sdk.CSRF(http.HandlerFunc(s.handleTapsEnable)))
+		mux.HandleFunc("GET /api/audio/stream", s.handleTapStream)
 	}
 	mux.HandleFunc("/plugins/{name}", s.handleProxy)
 	mux.HandleFunc("/plugins/{name}/", s.handleProxy)

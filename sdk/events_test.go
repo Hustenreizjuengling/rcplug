@@ -2,6 +2,8 @@ package sdk_test
 
 import (
 	"context"
+	"encoding/binary"
+	"io"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -45,5 +47,71 @@ func TestPublishAndEvents(t *testing.T) {
 		}
 	case <-ctx.Done():
 		t.Fatal("no event")
+	}
+}
+
+// toneBridge stands in for the JACK bridge: every sample of channel c is c.
+type toneBridge struct{ pw *io.PipeWriter }
+
+func (b *toneBridge) Ports(ctx context.Context) ([]string, error) {
+	return []string{"system:capture_1", "system:capture_2"}, nil
+}
+
+func (b *toneBridge) Start(ctx context.Context) (io.ReadCloser, error) {
+	pr, pw := io.Pipe()
+	b.pw = pw
+	go func() {
+		frame := make([]byte, 8*2*960)
+		for i := 0; i < len(frame); i += 2 {
+			binary.LittleEndian.PutUint16(frame[i:], uint16(i/2%8))
+		}
+		for {
+			if _, err := pw.Write(frame); err != nil {
+				return
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+	return pr, nil
+}
+func (b *toneBridge) Connect(string, int) error    { return nil }
+func (b *toneBridge) Disconnect(string, int) error { return nil }
+func (b *toneBridge) Stop()                        { b.pw.Close() }
+func (b *toneBridge) Problems() int                { return 0 }
+
+func TestAudioTap(t *testing.T) {
+	m := host.NewManager(t.TempDir(), 19750)
+	m.Events = host.NewBus()
+	m.SetAudioTaps(true)
+	srv := host.NewServer(m, nil, "test")
+	srv.Events = m.Events
+	srv.Taps = host.NewTaps(&toneBridge{}, m.AudioTaps)
+	hs := httptest.NewServer(srv.Handler())
+	defer hs.Close()
+	t.Setenv("RCPLUG_HOST_URL", hs.URL)
+	t.Setenv("RCPLUG_TOKEN", m.Events.Token("meter"))
+	ctx := context.Background()
+	on, ports, err := sdk.AudioPorts(ctx)
+	if err != nil || !on || len(ports) != 2 {
+		t.Fatalf("ports %v %v %v", on, ports, err)
+	}
+	r, err := sdk.AudioTap(ctx, "system:capture_2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	buf := make([]byte, 64)
+	if _, err := io.ReadFull(r, buf); err != nil {
+		t.Fatal(err)
+	}
+	// The port took the bridge's first free channel (JACK routes it there);
+	// the stream has that one channel only.
+	for i := 0; i < len(buf); i += 2 {
+		if v := binary.LittleEndian.Uint16(buf[i:]); v != 0 {
+			t.Fatalf("sample %d at %d", v, i)
+		}
+	}
+	if _, err := sdk.AudioTap(ctx, "nope:port"); err == nil {
+		t.Fatal("an unknown port was tapped")
 	}
 }

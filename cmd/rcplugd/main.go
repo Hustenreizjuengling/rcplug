@@ -92,6 +92,7 @@ func main() {
 	m.Events = host.NewBus()
 	srv := host.NewServer(m, dash, version)
 	srv.Events = m.Events
+	srv.Taps = host.NewTaps(host.NewJackBridge(), m.AudioTaps)
 	srv.Access = host.NewAccess(*root)
 	srv.Access.Presence = host.PresenceViaConsole(m)
 	if *allow != "" {

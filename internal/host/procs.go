@@ -113,6 +113,13 @@ func (s *Server) handleProcesses(w http.ResponseWriter, r *http.Request) {
 			groups[st.PID] = st.Name // plugins run in their own process group
 		}
 	}
+	if s.Taps != nil {
+		if b, ok := s.Taps.bridge.(interface{ PIDs() []int }); ok {
+			for _, pid := range b.PIDs() {
+				groups[pid] = "audio taps"
+			}
+		}
+	}
 	list := s.procs.sample("/proc", groups, os.Getpid())
 	all := r.URL.Query().Get("all") == "1"
 	var total int64

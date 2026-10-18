@@ -6,6 +6,13 @@ may break compatibility).
 
 ## 0.6.11 - Unreleased
 
+### Added
+- **Shared audio taps** (experimental, off by default; dashboard → System → *Audio
+  taps*): one JACK bridge, `rcplug-taps` with 8 channels, run by the host for every
+  plugin that needs sound. Plugins ask for ports and get a stream (`sdk.AudioTap`,
+  `GET /api/audio/stream` with their token); the bridge runs only while one listens,
+  and the System page shows what runs and the dropouts. See docs/plugin-api.md#audio.
+
 ## 0.6.10 - 2026-10-18
 
 ### Added

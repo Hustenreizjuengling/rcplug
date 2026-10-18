@@ -123,6 +123,11 @@ const T = {
     procTitle: 'Processes', procDesc: 'What runs on the device: CPU as a share of one core over the last seconds, memory in use (RSS). Tags mark rcplug and its plugins, and RØDE\'s own programs.',
     procByCPU: 'by CPU', procByMem: 'by memory', procName: 'Process', procMem: 'Memory', procThreads: 'Threads', procNone: 'Not available.',
     procFoot: '{n} processes (without kernel threads) on {cores} cores, {mem} MB in use together. The first values for CPU appear after a few seconds.',
+    tapTitle: 'Audio taps', tapExperimental: 'experimental', tapSwitch: 'switched on',
+    tapDesc: 'One bridge from the desk\'s audio graph (JACK) to the plugins that need sound, such as Sonar: plugins ask for inputs or outputs and get a stream. It adds one client to RØDE\'s audio graph, so it is off until you switch it on; it only runs while a plugin listens.',
+    tapConfirm: 'Switch on the audio taps? Plugins can then hear the desk\'s inputs and outputs. The bridge adds one client to RØDE\'s audio graph while a plugin listens. Watch for dropouts on the first use.',
+    tapRunning: 'Running: {n} channel(s) in use', tapIdle: 'Ready; the bridge starts when a plugin asks for audio.', tapProblems: '{n} dropout(s) reported',
+    tapNoJack: 'JACK is not reachable here: {err}', tapPorts: '{n} ports can be tapped.',
     evTitle: 'Events', evDesc: 'What the desk, the host and the plugins report on the event bus, live (the last 30).', evNone: 'No events yet.',
     accTitle: 'Access', accDesc: 'An optional password for the dashboard and every plugin page. Without one, everyone on the network can use them.',
     accOn: 'A password is set.', accOff: 'No password: everyone on the network can use the dashboard.', accCurrent: 'Current password', accNew: 'New password', accRepeat: 'Repeat',
@@ -162,6 +167,11 @@ const T = {
     procTitle: 'Prozesse', procDesc: 'Was auf dem Gerät läuft: CPU als Anteil eines Kerns über die letzten Sekunden, belegter Speicher (RSS). Markiert sind rcplug und seine Plugins sowie RØDEs eigene Programme.',
     procByCPU: 'nach CPU', procByMem: 'nach Speicher', procName: 'Prozess', procMem: 'Speicher', procThreads: 'Threads', procNone: 'Nicht verfügbar.',
     procFoot: '{n} Prozesse (ohne Kernel-Threads) auf {cores} Kernen, zusammen {mem} MB belegt. Die ersten CPU-Werte erscheinen nach ein paar Sekunden.',
+    tapTitle: 'Audio-Abgriffe', tapExperimental: 'experimentell', tapSwitch: 'eingeschaltet',
+    tapDesc: 'Eine Brücke vom Audio-Graph des Pults (JACK) zu den Plugins, die Ton brauchen, etwa Sonar: Plugins fragen nach Ein- oder Ausgängen und bekommen einen Datenstrom. Sie fügt RØDEs Audio-Graph einen Client hinzu, ist deshalb aus, bis du sie einschaltest, und läuft nur, solange ein Plugin zuhört.',
+    tapConfirm: 'Audio-Abgriffe einschalten? Plugins können dann Ein- und Ausgänge des Pults hören. Solange ein Plugin zuhört, hängt die Brücke einen Client an RØDEs Audio-Graph. Beim ersten Einsatz bitte auf Aussetzer achten.',
+    tapRunning: 'Läuft: {n} Kanal/Kanäle belegt', tapIdle: 'Bereit; die Brücke startet, sobald ein Plugin Ton anfordert.', tapProblems: '{n} Aussetzer gemeldet',
+    tapNoJack: 'JACK ist hier nicht erreichbar: {err}', tapPorts: '{n} Ports können abgegriffen werden.',
     evTitle: 'Ereignisse', evDesc: 'Was Pult, Host und Plugins auf dem Ereignis-Bus melden, live (die letzten 30).', evNone: 'Noch keine Ereignisse.',
     accTitle: 'Zugang', accDesc: 'Ein optionales Passwort für das Dashboard und alle Plugin-Seiten. Ohne Passwort kann jeder im Netzwerk sie benutzen.',
     accOn: 'Ein Passwort ist gesetzt.', accOff: 'Kein Passwort: Jeder im Netzwerk kann das Dashboard benutzen.', accCurrent: 'Aktuelles Passwort', accNew: 'Neues Passwort', accRepeat: 'Wiederholen',
@@ -513,6 +523,7 @@ function renderSystem() {
         <p class="desc">${esc(t('procDesc'))}</p><div id="procList"></div></div>
       <div class="card" id="updCard" style="margin-top:14px"></div>
       <div class="card" id="accCard" style="margin-top:14px"></div>
+      <div class="card" id="tapCard" style="margin-top:14px"></div>
       <div class="card" id="evCard" style="margin-top:14px"><h2>${esc(t('evTitle'))}</h2><p class="desc">${esc(t('evDesc'))}</p><div id="evList" class="evlist"></div></div>
       <div class="card" style="margin-top:14px"><h2>${esc(t('diagTitle'))}</h2><p class="desc">${esc(t('diagText'))}</p>
         <a class="btn primary" href="api/diagnostics" download>${esc(t('diagButton'))}</a></div>
@@ -523,6 +534,7 @@ function renderSystem() {
     bindProcSort();
   }
   loadProcs();
+  renderTaps();
   const mem = sys.memTotalKB ? `${esc(t('memUsed', { used: Math.round((sys.memTotalKB - sys.memAvailableKB) / 1024), total: Math.round(sys.memTotalKB / 1024) }))}<div class="bar"><i style="width:${((1 - sys.memAvailableKB / sys.memTotalKB) * 100).toFixed(0)}%"></i></div>` : '—';
   const disk = sys.diskTotalMB ? `${esc(t('diskFree', { free: sys.diskFreeMB, total: sys.diskTotalMB }))}<div class="bar"><i style="width:${((1 - sys.diskFreeMB / sys.diskTotalMB) * 100).toFixed(0)}%"></i></div>` : '—';
   const row = (k, v) => `<dt>${esc(t(k))}</dt><dd>${v}</dd>`;
@@ -554,6 +566,32 @@ async function loadProcs() {
   el.innerHTML = `<table class="procs"><thead><tr><th>${esc(t('procName'))}</th><th>PID</th><th class="num">CPU</th><th class="num">${esc(t('procMem'))}</th><th class="num">${esc(t('procThreads'))}</th></tr></thead><tbody>`
     + d.processes.map((p) => `<tr title="${esc(p.command || p.name)}"><td>${esc(p.name)} ${owner(p)}</td><td class="muted">${esc(p.pid)}</td><td class="num">${esc(p.cpu.toFixed(1))} %</td><td class="num">${esc(mb(p.rssKB))} MB</td><td class="num muted">${esc(p.threads)}</td></tr>`).join('')
     + `</tbody></table><p class="note">${esc(t('procFoot', { n: d.count, cores: d.cores, mem: mb(d.rssKB) }))}</p>`;
+}
+
+// ---- shared audio taps
+async function renderTaps() {
+  const card = $('#tapCard');
+  if (!card) return;
+  let d;
+  try { d = await jget('api/audio'); } catch (e) { card.hidden = true; return; }
+  card.hidden = false;
+  const st = d.status || {};
+  let h = `<div class="row"><h2 style="margin:0">${esc(t('tapTitle'))}</h2><span class="tag">${esc(t('tapExperimental'))}</span><span class="spacer"></span>
+    <label class="row" style="gap:6px;font-size:13px"><input type="checkbox" id="tapOn"${st.enabled ? ' checked' : ''}> ${esc(t('tapSwitch'))}</label></div>
+    <p class="desc">${esc(t('tapDesc'))}</p>`;
+  if (st.enabled) {
+    h += `<p><b>${esc(st.running ? t('tapRunning', { n: (st.channels || []).length }) : t('tapIdle'))}</b>${st.problems ? ` · <span class="error">${esc(t('tapProblems', { n: st.problems }))}</span>` : ''}</p>`;
+    if (st.error) h += `<p class="error">${esc(st.error)}</p>`;
+    for (const s of st.streams || []) h += `<div class="ev"><b>${esc(s.plugin)}</b> <code>${esc((s.ports || []).join(', '))}</code></div>`;
+    if (d.portsError) h += `<p class="muted">${esc(t('tapNoJack', { err: d.portsError }))}</p>`;
+    else h += `<p class="note">${esc(t('tapPorts', { n: (d.ports || []).length }))}</p>`;
+  }
+  card.innerHTML = h;
+  $('#tapOn').onchange = async (e) => {
+    if (e.target.checked && !confirm(t('tapConfirm'))) { e.target.checked = false; return; }
+    try { await jpost('api/audio/enable?on=' + e.target.checked); } catch (x) { alert(t('failed', { err: x.message })); }
+    renderTaps();
+  };
 }
 
 // ---- the event bus, live on the System page
