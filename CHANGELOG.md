@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.6.7 - Unreleased
+## 0.6.7 - 2026-10-18
 
 ### Added
 - Updates show a **progress bar** with the amount and the time left while they
