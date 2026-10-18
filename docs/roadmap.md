@@ -4,10 +4,12 @@ Where rcplug is going, and plugins that would be worth building. Nothing here is
 promise; priorities follow what users need and what the first tests on hardware
 show. Ideas and comments are welcome as issues.
 
-**Today (0.6.7):**
+**Today (0.6.10):**
 
 - **Host:** dashboard and plugin supervisor, signed in-app updates with rollback,
-  diagnostics, plugin settings in the dashboard.
+  diagnostics, plugin settings in the dashboard, update notices, an optional dashboard
+  password, an event bus for plugins, and the device's processes with their CPU and
+  memory.
   - Updates download gently and show a progress bar.
 - **Console:** the whole desk in the browser, reading along on the real Duo.
   - Live meters from the mixer's memory.

@@ -435,6 +435,7 @@ The dashboard's API, open to plugins (`$RCPLUG_HOST_URL`) and scripts. POSTs nee
 | `POST /api/plugins/<name>/enable`, `/disable`, `/restart` | Start and remember, stop and remember, restart |
 | `POST /api/reload` | Rescan the plugins directory |
 | `GET /api/system` | Host name, version, uptimes, load, memory, CPU temperature, free storage |
+| `GET /api/processes?sort=cpu\|mem&limit=20&all=1` | The device's processes: `pid`, `name`, `command` (secrets masked), `cpu` (percent of one core since the previous request), `cpuTime`, `rssKB`, `threads`, `owner` (`rcplug` with the `plugin`, or `rode`); `all=1` includes kernel threads |
 | `GET /api/diagnostics` | The diagnostics bundle |
 | `GET /api/updates`, `POST /api/updates/check`, `POST /api/updates/install?target=` | Updates, see [updates.md](updates.md) |
 | `GET /api/events`, `GET /api/events/stream`, `POST /api/events` | The event bus, see [Events](#events) |

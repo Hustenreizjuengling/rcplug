@@ -41,6 +41,8 @@ type Server struct {
 	// found); nil means Manager.Load.
 	Rescan func() ([]string, error)
 
+	procs procSampler
+
 	mu      sync.Mutex
 	proxies map[string]*httputil.ReverseProxy // key: name@target
 	invalid []string
@@ -97,6 +99,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/plugins", s.handlePlugins)
 	mux.HandleFunc("GET /api/system", s.handleSystem)
+	mux.HandleFunc("GET /api/processes", s.handleProcesses)
 	mux.HandleFunc("GET /api/plugins/{name}/logs", s.handleLogs)
 	mux.HandleFunc("GET /api/diagnostics", s.handleDiagnostics)
 	mux.Handle("POST /api/plugins/{name}/{action}", sdk.CSRF(http.HandlerFunc(s.handleAction)))

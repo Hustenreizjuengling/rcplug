@@ -14,6 +14,9 @@ may break compatibility).
   the show and its connection. The host reports plugins starting, crashing and
   stopping, and updates. The dashboard's System page lists the events live. See
   docs/plugin-api.md#events.
+- **Processes** on the dashboard's System page: what runs on the device with its CPU
+  (share of one core), memory and threads, sortable, with rcplug's plugins and RØDE's
+  own programs marked (`GET /api/processes`).
 
 ## 0.6.9 - 2026-10-18
 
