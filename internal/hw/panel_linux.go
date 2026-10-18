@@ -20,7 +20,8 @@ func (p *Panel) Do(id string, value int) error {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	f, err := os.OpenFile(p.tty(), os.O_WRONLY, 0)
+	// O_NOCTTY: the panel's tty must never become a controlling terminal.
+	f, err := os.OpenFile(p.tty(), os.O_WRONLY|syscall.O_NOCTTY, 0)
 	if err != nil {
 		return err
 	}

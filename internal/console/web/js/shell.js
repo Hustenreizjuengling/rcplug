@@ -14,6 +14,8 @@ import { views } from './views/index.js';
 let current = null;
 let scope = null;
 let lastState = '';
+let mounted = ''; // the view on the page while there is no device state
+let lastError = null;
 
 function tabFromHash() {
   const id = location.hash.replace(/^#\/?/, ''); // "#mixer" and "#/mixer" both work
@@ -23,8 +25,18 @@ function tabFromHash() {
 }
 
 export function render() {
-  if (!store.loaded) return;
-  setCapabilities(store.meta.control);
+  // Without the device state only views that do not need it (noTree) can
+  // show something; the others say why there is nothing.
+  if (!store.loaded && !current.noTree) {
+    if (scope) scope.dispose();
+    scope = null;
+    mounted = '';
+    $('#main').replaceChildren(h('div', { class: 'empty' }, h('p', null, t('loading.none')), lastError ? h('p', { class: 'muted' }, lastError.message) : null));
+    markTab();
+    return;
+  }
+  if (store.loaded) setCapabilities(store.meta.control);
+  mounted = store.loaded ? '' : current.id;
   if (scope) scope.dispose();
   scope = createScope(render);
   const main = $('#main');
@@ -40,6 +52,10 @@ export function render() {
   main.replaceChildren(...banners(), ...content);
   window.scrollTo(0, y);
   if (focusId && document.getElementById(focusId)) document.getElementById(focusId).focus();
+  markTab();
+}
+
+function markTab() {
   $$('#tabs a').forEach((a) => {
     const on = a.dataset.view === current.id;
     a.classList.toggle('on', on);
@@ -51,10 +67,10 @@ function banners() {
   const out = [];
   const st = liveState.status;
   const conn = st && st.connection;
-  if (conn && conn.state !== 'live') out.push(h('div', { class: 'banner' + (conn.state === 'conflict' ? ' bad' : ''), role: 'status' }, connText(conn), ' – ', t('banner.lastKnown')));
+  if (conn && conn.state !== 'live') out.push(h('div', { class: 'banner' + (conn.state === 'conflict' ? ' bad' : ''), role: 'status' }, connText(conn), store.loaded ? ' – ' + t('banner.lastKnown') : ''));
   else if (store.stale) out.push(h('div', { class: 'banner', role: 'status' }, t('banner.lastKnown')));
-  const limit = store.meta.controlLimit;
-  if (limit === 'untested_model') out.push(h('div', { class: 'banner info' }, t('banner.untested', { model: store.L.modelName })));
+  const limit = store.loaded ? store.meta.controlLimit : st && st.controlLimit;
+  if (limit === 'untested_model' && store.loaded) out.push(h('div', { class: 'banner info' }, t('banner.untested', { model: store.L.modelName })));
   if (limit === 'read_only') out.push(h('div', { class: 'banner info' }, t('banner.readOnly')));
   return out;
 }
@@ -87,6 +103,12 @@ export function renderHeader() {
     const show = val(single('CURRENTSHOW'), 'currentShowName');
     $('#devSub').textContent = [store.L.modelName, store.L.firmware && t('header.firmware', { v: store.L.firmware }), show && t('header.show', { name: show })].filter(Boolean).join(' · ');
   }
+  // Without the device state the level comes from the status (the Display
+  // page's front panel needs it).
+  if (!store.loaded && st && st.control !== controlLevel()) {
+    setCapabilities({ level: st.control });
+    if (current && current.noTree) render();
+  }
   const level = st ? st.control : controlLevel();
   const locked = st && (st.readOnly || st.controlLimit);
   $$('.ctl button').forEach((b) => {
@@ -113,7 +135,10 @@ async function chooseLevel(lv) {
   if (lv === controlLevel()) return;
   if (lv === 'basic' && !(await confirmDialog(h('div', null, h('p', null, h('b', null, t('level.basicTitle'))), h('p', null, t('level.basicText'))), t('level.basicOk')))) return;
   if (lv === 'expert' && !(await confirmDialog(h('div', null, h('p', null, h('b', null, t('level.expertTitle'))), h('p', null, t('level.expertText'))), t('level.expertOk')))) return;
-  if (await setControl(lv)) toast(t('level.now.' + lv), 'ok');
+  if (await setControl(lv)) {
+    toast(t('level.now.' + lv), 'ok');
+    request('api/status').then((s) => { liveState.status = s; renderHeader(); }).catch(() => {});
+  }
 }
 
 export function initShell() {
@@ -145,7 +170,9 @@ export function initShell() {
   on('reloaded', () => { renderHeader(); render(); requestAnimationFrame(fixTabs); });
   on('error', (e) => {
     if (store.loaded) return;
-    $('#main').replaceChildren(h('div', { class: 'empty' }, h('p', null, t('loading.none')), h('p', { class: 'muted' }, e.message)));
+    lastError = e;
+    if (current.noTree && mounted === current.id) return; // keep it (and its screen stream) as it is
+    render();
   });
   // Poll the status for the rate counter and retry countdowns.
   setInterval(() => {

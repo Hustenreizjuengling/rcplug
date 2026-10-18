@@ -15,7 +15,8 @@ import (
 // This is experimental and off by default: an injected message can in rare
 // cases interleave with one the panel is sending at the same moment. The codes
 // are factual protocol constants as documented by rc2http (which carries no
-// licence); they have not been re-verified on hardware by this project.
+// licence); on a real Duo with firmware 1.7.6 "listen1" (b0 19 00, 50 ms,
+// b0 19 01) toggled Listen 1 like the button, LED included.
 
 // PanelControl is one injectable front-panel control.
 type PanelControl struct {

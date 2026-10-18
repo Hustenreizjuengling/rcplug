@@ -6,6 +6,7 @@ import { request, report } from '../api.js';
 export const audit = {
   id: 'audit',
   title: 'tab.audit',
+  noTree: true,
   render(scope) {
     const box = h('div', { class: 'card' }, h('p', { class: 'muted' }, t('loading')));
     request('api/audit').then((d) => {

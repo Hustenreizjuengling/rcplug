@@ -18,9 +18,15 @@ may break compatibility).
   state is *busy* (`desk_busy`, with the holding process) instead of "not reachable",
   and the console no longer retries by itself, so it can never take the screen's
   place when the screen reconnects. *Reconnect* tries again.
+- The console's *Display* page (front panel and screen mirror) and *Log* page work
+  without the device state, so the desk can be operated through the front panel while
+  the mixer's port is busy; the other pages say why they are empty. Without the state
+  the control level comes from the console's status.
+- The front-panel tty is opened with `O_NOCTTY`.
 - Docs: the first test on a real Duo (flashing from Windows, SSH, installer,
   dashboard and plugins work; the mixer serves one client at a time) in
-  docs/device-notes.md, docs/protocol.md, docs/safety.md, the READMEs and the roadmap.
+  docs/device-notes.md, docs/protocol.md, docs/safety.md, the READMEs and the roadmap;
+  the front-panel emulation works on it (Listen 1 toggled like the button).
 
 ## 0.5.0 - 2026-10-18
 

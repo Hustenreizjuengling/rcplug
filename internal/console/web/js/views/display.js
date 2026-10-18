@@ -80,6 +80,7 @@ function panelCard(hw) {
 export const display = {
   id: 'display',
   title: 'tab.display',
+  noTree: true, // works without the device state: the panel and the screen do not need it
   render(scope) {
     const wrap = h('div', { class: 'grid cols-2' }, h('section', { class: 'card' }, h('p', { class: 'muted' }, t('loading'))));
     request('api/hw').then((hw) => {

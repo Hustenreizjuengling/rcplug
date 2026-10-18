@@ -21,7 +21,7 @@ everything below.
 | Storage | only the root partition (ext4, rw, A/B: `mmcblk1p1`/`p2`) and RØDE's own vfat partitions `/Application/update-staging` and `/Application/emmc-data`; a firmware update writes a fresh root partition | installer: `/usr/local/rcplug`, removed by a firmware update |
 | Access | OpenSSH: root login with a key only (`PasswordAuthentication no`, root's password is RØDE's); `authorized_keys` is empty in the stock image, so you add your key to the firmware once ([enable-ssh.md](https://github.com/Hustenreizjuengling/rcplug-toolkit/blob/main/docs/enable-ssh.md)). No firewall rules. rcplug ships no credentials. | wizard, setup |
 | Desk state | `rc_audio_mixer` serves the state tree on **127.0.0.1:2345** to **one client at a time**; the touch-screen GUI `rc_gui_juce` connects at boot and holds it, so nobody else gets in (seen on a real Duo, see below and [protocol.md](protocol.md)) | console |
-| Front panel | `rc_audio_mixer` talks to the fader/button MCU on `/dev/ttyAML3`, 115200 baud, 3-byte MIDI-style control-change messages (`0xBn`, control number, value), both ways | experimental panel emulation (its message table matches the mixer's) |
+| Front panel | `rc_audio_mixer` talks to the fader/button MCU on `/dev/ttyAML3`, 115200 baud, 3-byte MIDI-style control-change messages (`0xBn`, control number, value), both ways | experimental panel emulation (its message table matches the mixer's; works on a real Duo, see below) |
 | Display | `rc_gui_juce` renders in software into a DRM/KMS dumb buffer (XRGB8888) on `/dev/dri/card0`; it does not use `/dev/fb0` (only the boot splash does) | screen mirror (prefers DRM) |
 | Audio | one ALSA card; `jackd` (JACK2 1.9.20) holds its capture (`hw:0,3`) and playback (`hw:0,0`) device; the mixer is a JACK client, and the desk's inputs and outputs are JACK ports. JACK tools, `alsa_out`, `arecord` and the `snd-aloop` module are in the image | [Sonar](https://github.com/Hustenreizjuengling/rcplug-plugins/tree/main/sonar)'s opt-in JACK source |
 | Ports | the mixer listens on 127.0.0.1:2345 and 127.0.0.1:2346 (internal) only until their one client (the screen, the call engine) has connected; the call engine `callme-t` on SIP 5060, RTP 15004–15515 and its own web ports; nothing uses 8080 | dashboard on :8080 |
@@ -72,6 +72,14 @@ from Windows to a patched 1.7.6):
   *busy* and does not retry by itself. The mixer's D-Bus object is no way around this.
   The console is being reworked to read the screen's connection alongside it and to
   operate the desk through the front panel ([roadmap](roadmap.md)).
+- **The front-panel emulation works**: injecting *Listen 1* (`b0 19 00`, 50 ms,
+  `b0 19 01` into `/dev/ttyAML3` with `TIOCSTI`) toggled it exactly like the button,
+  LED included, and a second press turned it off again. It needs no connection to the
+  mixer, so the console's *Display* page (front panel and screen mirror) can operate
+  the desk although the screen holds the mixer's port. To use it: save
+  `{"args": ["--panel"]}` as `config/console.json` in the install directory, start
+  the console (dashboard → Plugins), choose *Expert* in the console's header and open
+  *Display*. Since 0.5.1 the *Display* and *Log* pages work without the device state.
 - **Diagnostics** now include the network and unix sockets with their processes and
   the names on the D-Bus system bus, which is what this needed.
 
