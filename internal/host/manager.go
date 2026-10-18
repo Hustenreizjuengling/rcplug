@@ -1,6 +1,7 @@
 package host
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -255,6 +256,41 @@ func (m *Manager) Restart(name string) bool {
 		p.start()
 	}
 	return true
+}
+
+// Options returns the option values set for a plugin (nil, false if there
+// is no such plugin).
+func (m *Manager) Options(name string) (map[string]json.RawMessage, bool, error) {
+	p := m.get(name)
+	if p == nil {
+		return nil, false, nil
+	}
+	cfg, err := LoadUserConfig(m.root, name)
+	if cfg.Options == nil {
+		cfg.Options = map[string]json.RawMessage{}
+	}
+	return cfg.Options, true, err
+}
+
+// SetOptions stores option values for a plugin and restarts it if it runs,
+// so they take effect.
+func (m *Manager) SetOptions(name string, values map[string]json.RawMessage) (found, restarted bool, err error) {
+	p := m.get(name)
+	if p == nil {
+		return false, false, nil
+	}
+	if err := SaveOptions(m.root, p.Manifest(), values); err != nil {
+		return true, false, err
+	}
+	p.mu.Lock()
+	enabled := p.enabled
+	p.mu.Unlock()
+	if enabled {
+		p.log.add("options changed in the dashboard; restarting")
+		p.stop()
+		p.start()
+	}
+	return true, enabled, nil
 }
 
 // Manifests returns the manifests of the loaded plugins in navigation order.

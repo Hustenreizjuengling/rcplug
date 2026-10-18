@@ -69,6 +69,12 @@
   details summary{cursor:pointer;color:var(--muted);font-size:12px}
   details .logs{margin-top:6px}
   .ok{color:var(--accent)}
+  .opts{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:grid;gap:12px}
+  .opts label{display:grid;gap:3px;font-size:13px}
+  .opts .odesc{color:var(--muted);font-size:12px}
+  .opts select,.opts input[type=text],.opts input[type=number]{font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;max-width:320px}
+  .opts .check{display:flex;gap:8px;align-items:center}
+  .opts .linkbtn{justify-self:start}
   @media (max-width:700px){ .vitals{margin-left:0;width:100%} }
 </style>
 </head>
@@ -109,6 +115,8 @@ const T = {
     updLastOk: 'Last rcplug update{v}: successful ({at}).', updLastFail: 'Last rcplug update{v} failed ({at}); the previous version was kept or restored.',
     updKeys: 'Trusted signing keys: {ids}', updBadge: 'update {v}', updPlugin: 'Update',
     days: '{d} d {h} h', hours: '{h} h {m} min', mins: '{m} min', switchLang: 'Deutsch',
+    settings: 'Settings', optSave: 'Save', optSaveRestart: 'Save and restart', optSaved: 'Saved.', optSavedRestart: 'Saved; the plugin restarts.',
+    optDefault: 'default: {v}', optReset: 'use the default', optYes: 'on', optNo: 'off', optHint: 'Changes take effect when the plugin starts.',
   },
   de: {
     connecting: 'verbinde…', offline: 'Host nicht erreichbar', cpu: 'CPU', load: 'Last', ramFree: 'RAM frei', up: 'an seit',
@@ -135,6 +143,8 @@ const T = {
     updLastOk: 'Letztes rcplug-Update{v}: erfolgreich ({at}).', updLastFail: 'Letztes rcplug-Update{v} fehlgeschlagen ({at}); die vorherige Version blieb bzw. wurde wiederhergestellt.',
     updKeys: 'Vertrauenswürdige Signaturschlüssel: {ids}', updBadge: 'Update {v}', updPlugin: 'Aktualisieren',
     days: '{d} T {h} h', hours: '{h} h {m} min', mins: '{m} min', switchLang: 'English',
+    settings: 'Einstellungen', optSave: 'Speichern', optSaveRestart: 'Speichern und neu starten', optSaved: 'Gespeichert.', optSavedRestart: 'Gespeichert; das Plugin startet neu.',
+    optDefault: 'Standard: {v}', optReset: 'Standard verwenden', optYes: 'an', optNo: 'aus', optHint: 'Änderungen wirken, wenn das Plugin startet.',
   },
 };
 let lang = 'en';
@@ -147,8 +157,10 @@ const $ = (s, r = document) => r.querySelector(s);
 const dec = (s) => { try { return decodeURIComponent(s); } catch (e) { return s; } };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 async function jget(u) { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
-async function jpost(u) {
-  const r = await fetch(u, { method: 'POST', headers: { 'X-Rcplug': '1' } });
+async function jpost(u, body) {
+  const init = { method: 'POST', headers: { 'X-Rcplug': '1' } };
+  if (body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(body); }
+  const r = await fetch(u, init);
   if (!r.ok) {
     const body = (await r.text()).trim();
     let msg = body;
@@ -161,6 +173,7 @@ async function jpost(u) {
 let plugins = [], invalid = [], sys = null, route = '', loaded = false, pageSig = '';
 let upd = null, updSig = '', updChecking = false, bootVersion = null;
 const openLogs = {};
+const openOpts = {}; // plugin → the values being edited (kept across re-renders)
 
 function fmtUptime(s) {
   const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
@@ -307,10 +320,11 @@ function renderPlugins() {
         ${p.hasUI ? `<a class="btn" href="#/p/${encodeURIComponent(p.name)}">${esc(t('open'))}</a><a class="btn" href="plugins/${encodeURIComponent(p.name)}/" target="_blank" rel="noopener">${esc(t('newTab'))}</a>` : ''}
         ${p.enabled ? `<button class="danger" data-act="disable">${esc(t('stop'))}</button><button data-act="restart">${esc(t('restart'))}</button>` : `<button class="primary" data-act="enable">${esc(t('start'))}</button>`}
         ${u ? `<button data-act="update"${jobActive() ? ' disabled' : ''}>${esc(t('updPlugin'))}</button>` : ''}
+        ${p.options && p.options.length ? `<button class="linkbtn" data-act="settings" aria-expanded="${!!openOpts[p.name]}">${esc(t('settings'))}</button>` : ''}
         <button class="linkbtn" data-act="logs" aria-expanded="${!!openLogs[p.name]}">${esc(t('log'))}</button>
         ${p.restarts ? `<span class="muted" style="font-size:12px">${esc(t('restarts', { n: p.restarts }))}</span>` : ''}
         ${p.lastErr && st !== 'running' ? `<span style="font-size:12px;color:var(--warn)">${esc(p.lastErr)}</span>` : ''}
-      </div><p class="error"></p><pre class="logs" ${openLogs[p.name] ? '' : 'hidden'}></pre></div>`;
+      </div><p class="error"></p><div class="opts" ${openOpts[p.name] ? '' : 'hidden'}></div><pre class="logs" ${openLogs[p.name] ? '' : 'hidden'}></pre></div>`;
   }
   html += `</div><p class="note" style="text-align:center">${esc(t('footer'))}</p></div>`;
   $('#view').innerHTML = html;
@@ -322,7 +336,10 @@ function renderPlugins() {
   };
   document.querySelectorAll('#view .card[data-name]').forEach((c) => {
     const name = c.dataset.name, logsEl = $('.logs', c);
+    const p = plugins.find((x) => x.name === name);
+    if (openOpts[name]) renderOptions(p, $('.opts', c));
     c.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.act === 'settings') { toggleOptions(p, $('.opts', c), b); return; }
       if (b.dataset.act === 'logs') {
         openLogs[name] = !openLogs[name];
         logsEl.hidden = !openLogs[name];
@@ -336,6 +353,98 @@ function renderPlugins() {
   });
   refreshLogs();
 }
+// ---- plugin options (manifest "options", stored by the host in
+// config/<plugin>.json; see docs/plugin-api.md#options)
+const trOpt = (p, o, k) => (p.translations && p.translations[lang] && p.translations[lang].options && p.translations[lang].options[o.id] && p.translations[lang].options[o.id][k]) || o[k] || '';
+const trChoice = (p, o, v) => {
+  const c = (o.choices || []).find((x) => x.value === v);
+  const l = p.translations && p.translations[lang] && p.translations[lang].options && p.translations[lang].options[o.id];
+  return (l && l.choices && l.choices[v]) || (c ? c.title : String(v));
+};
+async function toggleOptions(p, el, btn) {
+  if (openOpts[p.name]) { delete openOpts[p.name]; el.hidden = true; btn.setAttribute('aria-expanded', 'false'); return; }
+  try {
+    const d = await jget(`api/plugins/${encodeURIComponent(p.name)}/options`);
+    openOpts[p.name] = { values: { ...(d.values || {}) } };
+  } catch (e) { el.hidden = false; el.textContent = t('failed', { err: e.message }); return; }
+  btn.setAttribute('aria-expanded', 'true');
+  renderOptions(p, el);
+}
+function renderOptions(p, el) {
+  const st = openOpts[p.name];
+  el.hidden = false;
+  el.replaceChildren();
+  const show = (o, v) => (o.type === 'bool' ? t(v ? 'optYes' : 'optNo') : o.type === 'choice' ? trChoice(p, o, v) : String(v));
+  for (const o of p.options) {
+    const set = Object.prototype.hasOwnProperty.call(st.values, o.id) && st.values[o.id] !== null;
+    const cur = set ? st.values[o.id] : o.default;
+    const label = document.createElement('label');
+    const title = document.createElement('span');
+    title.textContent = trOpt(p, o, 'title');
+    let input;
+    if (o.type === 'bool') {
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !!cur;
+      input.onchange = () => { st.values[o.id] = input.checked; };
+      const row = document.createElement('span');
+      row.className = 'check';
+      row.append(input, title);
+      label.append(row);
+    } else {
+      if (o.type === 'choice') {
+        input = document.createElement('select');
+        for (const c of o.choices) { const op = new Option(trChoice(p, o, c.value), c.value); input.append(op); }
+        input.value = cur ?? '';
+      } else {
+        input = document.createElement('input');
+        input.type = o.type === 'number' ? 'number' : 'text';
+        if (o.type === 'number') { input.step = 'any'; if (o.min != null) input.min = o.min; if (o.max != null) input.max = o.max; }
+        if (o.maxLength) input.maxLength = o.maxLength;
+        input.value = cur ?? '';
+      }
+      input.onchange = () => { st.values[o.id] = o.type === 'number' ? Number(input.value) : input.value; };
+      label.append(title, input);
+    }
+    const desc = document.createElement('span');
+    desc.className = 'odesc';
+    desc.textContent = [trOpt(p, o, 'description'), o.default !== undefined ? t('optDefault', { v: show(o, o.default) }) : ''].filter(Boolean).join(' · ');
+    label.append(desc);
+    if (set) {
+      const reset = document.createElement('button');
+      reset.type = 'button';
+      reset.className = 'linkbtn';
+      reset.textContent = t('optReset');
+      reset.onclick = (e) => { e.preventDefault(); st.values[o.id] = null; renderOptions(p, el); };
+      label.append(reset);
+    }
+    el.append(label);
+  }
+  const msg = document.createElement('span');
+  msg.className = 'muted';
+  msg.style.fontSize = '12px';
+  msg.textContent = st.msg || t('optHint');
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.className = 'primary';
+  save.textContent = t(p.enabled ? 'optSaveRestart' : 'optSave');
+  save.onclick = async () => {
+    save.disabled = true;
+    try {
+      const r = await jpost(`api/plugins/${encodeURIComponent(p.name)}/options`, { values: st.values });
+      const d = await jget(`api/plugins/${encodeURIComponent(p.name)}/options`);
+      st.values = { ...(d.values || {}) };
+      st.msg = t(r.restarted ? 'optSavedRestart' : 'optSaved');
+      renderOptions(p, el);
+      setTimeout(refresh, 600);
+    } catch (e) { msg.textContent = t('failed', { err: e.message }); msg.className = 'error'; save.disabled = false; }
+  };
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.append(save, msg);
+  el.append(row);
+}
+
 function refreshLogs() {
   for (const [name, open] of Object.entries(openLogs)) {
     const el = $(`.card[data-name="${CSS.escape(name)}"] .logs`);

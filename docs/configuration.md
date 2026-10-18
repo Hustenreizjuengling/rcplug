@@ -7,7 +7,7 @@ removes them together with rcplug (the Duo has no partition that survives it):
 | File | Applies to | Takes effect |
 |---|---|---|
 | `config/rcplugd.env` | the host: environment variables in `sh` syntax, e.g. `RCPLUG_ALLOW_HOST=studio.example` | `/etc/init.d/rcplug restart` |
-| `config/<plugin>.json` | one plugin: `{"args": [...], "env": {...}}`, `args` are appended to the manifest's command line | restarting the plugin (dashboard → Plugins → Restart) |
+| `config/<plugin>.json` | one plugin: `{"args": [...], "env": {...}}`, `args` are appended to the manifest's command line; `"options"` holds what users set in the dashboard (Plugins → *Settings*) | restarting the plugin (dashboard → Plugins → Restart); *Settings* restarts it itself |
 
 Example: allow control on a Pro II for testing.
 

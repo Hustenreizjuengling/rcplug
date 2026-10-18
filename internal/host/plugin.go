@@ -53,6 +53,8 @@ type Manifest struct {
 	// Update says where newer versions of the plugin are published, so the
 	// dashboard can update it (see docs/updates.md). Nil: no in-app updates.
 	Update *UpdateSource `json:"update,omitempty"`
+	// Options are settings users change in the dashboard (see options.go).
+	Options []Option `json:"options,omitempty"`
 
 	// Unknown lists fields of plugin.json this host does not understand
 	// (typos, or a manifest written for a newer host).
@@ -87,8 +89,9 @@ func validateUpdate(u *UpdateSource) error {
 
 // Translation is a localised title and description of a plugin.
 type Translation struct {
-	Title       string `json:"title,omitempty"`
-	Description string `json:"description,omitempty"`
+	Title       string                       `json:"title,omitempty"`
+	Description string                       `json:"description,omitempty"`
+	Options     map[string]OptionTranslation `json:"options,omitempty"`
 }
 
 // Action is an entry point into a plugin's web UI that other UIs show in a
@@ -183,6 +186,9 @@ func LoadManifest(dir string) (*Manifest, error) {
 	if err := validateUpdate(m.Update); err != nil {
 		return nil, fmt.Errorf("plugin %q: %w", m.Name, err)
 	}
+	if err := validateOptions(&m); err != nil {
+		return nil, fmt.Errorf("plugin %q: %w", m.Name, err)
+	}
 	return &m, nil
 }
 
@@ -204,7 +210,7 @@ func loopbackTarget(s string) bool {
 var validName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 var knownFields = map[string]bool{"$schema": true, "name": true, "title": true, "description": true, "version": true,
-	"exec": true, "httpProxy": true, "autostart": true, "needsAudio": true, "primary": true, "order": true, "icon": true, "translations": true, "actions": true, "update": true}
+	"exec": true, "httpProxy": true, "autostart": true, "needsAudio": true, "primary": true, "order": true, "icon": true, "translations": true, "actions": true, "update": true, "options": true}
 
 func unknownFields(raw []byte) []string {
 	var all map[string]json.RawMessage
@@ -226,9 +232,12 @@ func unknownFields(raw []byte) []string {
 // reinstalls (a firmware update removes the whole install directory).
 type UserConfig struct {
 	// Args are appended to the manifest's exec line.
-	Args []string `json:"args"`
+	Args []string `json:"args,omitempty"`
 	// Env adds environment variables.
-	Env map[string]string `json:"env"`
+	Env map[string]string `json:"env,omitempty"`
+	// Options are the values of the manifest's options set in the
+	// dashboard (option id → value).
+	Options map[string]json.RawMessage `json:"options,omitempty"`
 }
 
 // LoadUserConfig reads <root>/config/<name>.json (missing = empty).

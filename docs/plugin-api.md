@@ -82,11 +82,12 @@ warning on the dashboard and in the host's log; the plugin still loads.
 | `translations` | object | | Localised `title` and `description` per language code: `{"de": {"title": "…", "description": "…"}}` |
 | `actions` | array | | Entry points other UIs show, see [Actions](#actions). Needs `httpProxy`. |
 | `update` | object | | Where updates come from, see [Updates](#updates) |
+| `options` | array | | Settings users change in the dashboard, see [Options](#options) |
 | `name` | string | | Ignored; the directory name is authoritative |
 | `$schema` | string | | Ignored by the host |
 
 A manifest that cannot be read, has no `exec`, a non-loopback `httpProxy` or an
-invalid `actions` or `update` entry is skipped; the reason is listed on the
+invalid `actions`, `update` or `options` entry is skipped; the reason is listed on the
 dashboard.
 
 ## Process
@@ -180,10 +181,55 @@ memory and storage the firmware needs too: keep memory use small, avoid polling 
 than needed, never busy-wait, and bound everything that grows (logs, history,
 caches). The dashboard's System page shows free memory and storage.
 
+## Options
+
+Users of a desk should never need a shell. Settings a user may change are declared as
+`options`; the dashboard shows them under *Settings* on the plugin's card, the host
+checks every value against the declaration, keeps it in `config/<name>.json` (below)
+and restarts the plugin. When it starts the plugin, the host passes each value a user
+has set as a command-line argument or an environment variable; for options nobody has
+set, nothing is passed and the plugin's own default applies.
+
+```json
+"options": [
+  {"id": "interval", "type": "number", "title": "Interval (seconds)", "min": 1, "max": 3600,
+   "default": 5, "arg": "--interval={value}"},
+  {"id": "style", "type": "choice", "title": "Style", "default": "big",
+   "choices": [{"value": "big", "title": "Big clock"}, {"value": "small", "title": "Small"}],
+   "arg": "--style={value}"},
+  {"id": "quiet", "type": "bool", "title": "Quiet", "arg": "--quiet"},
+  {"id": "label", "type": "text", "title": "Label", "maxLength": 40, "env": "MY_LABEL"}
+]
+```
+
+| Field | Meaning |
+|---|---|
+| `id` | Unique, starts with a letter; letters, digits, `-`, `_` |
+| `type` | `bool`, `choice`, `number` or `text` |
+| `title`, `description` | Shown in the form (English; translations below) |
+| `default` | The plugin's own default, shown as "default: …"; it is not passed |
+| `choices` | `choice`: `[{"value", "title"}]` |
+| `min`, `max` | `number`: bounds |
+| `maxLength`, `pattern` | `text`: at most this many characters (default 256), and a regular expression the whole value must match; control characters are always refused |
+| `arg` | `bool`: the flag added when the value is true (`--quiet`); otherwise one argument with `{value}` (`--style={value}`). Each value is exactly one argument, never split or passed through a shell. |
+| `env` | Instead of `arg`: an environment variable set to the value (`1`/`0` for `bool`); not `RCPLUG_*` |
+
+Translations go into `translations.<lang>.options.<id>`: `title`, `description` and
+`choices` (value → title). A value stored for an option that a later version of the
+plugin no longer has, or that no longer fits, is left out at the start and noted in the
+plugin's log.
+
+Options are as open as the rest of the dashboard: everyone who can reach the device
+can change them. Never make secrets (PINs, tokens) or decisions only the owner may take
+an option; those belong in the operator's `args`/`env` below. The API is
+`GET`/`POST api/plugins/<name>/options` (`{"values": {"<id>": value}}`, `null` goes back
+to the default).
+
 ## Operator settings
 
 `<root>/config/<name>.json` adds arguments and environment variables without editing
-the manifest, and survives updates:
+the manifest, and survives updates (the dashboard keeps option values in it too, under
+`"options"`):
 
 ```json
 {
@@ -192,7 +238,7 @@ the manifest, and survives updates:
 }
 ```
 
-- `args` are appended to `exec`; `env` is added to the environment.
+- `args` are appended to `exec` (after the options); `env` is added to the environment.
 - The file is read at every start of the plugin: restart it after a change.
 - Unknown fields and invalid JSON keep the plugin from starting; the reason is in its
   log.

@@ -111,6 +111,8 @@ type Status struct {
 	Translations map[string]Translation `json:"translations,omitempty"`
 	// Actions are the plugin's entry points for other UIs.
 	Actions []Action `json:"actions,omitempty"`
+	// Options are the settings users change in the dashboard.
+	Options []Option `json:"options,omitempty"`
 }
 
 func (p *Plugin) status() Status {
@@ -126,7 +128,7 @@ func (p *Plugin) status() Status {
 		HasUI: m.HTTPProxy != "", NeedsAudio: m.NeedsAudio, Enabled: p.enabled, State: st,
 		Running: st == StateRunning, PID: p.pid, Restarts: p.restarts, LastErr: p.lastErr,
 		Port: p.port, Primary: m.Primary, Order: m.Order, Icon: m.Icon, Unknown: m.Unknown,
-		Translations: m.Translations, Actions: m.Actions,
+		Translations: m.Translations, Actions: m.Actions, Options: m.Options,
 	}
 }
 
@@ -226,6 +228,11 @@ func (p *Plugin) command(ctx context.Context) (*exec.Cmd, []string, error) {
 	for _, a := range m.Exec {
 		args = append(args, expand(a, port, p.dir))
 	}
+	optArgs, optEnv, problems := optionArgs(m, cfg)
+	for _, msg := range problems {
+		p.log.add(msg)
+	}
+	args = append(args, optArgs...)
 	args = append(args, cfg.Args...)
 	dataDir := h.dataDir(m.Name)
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
@@ -241,6 +248,7 @@ func (p *Plugin) command(ctx context.Context) (*exec.Cmd, []string, error) {
 		"RCPLUG_HOST_URL="+h.HostURL,
 		"RCPLUG_VERSION="+h.Version,
 	)
+	cmd.Env = append(cmd.Env, optEnv...)
 	for k, v := range cfg.Env {
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}

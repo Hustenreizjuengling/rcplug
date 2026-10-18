@@ -14,6 +14,12 @@ may break compatibility).
   restarts the device's screen once. The console gives the place back when it is
   switched off, when the console stops or crashes, or when the screen does not
   connect, so the screen always finds the mixer again.
+- **Plugin settings in the dashboard**: plugins declare `options` in their manifest
+  (yes/no, a choice, a number or text, each passed as one argument or an environment
+  variable); the dashboard shows them under *Settings* on the plugin's card, checks
+  them and restarts the plugin. No shell needed. The console offers its meters, the
+  screen mirror's source, operating the screen, the connection mode and control on
+  untested models (docs/plugin-api.md#options).
 - **Write protection** can be switched on and off on the console's *System* page
   (behind the PIN); `--read-only` still forces it.
 - **Forgot the PIN?** removes the console's PIN at the device, without a shell: four

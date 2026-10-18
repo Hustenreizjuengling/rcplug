@@ -13,7 +13,142 @@
   "translations": {
     "de": {
       "title": "Konsole",
-      "description": "Das komplette Mischpult im Browser: Kanäle, Pegel, Routing, Eingänge, Effekte, Pads, Aufnahme und System – live gespiegelt und optional fernsteuerbar."
+      "description": "Das komplette Mischpult im Browser: Kanäle, Pegel, Routing, Eingänge, Effekte, Pads, Aufnahme und System – live gespiegelt und optional fernsteuerbar.",
+      "options": {
+        "meters": {
+          "title": "Pegelmesser",
+          "description": "Pegel und Stellungen der Hardware-Fader aus dem Shared Memory des Mixers lesen (nur lesend).",
+          "choices": {
+            "auto": "Vom Mixer",
+            "off": "Aus"
+          }
+        },
+        "screen": {
+          "title": "Quelle des Bildschirmspiegels",
+          "description": "Woher der Spiegel des Gerätebildschirms kommt. Aus entfernt ihn ganz; ein- und ausgeschaltet wird er auf der Seite Display.",
+          "choices": {
+            "auto": "Automatisch",
+            "drm": "DRM-Scanout-Puffer",
+            "fb": "Framebuffer",
+            "off": "Aus"
+          }
+        },
+        "touch": {
+          "title": "Bildschirm bedienen",
+          "description": "Aus entfernt das Tippen auf den Gerätebildschirm über den Spiegel ganz; sonst schalten Nutzer es auf der Seite Display ein.",
+          "choices": {
+            "auto": "Verfügbar",
+            "off": "Aus"
+          }
+        },
+        "deskMode": {
+          "title": "Verbindung zum Mixer",
+          "description": "Automatisch liest auf einem RØDECaster beim Gerätebildschirm mit. Verbinden macht die Konsole zum Client des Mixer-Ports, den der Gerätebildschirm dann nicht nutzen kann: nur zur Fehlersuche.",
+          "choices": {
+            "auto": "Automatisch",
+            "tap": "Mitlesen",
+            "connect": "Verbinden (Fehlersuche)"
+          }
+        },
+        "allowUntested": {
+          "title": "Steuern auf ungetesteten Modellen",
+          "description": "Steuerung auf Modellen ohne geprüftes Profil anbieten, etwa dem RØDECaster Pro II. Auf eigene Gefahr."
+        }
+      }
     }
-  }
+  },
+  "options": [
+    {
+      "id": "meters",
+      "type": "choice",
+      "title": "Level meters",
+      "description": "Read the meters and the hardware faders' positions from the mixer's shared memory (read-only).",
+      "default": "auto",
+      "choices": [
+        {
+          "value": "auto",
+          "title": "From the mixer"
+        },
+        {
+          "value": "off",
+          "title": "Off"
+        }
+      ],
+      "arg": "--meters={value}"
+    },
+    {
+      "id": "screen",
+      "type": "choice",
+      "title": "Screen mirror source",
+      "description": "Where the mirror of the device's screen comes from. Off removes it entirely; users switch the mirror on and off on the Display page.",
+      "default": "auto",
+      "choices": [
+        {
+          "value": "auto",
+          "title": "Automatic"
+        },
+        {
+          "value": "drm",
+          "title": "DRM scanout buffer"
+        },
+        {
+          "value": "fb",
+          "title": "Framebuffer"
+        },
+        {
+          "value": "off",
+          "title": "Off"
+        }
+      ],
+      "arg": "--screen={value}"
+    },
+    {
+      "id": "touch",
+      "type": "choice",
+      "title": "Operating the screen",
+      "description": "Off removes tapping the device's screen from the mirror entirely; otherwise users switch it on on the Display page.",
+      "default": "auto",
+      "choices": [
+        {
+          "value": "auto",
+          "title": "Available"
+        },
+        {
+          "value": "off",
+          "title": "Off"
+        }
+      ],
+      "arg": "--touch={value}"
+    },
+    {
+      "id": "deskMode",
+      "type": "choice",
+      "title": "Connection to the mixer",
+      "description": "Automatic reads along with the device's screen on a RØDECaster. Connect makes the console a client of the mixer's port, which the device's screen then cannot use: only for troubleshooting.",
+      "default": "auto",
+      "choices": [
+        {
+          "value": "auto",
+          "title": "Automatic"
+        },
+        {
+          "value": "tap",
+          "title": "Read along"
+        },
+        {
+          "value": "connect",
+          "title": "Connect (troubleshooting)"
+        }
+      ],
+      "arg": "--desk-mode={value}"
+    },
+    {
+      "id": "allowUntested",
+      "type": "bool",
+      "title": "Control on untested models",
+      "description": "Offer control on models without a verified profile, such as the RØDECaster Pro II. At your own risk.",
+      "default": false,
+      "arg": "--allow-untested-model"
+    }
+  ]
 }

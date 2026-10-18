@@ -95,6 +95,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/plugins/{name}/logs", s.handleLogs)
 	mux.HandleFunc("GET /api/diagnostics", s.handleDiagnostics)
 	mux.Handle("POST /api/plugins/{name}/{action}", sdk.CSRF(http.HandlerFunc(s.handleAction)))
+	mux.HandleFunc("GET /api/plugins/{name}/options", s.handleOptions)
+	mux.Handle("POST /api/plugins/{name}/options", sdk.CSRF(http.HandlerFunc(s.handleSetOptions)))
 	mux.Handle("POST /api/reload", sdk.CSRF(http.HandlerFunc(s.handleReload)))
 	mux.HandleFunc("GET /api/updates", s.handleUpdates)
 	mux.Handle("POST /api/updates/check", sdk.CSRF(http.HandlerFunc(s.handleUpdateCheck)))
@@ -267,6 +269,45 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// handleOptions returns the option values set for a plugin (the options
+// themselves are in api/plugins).
+func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) {
+	values, ok, err := s.m.Options(r.PathValue("name"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	doc := map[string]interface{}{"values": values}
+	if err != nil {
+		doc["error"] = err.Error()
+	}
+	writeJSON(w, doc)
+}
+
+// handleSetOptions stores option values ({"values": {id: value|null}}) and
+// restarts the plugin if it runs.
+func (s *Server) handleSetOptions(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Values map[string]json.RawMessage `json:"values"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		sdk.WriteError(w, sdk.NewError(http.StatusBadRequest, "bad_request", "body must be {\"values\": {...}}"))
+		return
+	}
+	name := r.PathValue("name")
+	found, restarted, err := s.m.SetOptions(name, req.Values)
+	switch {
+	case !found:
+		http.NotFound(w, r)
+	case err != nil:
+		sdk.WriteError(w, err)
+	default:
+		writeJSON(w, map[string]bool{"ok": true, "restarted": restarted})
+	}
 }
 
 func (s *Server) handleUpdates(w http.ResponseWriter, r *http.Request) {
