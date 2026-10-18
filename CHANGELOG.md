@@ -6,6 +6,24 @@ may break compatibility).
 
 ## 0.8.5 - Unreleased
 
+### Added
+- **Backups of rcplug's and the desk's settings**, for the new *Backup* plugin
+  (rcplug-plugins): `GET /api/backup` reads rcplug's own settings (which plugins are
+  installed and switched on, their options, the daily update check, the extra
+  catalogs; never the dashboard's password, the console's PIN or options that look
+  like secrets), `POST /api/backup/diff` shows what restoring one would change and
+  `POST /api/backup/restore` carries it out. The console's `api/snapshot` lists the
+  desk's settings (a few thousand: channels, processing, routing, inputs, pads,
+  effects, outputs, the device's own settings), addressed by node family and index so
+  a snapshot survives a firmware update that moves nodes; `api/snapshot/diff`
+  compares one with the desk and marks what needs the expert level;
+  `api/snapshot/apply` restores it through the usual checks, in passes (a microphone
+  type applies its preset, so the restore looks again and writes what still
+  differs), routing links with the device's sequence and capped values in allowed
+  steps. Listening volumes are never part of it, so a restore cannot make the
+  headphones loud, and neither are the routing levels of channels on a physical
+  fader (they follow the fader).
+
 ## 0.8.4 - 2026-10-18
 
 ### Added

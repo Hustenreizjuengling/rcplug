@@ -84,6 +84,7 @@ type Console struct {
 	desk          *deskEvents
 	changes       *changeLog
 	presses       map[string]uint64 // button presses per path, for their releases (api/press)
+	restoring     sync.Mutex        // one snapshot restore at a time (api/snapshot/apply)
 }
 
 // New creates the console and loads persisted settings.

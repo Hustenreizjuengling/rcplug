@@ -123,6 +123,9 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/catalog/install", sdk.CSRF(http.HandlerFunc(s.handleCatalogInstall)))
 	mux.Handle("POST /api/catalog/sources", sdk.CSRF(http.HandlerFunc(s.handleCatalogSource)))
 	mux.Handle("POST /api/plugins/{name}/remove", sdk.CSRF(http.HandlerFunc(s.handleRemovePlugin)))
+	mux.HandleFunc("GET /api/backup", s.handleBackup)
+	mux.Handle("POST /api/backup/diff", sdk.CSRF(http.HandlerFunc(s.handleBackupDiff)))
+	mux.Handle("POST /api/backup/restore", sdk.CSRF(http.HandlerFunc(s.handleBackupRestore)))
 	if s.Access != nil {
 		mux.HandleFunc("GET /api/access", s.handleAccess)
 		mux.Handle("POST /api/login", sdk.CSRF(http.HandlerFunc(s.handleLogin)))
