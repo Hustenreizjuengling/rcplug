@@ -37,6 +37,19 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y qemu-user
       - run: make test-arm64
 
+  install:
+    name: Device installer and in-app updates (sandbox)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install, reinstall, failure halfway, rollback
+        run: make install-test
+      - name: Update 0.8.0 → 0.9.0 from a fake GitHub, rollback of a broken 0.9.1
+        run: make update-test
+
   cross:
     name: Device package and other platforms
     runs-on: ubuntu-latest
