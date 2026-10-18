@@ -103,6 +103,13 @@ func main() {
 		}
 		srv.Updates = host.NewUpdater(m, version, cfg)
 	}
+	// Before any plugin starts: a signal handled here reaches plugins with
+	// its default action even if rcplugd was started with it ignored (as by
+	// a background job of a shell), so plugins can trap SIGINT and stop
+	// cleanly instead of being killed 3 s later.
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+
 	reload := func() {
 		invalid, err := m.Load()
 		if err != nil {
@@ -136,8 +143,6 @@ func main() {
 	}()
 	log.Printf("dashboard listening on %s", ln.Addr())
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	for s := range sig {
 		if s == syscall.SIGHUP {
 			log.Printf("SIGHUP: rescanning plugins")

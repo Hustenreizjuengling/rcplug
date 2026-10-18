@@ -1,156 +1,286 @@
-# Writing plugins
+# Plugin interface reference
 
-A plugin is a directory with a `plugin.json` and a program. The host starts the
-program, restarts it when it crashes, shows its output on the dashboard and, if it
-has a web UI, makes that UI reachable under `/plugins/<name>/`.
+Everything the host (`rcplugd`) promises a plugin and expects from it. To learn
+plugin development step by step, start with [plugin-guide.md](plugin-guide.md);
+for ready-made solutions see [cookbook.md](cookbook.md). Reading and controlling the
+desk is described in [console-api.md](console-api.md).
 
-Plugins can be written in any language that runs on the device (aarch64 Linux).
-Go is the easiest choice: it produces one static binary, and the small
-[`sdk`](../sdk) package handles the details below. Two complete examples:
-
-| Example | What it shows |
+| | |
 |---|---|
-| [`examples/hello-sh`](../examples/hello-sh) | The smallest plugin: POSIX sh, no web UI, output in the log, a counter in the data directory |
-| [`examples/reclog`](../examples/reclog) | A Go plugin with a web UI that watches the recorder through the console API and keeps a log in its data directory, with tests |
+| [Overview](#overview) | The contract on one page |
+| [Directory and files](#directory-and-files) | Where a plugin lives and what is kept |
+| [The manifest](#the-manifest-pluginjson) | Every field of `plugin.json` |
+| [Process](#process) | Start, environment, output, signals, restarts, priority |
+| [Operator settings](#operator-settings) | `config/<name>.json` |
+| [HTTP](#http) | Port, proxy, headers, streaming, WebSockets, security |
+| [Dashboard](#dashboard) | Navigation, start page, language, embedding |
+| [Actions](#actions) | Entry points other UIs show |
+| [Diagnostics](#diagnostics) | Contributing to the diagnostics bundle |
+| [Updates](#updates) | Installing and updating plugins |
+| [Host API](#host-api) | What a plugin may ask the host |
+| [The desk](#the-desk) | Reading and controlling through the console |
+| [Go SDK](#go-sdk) | `sdk`, `sdk/console`, `sdk/release` |
+| [Compatibility](#compatibility) | Versions and what stays stable |
+| [Checklist](#checklist) | Before you publish |
 
-## A minimal plugin
+## Overview
+
+| The host | The plugin |
+|---|---|
+| finds `plugins/<name>/plugin.json` and runs `exec` in that directory | exits within 3 s of SIGINT |
+| passes `RCPLUG_*` variables and the operator's settings | keeps state in `RCPLUG_DATA_DIR` |
+| assigns a loopback port to plugins with `httpProxy` | serves HTTP on `127.0.0.1:$RCPLUG_PORT` only |
+| forwards `/plugins/<name>/…` to it, prefix removed | uses relative URLs in its pages |
+| refuses foreign `Host` names and cross-site state changes | requires `X-Rcplug` on state-changing requests |
+| restarts it after a crash, with growing pauses | does not depend on being started exactly once |
+| keeps its output as a log | writes plain lines, never secrets |
+| runs it at the lowest CPU priority | does not poll or spin |
+
+Plugins run as **root** on the device, like the host. Nothing separates one plugin
+from another or from the system: install only plugins you trust, and write plugins
+that touch only what they need.
+
+## Directory and files
 
 ```
-plugins/hello/
-  plugin.json
-  run.sh
+<root>/                     /usr/local/rcplug on the device
+  plugins/<name>/           the plugin: plugin.json, program, assets   replaced by updates
+  data/<name>/              RCPLUG_DATA_DIR, created by the host        kept
+  config/<name>.json        operator settings, optional                kept
+  logs/<name>.log           the plugin's output, rotated at 512 KB     kept
+  state.json                which plugins the user started or stopped  kept
 ```
 
-```json
-{
-  "title": "Hello",
-  "description": "Says hello once a minute.",
-  "version": "0.1.0",
-  "exec": ["/bin/sh", "./run.sh"],
-  "autostart": true
-}
-```
-
-```sh
-#!/bin/sh
-# A background sleep ignores SIGINT, so the trap stops it explicitly.
-trap 'kill "$pid" 2>/dev/null; exit 0' INT TERM
-while :; do echo "hello"; sleep 60 & pid=$!; wait "$pid"; done
-```
-
-Copy the directory to `<root>/plugins/` on the device and press **Rescan** on the
-dashboard's Plugins page (or run `/etc/init.d/rcplug reload`). From your computer, the
-wizard does it for you: `rcplug-wizard.sh --host <ip> --plugin ./hello`.
-
-A rescan picks up new and removed plugins and reads changed manifests, but a plugin
-that is already running keeps its process. After replacing a plugin by hand, press
-**Restart** on its card. The wizard restarts updated plugins itself.
+- The directory name is the plugin's **id**: lower-case letters, digits, `-` and
+  `_`, starting with a letter or digit (`^[a-z0-9][a-z0-9_-]*$`). It is also the URL
+  segment. Other directories are skipped and listed on the dashboard.
+- **Kept** means: across restarts, reboots, reinstalls with the toolkit and in-app
+  updates. A **firmware update** of the RØDECaster removes the whole install
+  directory.
+- Uninstalling rcplug removes everything, including `data/`.
 
 ## The manifest: `plugin.json`
 
-The directory name is the plugin's id: lower-case letters, digits, `-` and `_`. The
-host skips other directories and lists them on the dashboard.
-[`plugin.schema.json`](../plugin.schema.json) describes the format for editors: inside
-this repository add `"$schema": "../../plugin.schema.json"`, elsewhere point it at the
-file's raw URL in the published repository. The host lists unknown fields as a warning
-on the dashboard.
+[`plugin.schema.json`](../plugin.schema.json) describes the format for editors. Set
+`"$schema"` to the file's raw URL,
+`https://raw.githubusercontent.com/Hustenreizjuengling/rcplug/main/plugin.schema.json`
+(inside this repository: `../../plugin.schema.json`). Unknown fields are shown as a
+warning on the dashboard and in the host's log; the plugin still loads.
 
-| Field | Type | Meaning |
-|---|---|---|
-| `exec` | string array, **required** | Command line, run in the plugin directory. Start a program of the plugin with `./` (`["./hello"]`); a bare name is looked up in `PATH` (`["/bin/sh", "./run.sh"]`). `{{port}}` becomes the assigned port, `{{dir}}` the plugin directory. |
-| `title` | string | Name in the navigation and the plugin list (English). Defaults to the id. |
-| `description` | string | One or two sentences for the plugin list (English). |
-| `version` | string | Version of the plugin, shown on the dashboard. |
-| `httpProxy` | string | Address of the plugin's web server, normally `127.0.0.1:{{port}}`. It must be a loopback address. Leave it out for a plugin without a UI. |
-| `autostart` | bool | Run the plugin by default. The user's choice on the dashboard overrides it. |
-| `primary` | bool | Open this plugin as the dashboard's start page. |
-| `order` | int | Position in the navigation, lower first. |
-| `icon` | string | A short glyph or emoji for the navigation. |
-| `needsAudio` | bool | Shows an "audio" badge in the plugin list. |
-| `translations` | object | Localised `title` and `description` per language, e.g. `{"de": {"title": "Hallo"}}`. |
-| `actions` | array | Entry points that other UIs show for this plugin, see [Actions](#actions). Needs `httpProxy`. |
-| `name` | string | Ignored; the directory name is authoritative. |
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `exec` | string array | **required** | Command line, run in the plugin directory. A program of the plugin starts with `./` (`["./onair"]`); a bare name is looked up in `PATH` (`["/bin/sh", "./run.sh"]`). `{{port}}` becomes the assigned port, `{{dir}}` the plugin directory. |
+| `title` | string | the id | Name in the navigation and the plugin list (English) |
+| `description` | string | | One or two sentences for the plugin list (English). Say what the plugin changes, if anything. |
+| `version` | string | | Shown on the dashboard. `X.Y.Z` (semantic versioning) is required for updates. |
+| `httpProxy` | string | | Where the plugin's web server listens, normally `127.0.0.1:{{port}}`. Must be a loopback address (`127.x.x.x`, `::1`, `localhost`). Without it the plugin has no port and no page. |
+| `autostart` | bool | `false` | Run the plugin unless the user stopped it |
+| `primary` | bool | `false` | Open this plugin as the dashboard's start page (the first enabled one wins) |
+| `order` | int | `0` | Position in the navigation and the plugin list, lower first; ties by id |
+| `icon` | string | | A short glyph or emoji for the navigation (at most 8 characters) |
+| `needsAudio` | bool | `false` | Shows an "audio" badge in the plugin list |
+| `translations` | object | | Localised `title` and `description` per language code: `{"de": {"title": "…", "description": "…"}}` |
+| `actions` | array | | Entry points other UIs show, see [Actions](#actions). Needs `httpProxy`. |
+| `update` | object | | Where updates come from, see [Updates](#updates) |
+| `name` | string | | Ignored; the directory name is authoritative |
+| `$schema` | string | | Ignored by the host |
 
-## Environment
+A manifest that cannot be read, has no `exec`, a non-loopback `httpProxy` or an
+invalid `actions` or `update` entry is skipped; the reason is listed on the
+dashboard.
 
-The host starts the program in its plugin directory with these variables:
+## Process
+
+### Start
+
+The host starts a plugin when it is enabled: by `autostart`, by the user on the
+dashboard (remembered in `state.json`), and again at every start of the host if it
+was enabled before.
+
+- **Command:** `exec` with `{{port}}` and `{{dir}}` replaced, followed by `args` from
+  the [operator settings](#operator-settings). There is no shell unless `exec` starts
+  one.
+- **Working directory:** the plugin directory.
+- **Standard input:** `/dev/null`.
+- **Process group:** a new one per plugin; children belong to it.
+- **User:** root, like the host.
+- Two instances of a plugin never run at the same time: a new start waits until the
+  previous process is gone.
+
+### Environment
+
+The host's own environment, plus:
 
 | Variable | Value |
 |---|---|
-| `RCPLUG_NAME` | the plugin id |
-| `RCPLUG_PORT` | the loopback port for the web UI (`0` without `httpProxy`) |
+| `RCPLUG_NAME` | the plugin's id |
+| `RCPLUG_PORT` | the loopback port for the web server, `0` without `httpProxy` |
 | `RCPLUG_PLUGIN_DIR` | the plugin directory. **Replaced on every update**: do not store anything here. |
-| `RCPLUG_DATA_DIR` | `<root>/data/<name>/`, created by the host and kept across updates. Store settings and state here. |
-| `RCPLUG_HOST_URL` | the host's base URL on loopback, e.g. `http://127.0.0.1:8080`. Other plugins are at `$RCPLUG_HOST_URL/plugins/<name>/`. |
+| `RCPLUG_DATA_DIR` | `<root>/data/<name>/`, created before the start and kept across updates |
+| `RCPLUG_HOST_URL` | the host on loopback, e.g. `http://127.0.0.1:8080`. Other plugins are at `$RCPLUG_HOST_URL/plugins/<name>/`. |
 | `RCPLUG_VERSION` | the host's version |
 
-The rest of the host's environment is passed through.
+`env` from the operator settings comes last and wins over everything above.
 
-### Operator settings
+### Output and logs
+
+Everything the program writes to stdout and stderr becomes the plugin's log, line by
+line:
+
+- the dashboard shows the last 500 lines (**Plugins → Log**,
+  `GET /api/plugins/<name>/logs`);
+- `<root>/logs/<name>.log` keeps it on the device across reboots, rotated at 512 KB
+  with one older file;
+- the host adds its own lines (`started pid=…`, `exited (…), restarting in 4s`,
+  `stopped by host`), with secret-looking arguments masked;
+- lines longer than 64 KB are split;
+- the logs go into the [diagnostics bundle](#diagnostics).
+
+Write plain lines. Never write secrets: logs are shown to everyone who can open the
+dashboard and end up in bug reports.
+
+### Stop
+
+The host stops a plugin when the user stops or restarts it, when it is removed or
+updated, and when the host itself stops:
+
+1. **SIGINT** to the plugin's process group;
+2. after **3 seconds**, SIGKILL to the program;
+3. once the program has exited, SIGKILL to whatever is left in its group (helpers
+   that kept running).
+
+Exit promptly on SIGINT (and SIGTERM). If the host dies without stopping its
+plugins, they get SIGTERM. Shell scripts need a `trap` for SIGINT, because a
+background `sleep` in a non-interactive shell ignores it; Python must flush its
+output and handle SIGINT, see the [guide](plugin-guide.md#12-other-languages).
+
+### Crashes and restarts
+
+| State | Meaning |
+|---|---|
+| `starting` | the process is being started |
+| `running` | the process runs |
+| `backoff` | it exited while enabled and is restarted after a pause |
+| `stopped` | not enabled |
+
+The pause after an exit doubles from 1 s up to about 30 s; a process that ran for over
+a minute starts again with 1 s. An exit with status 0 counts like a crash: a plugin
+that is enabled is supposed to run. The dashboard shows the number of restarts and the
+last error.
+
+### Priority and resources
+
+The host runs at nice 19 and its plugins inherit it, so audio on the device always
+comes first. There are no other limits. The RØDECaster is an embedded device whose
+memory and storage the firmware needs too: keep memory use small, avoid polling faster
+than needed, never busy-wait, and bound everything that grows (logs, history,
+caches). The dashboard's System page shows free memory and storage.
+
+## Operator settings
 
 `<root>/config/<name>.json` adds arguments and environment variables without editing
-the manifest, so the settings survive updates:
+the manifest, and survives updates:
 
 ```json
 {
   "args": ["--read-only"],
-  "env": {"HELLO_INTERVAL": "10"}
+  "env": {"HELLO_INTERVAL": "10", "CONSOLE_PIN": "4711"}
 }
 ```
 
-`args` are appended to `exec`. The file is read whenever the plugin starts, so restart
-the plugin after changing it. Unknown fields are an error that shows up in the plugin's
-log. Arguments that look like secrets (`--pin`, `--password`, `--token`, …) are masked
-in the log; values in `env` are never logged. All flags of the built-in plugins are in
+- `args` are appended to `exec`; `env` is added to the environment.
+- The file is read at every start of the plugin: restart it after a change.
+- Unknown fields and invalid JSON keep the plugin from starting; the reason is in its
+  log.
+- `env` values are never logged. In the command line the host logs, the value of every
+  argument whose name starts with `pin`, `pass`, `token`, `secret` or `key`
+  (`--pin 4711`, `--token=…`, `--password …`) is masked.
+
+This is the place for anything only the operator may decide: PINs, tokens, webhook
+URLs, options that change the desk. Everything a web page can change is open to
+everyone on the network. The flags of the built-in plugins are in
 [configuration.md](configuration.md).
 
-## Lifecycle
+## HTTP
 
-- **Start.** When the plugin is enabled (on the dashboard, by `autostart`, or at boot
-  if it was enabled before).
-- **Output.** Everything the program writes to stdout and stderr appears in the
-  plugin's log on the dashboard (the last 500 lines) and in `<root>/logs/<name>.log`
-  on the device (rotated at 512 KB, one older file kept). Write plain lines; a Go panic
-  with its stack trace lands there too.
-- **Crash.** If the program exits while enabled, it is started again after a pause
-  that doubles from 1 s to about 30 s. After a minute of running the pause resets.
-- **Stop.** The host sends **SIGINT** to the plugin's process group, waits up to 3 s,
-  then sends SIGKILL and removes any processes left in the group. Exit promptly on
-  SIGINT and SIGTERM.
-- **Priority.** Plugins inherit the lowest CPU priority (nice 19). Audio on the
-  device always comes first. Avoid busy loops and polling faster than you need.
-- **Update.** A new version replaces the plugin directory. The data directory and
-  the operator settings stay.
+### Port and proxy
 
-## Web UI
+A plugin with `httpProxy` gets a free loopback port, from `--base-port` (9100) up,
+assigned when it is first loaded. It may change between host restarts: always take
+it from `{{port}}` or `RCPLUG_PORT`.
 
-A plugin with `httpProxy` serves HTTP on `127.0.0.1:$RCPLUG_PORT`. The host forwards
-`/plugins/<name>/…` to it with the prefix removed, so the plugin sees `/`, `/api/…`
-and so on.
+The host forwards every request below `/plugins/<name>/` to the plugin:
 
-- **Listen on loopback only.** The host is the single entry point and checks the
-  `Host` header against DNS rebinding.
-- **Use relative URLs** (`api/state`, not `/api/state`), so the page works both
-  behind the host and when you open the plugin's port directly during development.
-  `X-Forwarded-Prefix` carries `/plugins/<name>` if you need absolute links.
-- **Protect state changes.** Browsers cannot add custom headers to cross-site
-  requests without a CORS preflight, which rcplug never grants. Require the header
-  `X-Rcplug: 1` on every POST, PUT, PATCH and DELETE and reject requests without it
-  with 403. `sdk.Serve` does this for Go plugins. Your own pages send the header
-  with `fetch(url, {method: 'POST', headers: {'X-Rcplug': '1'}})`. The host
-  additionally refuses state-changing requests whose `Origin` is foreign.
-- **Streaming** (Server-Sent Events, MJPEG) works; the proxy flushes immediately.
-- **Embedding.** The dashboard shows the UI in an iframe. `window.self !==
-  window.top` tells you that you are embedded, for example to hide your own header.
-- **Language.** The dashboard stores the user's language (`de` or `en`) in
-  `localStorage` under `rcplug-lang`. Read it to match the dashboard, and fall back to
-  `navigator.language`. Leave the language switch to the dashboard when embedded.
+- The prefix is removed: the plugin sees `/`, `/api/state`, … Query strings are kept.
+- `/plugins/<name>` redirects to `/plugins/<name>/` (301), so relative URLs resolve.
+- Request headers are passed through, with `X-Forwarded-For`, `X-Forwarded-Host`,
+  `X-Forwarded-Proto` and `X-Forwarded-Prefix: /plugins/<name>`. The `Host` header is
+  the plugin's own address.
+- Responses are passed through and flushed at once: **Server-Sent Events**, MJPEG and
+  other streams work. **WebSocket** upgrades work as well.
+- If the plugin does not answer (starting, stopped, crashed), the host answers 502.
+  For an unknown plugin or one without `httpProxy`: 404.
+- The host has no timeouts for responses and no body size limit; protect your own
+  handlers (`http.MaxBytesReader`).
+
+**Use relative URLs** in pages (`api/state`, not `/api/state`), so they work behind the
+host and when the plugin's port is opened directly during development. For absolute
+links, prefix `X-Forwarded-Prefix`.
+
+### Security
+
+The host does this for every request, plugins included:
+
+- **Host names.** Only IP addresses, `localhost`, the device's host name, local
+  names (`.local`, `.lan`, `.home`, `.home.arpa`, `.internal`, `.localdomain`,
+  `.fritz.box`) and names added by the operator (`RCPLUG_ALLOW_HOST`) are answered;
+  others get 421. This stops DNS rebinding.
+- **Cross-site requests.** State-changing requests (anything but GET, HEAD, OPTIONS)
+  whose `Origin` belongs to another site are refused with 403.
+- **Framing.** Responses carry `X-Frame-Options: SAMEORIGIN` and
+  `Content-Security-Policy: frame-ancestors 'self'` (added to the plugin's own
+  headers), `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`.
+  Pages can be framed by the dashboard, not by other sites.
+
+The plugin must:
+
+- **listen on loopback only** (`127.0.0.1:$RCPLUG_PORT`), never on all interfaces;
+- **refuse state-changing requests without `X-Rcplug`** (any value; the dashboard and
+  the SDK send `1`) with 403. Browsers cannot add custom headers to cross-site
+  requests without a CORS preflight, which rcplug never grants. `sdk.Serve` and
+  `sdk.CSRF` do this;
+- **never change anything on GET**;
+- not send CORS headers that allow other origins.
+
+There are no user accounts: everyone who can reach the device can use every plugin
+page. Protect actions with a PIN or keep them in the operator settings where that
+matters, as the console does.
+
+## Dashboard
+
+- **Navigation.** Every plugin with `httpProxy` gets an entry with its `icon` and
+  title and a status dot, sorted by `order` and id. A click shows its page in an
+  iframe below the navigation (`#/p/<name>`); **new tab ↗** on the Plugins page
+  opens `/plugins/<name>/` alone.
+- **Start page.** The first enabled plugin with `primary`, otherwise the first
+  enabled plugin with a page, otherwise the Plugins page.
+- **Plugins page.** Every plugin with title, description, version, state, restarts,
+  last error, log, and the buttons Start, Stop, Restart, Update.
+- **Not running.** Instead of the iframe the dashboard shows the plugin's state and a
+  Start button.
+- **Language.** The dashboard stores `de` or `en` in `localStorage` under
+  `rcplug-lang` (same origin as your page). Read it, fall back to
+  `navigator.language`, and leave switching to the dashboard while embedded.
+- **Embedded or alone.** `window.self !== window.top` tells you that you are in the
+  dashboard's iframe. The iframe allows full screen.
+- **Deep links.** `#/p/<name>/<path>` or `#/p/<name>?<query>` opens the plugin's page
+  at that path, which is how [actions](#actions) work. `..` is not allowed.
 
 ## Actions
 
-A plugin can offer entry points that other UIs show where they fit. The console, for
-example, shows every action with the context `channel` as a button on each channel
-strip and in the channel dialog. Sonar uses this for its "◉ Sonar" button:
+A plugin can offer entry points that other UIs show where they fit. The console shows
+every action with the context `channel` as a button on each channel strip and in the
+channel dialog. Sonar uses this for its "◉ Sonar" button:
 
 ```json
 "actions": [{
@@ -165,124 +295,181 @@ strip and in the channel dialog. Sonar uses this for its "◉ Sonar" button:
 
 | Field | Meaning |
 |---|---|
-| `id` | Unique within the plugin (`a-z`, `0-9`, `-`, `_`) |
-| `context` | Where the action belongs. The console knows `channel`; other contexts are accepted and ignored by UIs that do not know them. |
+| `id` | Unique within the plugin (`^[a-z0-9][a-z0-9_-]*$`) |
+| `context` | Where the action belongs. The console knows `channel`; UIs ignore contexts they do not know. |
 | `title`, `icon`, `translations` | Button text, optional glyph (the plugin's icon otherwise) and localised titles |
-| `path` | Relative to the plugin's UI (no scheme, no leading `/`). Placeholders are filled in and URL-encoded. |
+| `path` | Relative to the plugin's page (no scheme, no leading `/`). Placeholders are filled in and URL-encoded. |
 
-Placeholders for `channel`: `{strip}` the strip id (`physical1`, `virtual2`, …), `{index}`
-its position (0-based), `{source}` the source id assigned to it (`combo1`, `usb2`, …, empty
-if none) and `{label}` the source's display name.
+Placeholders for `channel`: `{strip}` the strip id (`physical1`, `virtual2`, …),
+`{index}` its position (0-based), `{source}` the source id assigned to it (`combo1`,
+`usb2`, …, empty if none) and `{label}` the source's display name.
 
-Inside the dashboard, a click switches the dashboard to the plugin and opens the path
-there (the dashboard route is `#/p/<plugin><path>`). Without the dashboard, the browser
-navigates to `/plugins/<plugin>/<path>`. Only running plugins' actions are shown.
+Inside the dashboard, a click switches to the plugin and opens the path there.
+Without the dashboard, the browser goes to `/plugins/<plugin>/<path>`. Only running
+plugins' actions are shown.
 
 ## Diagnostics
 
-A plugin can add its own data to the diagnostics bundle (the dashboard's *Download
-diagnostics*, or `rcplugd --diagnostics` on the device). The host calls
-`GET /api/diagnostics` on every running plugin with a web UI and stores the answer
-under `plugins/<name>/` in the zip:
+**System → Download diagnostics** (and `rcplugd --diagnostics`, and the toolkit)
+build a zip with the logs of the host and all plugins, versions and the device's
+state. A plugin can add its own data: the host calls `GET /api/diagnostics` on every
+running plugin with a page and stores the answer under `plugins/<name>/`:
 
-- `application/json` → `diagnostics.json`, any other text → `diagnostics.txt`
-- `application/zip` → its entries are copied as they are
+| Content-Type | Stored as |
+|---|---|
+| `application/json` | `diagnostics.json` |
+| `application/zip` | its entries, as they are |
+| anything else | `diagnostics.txt` |
 
-Report what helps to find a problem (configuration, state, counters, what the plugin
-sees of the system), at most 20 MB, within 5 seconds. **Never include secrets.** Your
-log output is in the bundle anyway (`logs/<name>.log`).
+Answer within 5 seconds, with at most 20 MB. Report what helps to find a problem:
+configuration, state, counters, what the plugin sees of the system. **Never include
+secrets**; users attach the bundle to public bug reports.
 
-## Reading and controlling the desk
+## Updates
 
-Plugins never talk to the desk's control port themselves. They use the console
-plugin's HTTP API at `$RCPLUG_HOST_URL/plugins/console/`:
+Installing a plugin means putting its directory into `plugins/`. The toolkit does
+that (`rcplug-wizard.sh --plugin <dir>`, or **Add plugin** in the setup window): it
+replaces the directory, keeps `data/` and `config/`, and restarts the plugin.
 
-- `GET api/summary`: a compact view of channels, levels, mutes, recorder and pads.
-- `GET api/tree` and `GET api/events`: the full state and its live changes.
-- `POST api/set` and friends: changes, subject to the user's control level and PIN.
+A plugin can also update from the dashboard. Add its source to `plugin.json`:
 
-The full reference is in [console-api.md](console-api.md). Writes are refused while the
-console is read-only, which is the default. A plugin that wants to change something
-must say so in its description, and the user decides by setting the control level. If
-the user set a PIN, the plugin needs it too: let the user put it into the plugin's
-`config/<name>.json` as an environment variable and pass it on as `Client.PIN`.
+```json
+"update": {"github": "owner/repository", "publicKey": "<base64 Ed25519 public key>"}
+```
+
+| Field | Meaning |
+|---|---|
+| `github` | **Required.** The GitHub repository whose latest release carries the plugin. It must be public. |
+| `publicKey` | The key that signs the releases, trusted in addition to rcplug's built-in keys. Leave it out only for plugins released from rcplug's own repositories. |
+
+**System → Check for updates** then reads the repository's latest release, checks its
+signed `release.json` and offers a newer `version` of the plugin; **Install** (or
+**Update** on the plugin's card) downloads it, checks its SHA-256, unpacks it into a
+staging directory, stops the plugin, swaps the directories, and starts it again if it
+was enabled. The data directory and the operator settings stay. How to publish such
+releases: [updates.md](updates.md#publishing-a-plugin-with-updates) and
+[the guide](plugin-guide.md#13-publish-with-updates).
+
+A package is a `.tar.gz` with `plugin.json` at its root. `version` in the package's
+`plugin.json` must be the one in `release.json`, and its `name` must be the plugin's
+id. Files keep their permissions without write access for group and others and
+without special bits; links and paths outside the package are refused.
+
+A rescan (**Rescan** on the Plugins page, `POST /api/reload`, SIGHUP) picks up new and
+removed plugins and changed manifests, but a running plugin keeps its process until it
+is restarted.
+
+## Host API
+
+The dashboard's API, open to plugins (`$RCPLUG_HOST_URL`) and scripts. POSTs need
+`X-Rcplug: 1`.
+
+| Request | Effect |
+|---|---|
+| `GET /api/plugins` | `{"plugins": [...], "invalid": [...]}`: per plugin `name`, `title`, `description`, `version`, `hasUI`, `needsAudio`, `enabled`, `state`, `running`, `pid`, `restarts`, `lastErr`, `port`, `primary`, `order`, `icon`, `unknownFields`, `translations`, `actions` |
+| `GET /api/plugins/<name>/logs` | `{"lines": [...]}`, the last 500 lines |
+| `POST /api/plugins/<name>/enable`, `/disable`, `/restart` | Start and remember, stop and remember, restart |
+| `POST /api/reload` | Rescan the plugins directory |
+| `GET /api/system` | Host name, version, uptimes, load, memory, CPU temperature, free storage |
+| `GET /api/diagnostics` | The diagnostics bundle |
+| `GET /api/updates`, `POST /api/updates/check`, `POST /api/updates/install?target=` | Updates, see [updates.md](updates.md) |
+
+## The desk
+
+Plugins never talk to the desk's control port (TCP 2345) themselves: the desk serves
+few clients, and its own screen is one of them. They use the console plugin at
+`$RCPLUG_HOST_URL/plugins/console/`:
+
+- `GET api/summary`: channels, levels, mutes, recorder, pads in a compact form;
+- `GET api/tree` and `GET api/events`: the full state and its live changes;
+- `POST api/set`, `api/press`, `api/record`, …: changes.
+
+Writes are refused unless the user switched the console from *Read only* to *Control*
+(or *Expert*), and they need the PIN if one is set (header `X-Rcplug-Pin`; pass it in
+through the operator settings). Say in your plugin's description what it changes.
+Everything else is in [console-api.md](console-api.md); recipes are in the
+[cookbook](cookbook.md#the-desk).
 
 ## Go SDK
 
-```go
-import (
-	"rcplug/sdk"
-	capi "rcplug/sdk/console"
-)
+Module `github.com/Hustenreizjuengling/rcplug`, standard library only:
+
+```bash
+go get github.com/Hustenreizjuengling/rcplug@latest
 ```
+
+To work on the SDK and a plugin together, use a workspace:
+`go work init ./rcplug ./myplugin`.
+
+### Package `sdk`
 
 | Function | Purpose |
 |---|---|
-| `sdk.ListenAddr(def)` | `127.0.0.1:$RCPLUG_PORT`, or `def` when run standalone |
-| `sdk.DataDir()`, `sdk.PluginDir()`, `sdk.Name()`, `sdk.HostURL()` | The environment, with fallbacks for running standalone |
-| `sdk.StatePath(file)` | A path in the data directory; moves an old file from the plugin directory there |
-| `sdk.LoadJSON`, `sdk.SaveJSON`, `sdk.WriteFileAtomic` | State files that survive power cuts (write to a temporary file, sync, rename) |
-| `sdk.SignalContext()` | A context cancelled on SIGINT and SIGTERM |
-| `sdk.Serve(ctx, addr, handler)` | HTTP server with the `X-Rcplug` check, timeouts and graceful shutdown when `ctx` ends |
-| `sdk.CSRF(handler)` | Only the header check, for your own server |
-| `sdk.WriteJSON`, `sdk.WriteError`, `sdk.NewError` | JSON responses and errors as `{"error": "...", "code": "..."}` |
-| `sdk.LowPriority()` | Lowers all threads to nice 19 (already done when started by the host) |
-| `capi.New("")` | Client for the console API: `Status`, `Summary`, `Tree`, `Events`, `Set` |
+| `Name()` | `RCPLUG_NAME`, or `""` when run alone |
+| `ListenAddr(def)` | `127.0.0.1:$RCPLUG_PORT`, or `def` when run alone |
+| `PluginDir()` | `RCPLUG_PLUGIN_DIR`, else `.` |
+| `DataDir()` | `RCPLUG_DATA_DIR`, else the plugin directory |
+| `HostURL()` | `RCPLUG_HOST_URL`, else `http://127.0.0.1:8080` |
+| `StatePath(file)` | A path in the data directory; moves a file of that name from the plugin directory (older versions) there |
+| `LoadJSON(path, &v)` | Reads JSON; a missing file is no error |
+| `SaveJSON(path, v)` | Writes JSON atomically (temporary file, sync, rename) |
+| `WriteFileAtomic(path, data, perm)` | The same for any data |
+| `SignalContext()` | A context cancelled on SIGINT and SIGTERM |
+| `Serve(ctx, addr, h)` | HTTP server with the `X-Rcplug` check, a header timeout and graceful shutdown when `ctx` ends; running requests see their context cancelled |
+| `ServeListener(ctx, ln, h)` | The same on an existing listener |
+| `CSRF(h)` | Only the `X-Rcplug` check, for your own server |
+| `APIHeader` | `"X-Rcplug"` |
+| `WriteJSON(w, status, v)` | JSON response with `Cache-Control: no-store` |
+| `NewError(status, code, msg)`, `WriteError(w, err)` | Errors as `{"error": "…", "code": "…"}`; other errors become 500 `internal` |
+| `Error(w, status, msg)` | A plain error with the code `error` |
+| `LowPriority()` | Lowers all threads to nice 19 (the host has done that already) |
 
-[`examples/reclog/main.go`](../examples/reclog/main.go) is a complete plugin with all of
-these in about 150 lines.
+### Package `sdk/console`
 
-### Using the SDK outside this repository
+`capi.New(hostURL)` (`""` = `sdk.HostURL()`) returns a client for the console behind
+the host; set `Base` to talk to a console running alone (`http://127.0.0.1:8082/`) and
+`PIN` for writes.
 
-The module is called `rcplug` and is not fetched with `go get` (see
-[development.md](development.md#module-path)). Check out this repository next to your
-plugin and point your `go.mod` at it:
+| Method | Request |
+|---|---|
+| `Status(ctx)` | `GET api/status`: connection, control level, epoch, model |
+| `Summary(ctx)` | `GET api/summary` as `Summary` (strips, monitor, Bluetooth, recorder, pads) |
+| `Tree(ctx)` | `GET api/tree` as raw JSON |
+| `Events(ctx, fn)` | `GET api/events`: calls `fn` for every event until the stream ends |
+| `Set(ctx, epoch, path, name, value)` | `POST api/set` |
 
-```
-module example.com/myplugin
+Errors from the console are `*capi.Error` with `Status`, `Code` and `Message`.
 
-go 1.22
+### Package `sdk/release`
 
-require rcplug v0.0.0
+The signed release format (`release.json`) for plugin authors who publish their own
+releases: `Parse`, `Sign`, `Verify`, `Describe`, `GenerateKey`, `ParseVersion`,
+`Newer`. Most authors use the `rcplug-release` command instead, see
+[updates.md](updates.md#release-format).
 
-replace rcplug => ../rcplug
-```
+## Compatibility
 
-The SDK uses only the standard library, so this adds no other dependencies.
-
-## Building and installing
-
-The device is aarch64 Linux. For Go:
-
-```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o hello ./path/to/hello
-```
-
-Other languages need a static aarch64 build or must use what the device already has
-(bash as `sh`, GNU coreutils, BusyBox 1.35, Python 3.10, Perl, the JACK and ALSA
-tools, in firmware 1.7.x). The device has no package manager.
-
-Installing:
-
-1. Put the program and `plugin.json` into one directory, named like the plugin.
-2. Run `rcplug-wizard.sh --host <ip> --plugin <dir>` from your computer. It copies
-   the directory to `<root>/plugins/<name>/`, keeps the plugin's data, rescans and
-   restarts the plugin (through the dashboard API, or by restarting rcplug if the
-   dashboard cannot be reached from your computer).
-
-To try a plugin locally first, `make run-local EXTRA_PLUGINS=path/to/plugin` runs it in
-a local host next to the built-in plugins and the simulator.
-
-Plugins inside this repository: put the program in `cmd/<name>/` and the manifest in
-`plugins/<name>/plugin.json`. `make package` then builds and ships it with the host.
-The version in a built-in manifest must match the `VERSION` file (a test checks this).
+- `RCPLUG_VERSION` is the host's version. Before 1.0, minor versions may change the
+  interface; the [changelog](../CHANGELOG.md) says what changed.
+- Additions are compatible: a new manifest field shows as "unknown" on an older host,
+  which still loads the plugin and ignores the field.
+- `sdk/`, `sdk/console` and `sdk/release` are the public Go interface and are kept
+  compatible where possible. Everything under `internal/` may change at any time.
+- The console's HTTP API is versioned with rcplug; its error codes are stable.
 
 ## Checklist
 
-- [ ] `exec` works from the plugin directory, without a shell profile.
-- [ ] The program exits within 3 s of SIGINT.
-- [ ] State lives in `$RCPLUG_DATA_DIR`, not next to the program.
-- [ ] The web server listens on `127.0.0.1:$RCPLUG_PORT` and requires `X-Rcplug` on
-      state-changing requests.
-- [ ] All URLs in the UI are relative.
-- [ ] Nothing polls faster than necessary.
+- [ ] `exec` works from the plugin directory, without a shell profile and without
+      anything you installed by hand.
+- [ ] The program exits within 3 s of SIGINT; shell scripts trap it.
+- [ ] State lives in `$RCPLUG_DATA_DIR` and is written atomically.
+- [ ] The web server listens on `127.0.0.1:$RCPLUG_PORT` only.
+- [ ] State-changing requests require `X-Rcplug`; GET never changes anything.
+- [ ] All URLs in pages are relative.
+- [ ] Secrets come from `config/<name>.json`, never from a page, and are never logged
+      or put into diagnostics.
+- [ ] Nothing polls faster than needed; everything that grows is bounded.
+- [ ] Errors of the console (not running yet, desk offline, control off) are shown,
+      not fatal.
+- [ ] The description says what the plugin changes on the desk, if anything.
+- [ ] `version` follows `X.Y.Z`; with `update`, releases are signed.

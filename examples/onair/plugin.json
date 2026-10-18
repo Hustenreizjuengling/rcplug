@@ -1,0 +1,18 @@
+{
+  "$schema": "../../plugin.schema.json",
+  "name": "onair",
+  "title": "On air",
+  "description": "Example plugin: a big on-air clock for a tablet next to the desk, with the recording time and a time limit.",
+  "version": "0.1.0",
+  "exec": ["./onair", "--addr", "127.0.0.1:{{port}}"],
+  "httpProxy": "127.0.0.1:{{port}}",
+  "autostart": true,
+  "order": 55,
+  "icon": "⏱",
+  "translations": {
+    "de": {
+      "title": "On Air",
+      "description": "Beispiel-Plugin: eine große On-Air-Uhr für ein Tablet neben dem Pult, mit Aufnahmezeit und Zeitlimit."
+    }
+  }
+}

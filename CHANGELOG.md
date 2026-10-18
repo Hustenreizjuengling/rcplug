@@ -29,6 +29,12 @@ Sonar is no longer part of the device package; install it from rcplug-plugins.
 - `make update-test`: an update from 0.8.0 to 0.9.0 and the rollback of a 0.9.1 that
   cannot start, through the API against a fake GitHub; `DUO=<image>` runs it inside
   the stock firmware's userland.
+- Documentation for plugin authors: a guide that builds a complete plugin step by
+  step (docs/plugin-guide.md), a cookbook with tested recipes (docs/cookbook.md) and
+  a reference of the whole plugin interface (docs/plugin-api.md, rewritten). A
+  roadmap with plugin ideas (docs/roadmap.md).
+- Example plugin `onair`, the result of the guide: a big recording clock for a
+  tablet next to the desk, with Server-Sent Events, a setting and tests.
 - Plugin actions: plugins declare entry points (`actions` in plugin.json) that other
   UIs show; the console shows `channel` actions on every strip and in the channel
   dialog. Sonar uses it: "◉ Sonar" on a strip opens Sonar for that channel.
@@ -56,6 +62,9 @@ Sonar is no longer part of the device package; install it from rcplug-plugins.
   update removes it (see the README).
 
 ### Fixed
+- rcplugd registers its signal handlers before it starts any plugin. Started with
+  SIGINT ignored (as a background job of a shell is), it passed that on to the first
+  plugins, which then could not stop cleanly and were killed after 3 seconds.
 - The screen mirror's automatic mode reads the DRM buffer first. On the Duo the GUI
   draws through DRM, while `/dev/fb0` keeps the boot splash, which the old order
   (framebuffer first unless black) would have shown instead of the screen.

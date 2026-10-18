@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>On air · rcplug</title>
+<style>
+  :root{--bg:#0d1015;--panel:#151a21;--line:#2a333f;--fg:#e7edf3;--muted:#9aa8b6;--rec:#f85149;--pause:#e3a008}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,sans-serif}
+  body{display:flex;flex-direction:column}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vmin;text-align:center;padding:20px}
+  #state{font-size:7vmin;font-weight:700;letter-spacing:.08em;padding:.2em .8em;border-radius:.3em;border:.08em solid var(--line);color:var(--muted)}
+  #clock{font-size:24vmin;font-weight:600;font-variant-numeric:tabular-nums;line-height:1}
+  #show{font-size:4vmin;color:var(--muted);min-height:1.4em}
+  body.rec #state{color:#fff;background:var(--rec);border-color:var(--rec)}
+  body.pause #state{color:#1a1200;background:var(--pause);border-color:var(--pause)}
+  body.over #clock{color:var(--rec);animation:blink 1s steps(2) infinite}
+  @keyframes blink{50%{opacity:.35}}
+  footer{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;padding:10px;border-top:1px solid var(--line);color:var(--muted)}
+  input{font:inherit;width:5em;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+  button{font:inherit;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:5px 12px;cursor:pointer}
+  #msg{min-width:8em}
+</style>
+</head>
+<body>
+<main>
+  <div id="state"></div>
+  <div id="clock">0:00:00</div>
+  <div id="show"></div>
+</main>
+<footer>
+  <label for="limit" id="limitLabel"></label>
+  <input id="limit" type="number" min="0" max="1440" step="1">
+  <button type="button" id="save"></button>
+  <span id="msg"></span>
+  <button type="button" id="full"></button>
+</footer>
+<script>
+'use strict';
+// All URLs are relative, so the page works behind the host at
+// /plugins/onair/ and when the plugin's port is opened directly.
+const T = {
+  en: { live: 'ON AIR', pause: 'PAUSED', ready: 'READY', offline: 'DESK OFFLINE', unavailable: 'NO CONSOLE', lost: 'connection lost…',
+        limit: 'Time limit (minutes, 0 = none)', save: 'Save', saved: 'saved', full: 'Full screen', over: 'over the limit' },
+  de: { live: 'ON AIR', pause: 'PAUSE', ready: 'BEREIT', offline: 'PULT OFFLINE', unavailable: 'KEINE KONSOLE', lost: 'Verbindung verloren…',
+        limit: 'Zeitlimit (Minuten, 0 = keins)', save: 'Speichern', saved: 'gespeichert', full: 'Vollbild', over: 'über dem Limit' },
+};
+let lang = 'en';
+// The dashboard keeps the user's language here.
+try { lang = localStorage.getItem('rcplug-lang') || (navigator.language.startsWith('de') ? 'de' : 'en'); } catch (e) { /* ignore */ }
+const t = (k) => (T[lang] || T.en)[k];
+const $ = (s) => document.querySelector(s);
+document.documentElement.lang = lang;
+$('#limitLabel').textContent = t('limit');
+$('#save').textContent = t('save');
+$('#full').textContent = t('full');
+
+let view = null, at = 0; // the last view and when it arrived
+
+function fmt(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
+// Between two updates the page counts on by itself while recording.
+function draw() {
+  if (!view) return;
+  const ms = view.timeMs + (view.recording ? performance.now() - at : 0);
+  const over = view.limitMin > 0 && ms >= view.limitMin * 60000;
+  $('#clock').textContent = fmt(ms);
+  const state = view.desk !== 'live' ? view.desk : view.recording ? 'live' : view.paused ? 'pause' : 'ready';
+  $('#state').textContent = t(state);
+  document.body.className = (view.recording ? 'rec' : view.paused ? 'pause' : '') + (over ? ' over' : '');
+  $('#show').textContent = over ? `${view.show ? view.show + ' · ' : ''}${t('over')}` : view.show;
+}
+setInterval(draw, 250);
+
+const events = new EventSource('api/events');
+events.onmessage = (e) => {
+  view = JSON.parse(e.data);
+  at = performance.now();
+  if (document.activeElement !== $('#limit')) $('#limit').value = view.limitMin;
+  draw();
+};
+events.onerror = () => { $('#state').textContent = t('lost'); }; // EventSource reconnects by itself
+
+$('#save').addEventListener('click', async () => {
+  // State changes need the X-Rcplug header; the host and the plugin refuse them otherwise.
+  const r = await fetch('api/settings', {
+    method: 'POST',
+    headers: { 'X-Rcplug': '1', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ limitMin: Number($('#limit').value) || 0 }),
+  });
+  const d = await r.json();
+  $('#msg').textContent = r.ok ? t('saved') : d.error;
+  setTimeout(() => { $('#msg').textContent = ''; }, 2500);
+});
+
+$('#full').addEventListener('click', () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen().catch(() => {});
+});
+</script>
+</body>
+</html>

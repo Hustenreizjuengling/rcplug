@@ -142,8 +142,9 @@ Plugins only talk to the host through HTTP and environment variables. Sonar live
 [rcplug-plugins](https://github.com/Hustenreizjuengling/rcplug-plugins): it reads stereo audio from
 two JACK ports of the desk (bridged through an ALSA loopback, opt-in), with `arecord`,
 from a WAV file or a test generator, and serves its own radar page. The examples in
-`examples/` show a Go plugin using the console API and a shell plugin without a UI.
-See [plugin-api.md](plugin-api.md).
+`examples/` are an on-air clock (the result of [plugin-guide.md](plugin-guide.md)), a
+recording log, both in Go with the console API, and a shell plugin without a UI.
+The interface is described in [plugin-api.md](plugin-api.md).
 
 ## Design choices
 

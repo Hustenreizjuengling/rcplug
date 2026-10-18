@@ -13,7 +13,7 @@ switch on control in steps.
 More plugins, such as **Sonar** (which direction does a sound come from?), live in
 [rcplug-plugins](https://github.com/Hustenreizjuengling/rcplug-plugins). Writing your own takes a
 folder with a `plugin.json` and a program in any language; for Go there is an SDK in
-this repository. See [docs/plugin-api.md](docs/plugin-api.md).
+this repository. Start with the [plugin guide](docs/plugin-guide.md).
 
 ![The console's mixer view](docs/img/console-mixer.png)
 
@@ -124,7 +124,9 @@ More: [docs/safety.md](docs/safety.md).
 |---|---|
 | [Architecture](docs/architecture.md) | How the host, the plugins and the device fit together; the host's API |
 | [Configuration](docs/configuration.md) | All flags, environment variables and settings files |
-| [Writing plugins](docs/plugin-api.md) | Manifest, environment, lifecycle, Go SDK, examples |
+| [Developing plugins](docs/plugin-guide.md) | A complete plugin step by step, from the first page to signed updates |
+| [Plugin cookbook](docs/cookbook.md) | Recipes: follow the desk, mute, markers, pads, webhooks, audio, diagnostics, … |
+| [Plugin interface](docs/plugin-api.md) | The reference: manifest, process, environment, HTTP, dashboard, host API, SDK |
 | [Updates](docs/updates.md) | In-app updates: using them, how they are secured, publishing signed releases |
 | [Console API](docs/console-api.md) | Reading and controlling the desk over HTTP from your own code |
 | [Protocol](docs/protocol.md) | The desk's control port (JUCE ValueTree over TCP) |
@@ -132,6 +134,7 @@ More: [docs/safety.md](docs/safety.md).
 | [Device notes](docs/device-notes.md) | What the firmware has, what still needs a real device |
 | [Adding a model](docs/adding-a-model.md) | Capturing a device state and making a model controllable |
 | [Development](docs/development.md) | Building, testing, repository layout, the three repositories |
+| [Roadmap](docs/roadmap.md) | What comes next, and plugins worth building |
 
 ## Contributing
 

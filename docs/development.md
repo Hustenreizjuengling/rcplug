@@ -41,11 +41,15 @@ internal/desk/       connection to the desk, mirror, GUI guard, JSON encoding
 internal/console/    console API, write policy, PIN, settings, web UI (web/)
 internal/hw/         screen mirror, front-panel emulation
 internal/rcsim/      simulator and the Duo fixture
-sdk/                 public helpers for Go plugins; sdk/console is the console client
+cmd/rcplug-release/  signs and verifies releases (docs/updates.md)
+sdk/                 public helpers for Go plugins; sdk/console is the console client,
+                     sdk/release the signed release format
 plugins/<name>/      manifests of the built-in plugins (the console)
-examples/            example plugins (Go and sh)
+examples/            example plugins: onair (the guide's result), reclog, hello-sh
 installer/           device installer and init script (part of the device tarball)
 tools/webtest/       web UI tests
+tools/fakegithub/    a stand-in for GitHub's release API, for update tests
+tools/update-test.sh the in-app update end to end (make update-test)
 docs/                documentation
 ```
 

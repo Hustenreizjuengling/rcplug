@@ -13,8 +13,9 @@ lässt sich stufenweise zuschalten.
 Weitere Plugins wie **Sonar** (aus welcher Richtung kommt ein Geräusch?) liegen in
 [rcplug-plugins](https://github.com/Hustenreizjuengling/rcplug-plugins). Ein eigenes Plugin braucht
 nur einen Ordner mit `plugin.json` und einem Programm in beliebiger Sprache; für Go gibt
-es in diesem Repository ein SDK. Siehe [docs/plugin-api.md](docs/plugin-api.md)
-(Englisch).
+es in diesem Repository ein SDK. Einstieg: die [Plugin-Anleitung](docs/plugin-guide.md),
+dazu ein [Kochbuch](docs/cookbook.md) und die [Schnittstellen-Referenz](docs/plugin-api.md)
+(alle Englisch). Was als Nächstes kommt: [Roadmap](docs/roadmap.md).
 
 ![Mischpult-Ansicht der Konsole](docs/img/console-mixer.png)
 
