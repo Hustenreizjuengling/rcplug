@@ -387,14 +387,15 @@ func TestProcNetParsing(t *testing.T) {
 func TestBusyHolderNamesTheClientHoldingTheDesk(t *testing.T) {
 	f := filepath.Join(t.TempDir(), "tcp")
 	held := "  sl  local_address rem_address   st\n" +
-		"  10: 0100007F:0929 0100007F:B204 01 00000000:00000000 00:00000000 00000000     0        0 16434 1\n" +
-		"  11: 0100007F:B204 0100007F:0929 01 00000000:00000000 00:00000000 00000000     0        0 16439 1\n" +
-		"   6: 0100007F:0929 0100007F:B20C 08 00000000:00000001 00:00000000 00000000     0        0 14497 1\n"
+		"  10: 0100007F:0929 0100007F:B204 01 00000000:00000000 00:00000000 00000000     0        0 98765432108 1\n" +
+		"  11: 0100007F:B204 0100007F:0929 01 00000000:00000000 00:00000000 00000000     0        0 98765432109 1\n" +
+		"   6: 0100007F:0929 0100007F:B20C 08 00000000:00000001 00:00000000 00000000     0        0 98765432107 1\n"
 	_ = os.WriteFile(f, []byte(held), 0644)
 	old := procNetFiles
 	procNetFiles = []string{f}
 	defer func() { procNetFiles = old }()
-	if got := busyHolder(2345); got != "127.0.0.1:45572" { // no such inode here, so no process name
+	// Socket inodes are 32-bit, so no process owns that one: no process name.
+	if got := busyHolder(2345); got != "127.0.0.1:45572" {
 		t.Fatalf("busyHolder = %q", got)
 	}
 	_ = os.WriteFile(f, []byte(held+"   0: 0100007F:0929 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 100 1\n"), 0644)
