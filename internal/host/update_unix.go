@@ -8,14 +8,15 @@ import (
 	"syscall"
 )
 
-// installerScript runs a new device package's install.sh, records its exit
-// status and the time in the result file, and removes the unpacked package
-// and the then empty .update directory.
+// installerScript runs a new device package's install.sh, removes the
+// unpacked package and the then empty .update directory, and then records
+// the exit status and the time in the result file (last, so whoever waits
+// for the result finds everything done).
 // install.sh stops this rcplugd, replaces it and starts the new version (or
 // the previous one again if that fails).
 const installerScript = `sh "$1/install.sh"; rc=$?
-printf '%s %s\n' "$rc" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$3"
 rm -rf "$1"; rmdir "${1%/*}" 2>/dev/null
+printf '%s %s\n' "$rc" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$3"
 exit $rc`
 
 // spawnInstaller starts the installer in its own session, so it keeps

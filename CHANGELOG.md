@@ -15,6 +15,10 @@ may break compatibility).
   channel 1's Listen button (the console confirms them to the host). Kept as a
   PBKDF2-SHA256 hash in `config/dashboard-access.json`.
 
+### Fixed
+- The in-app installer records the update's result only after it removed the unpacked
+  package, so nothing is left to clean up once the result is there.
+
 ## 0.6.8 - 2026-10-18
 
 ### Added
