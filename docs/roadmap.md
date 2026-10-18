@@ -4,12 +4,12 @@ Where rcplug is going, and plugins that would be worth building. Nothing here is
 promise; priorities follow what users need and what the first tests on hardware
 show. Ideas and comments are welcome as issues.
 
-**Today (0.6.10):**
+**Today (0.6.11):**
 
 - **Host:** dashboard and plugin supervisor, signed in-app updates with rollback,
   diagnostics, plugin settings in the dashboard, update notices, an optional dashboard
-  password, an event bus for plugins, and the device's processes with their CPU and
-  memory.
+  password, an event bus for plugins, shared audio taps, and the device's processes
+  with their CPU and memory.
   - Updates download gently and show a progress bar.
 - **Console:** the whole desk in the browser, reading along on the real Duo.
   - Live meters from the mixer's memory.
@@ -46,19 +46,22 @@ show. Ideas and comments are welcome as issues.
    - the meaning of a few integer settings;
    - the CPU load of Sonar's JACK bridge.
 
-## Next: the core
+## Done: the core (0.6.8 – 0.6.11)
 
-The host's own features, in this order. They belong to rcplug itself, not to a plugin:
-every plugin builds on them.
+The host's own features, which every plugin builds on:
 
-| Topic | What | Why |
-|---|---|---|
-| **Update notices** | **Done in 0.6.8:** an opt-in daily check and a badge in the navigation; installing stays a click. | Users miss updates they never look for. |
-| **Dashboard access** | **Done in 0.6.9:** an optional password for the dashboard and all plugin pages, with sessions that survive updates and a reset at the device. | Today everyone on the network can use every page. |
-| **Event bus** | **Done in 0.6.10:** plugins publish and subscribe to events through the host; the console reports the desk (recording, markers, mutes, pads, show), the host its plugins and updates. | Plugins can work together without knowing each other's APIs. |
-| **Shared audio taps** | **Done in 0.6.11:** one JACK bridge run by the host: plugins ask for ports and get a stream, one opt-in, one place to watch it. Sonar uses it next. | Every audio plugin would otherwise add its own client to RØDE's graph. |
+| Topic | What |
+|---|---|
+| **Update notices** | *0.6.8:* an opt-in daily check and a badge in the navigation; installing stays a click. |
+| **Dashboard access** | *0.6.9:* an optional password for the dashboard and all plugin pages, with sessions that survive updates and a reset at the device. |
+| **Event bus** | *0.6.10:* plugins publish and subscribe to events through the host; the console reports the desk (recording, markers, mutes, pads, show), the host its plugins and updates. |
+| **Shared audio taps** | *0.6.11:* one JACK bridge run by the host: plugins ask for ports and get a stream, one opt-in, one place to watch it. Sonar 0.5.1 uses it. |
 
-## Later: the platform
+## Next: the platform
+
+In this order: uninstalling from the dashboard, plugin permissions, the plugin
+catalog, the Python SDK. The Pro II and flashing from macOS need hardware to test on.
+
 
 | Topic | What | Why |
 |---|---|---|
