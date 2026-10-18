@@ -26,7 +26,7 @@ func main() {
 	base := "http://" + *addr
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-		ok := func(s string) bool { return s != "" && s != "." && s != ".." && !strings.ContainsAny(s, `/\`) }
+		ok := func(s string) bool { return s != "." && filepath.IsLocal(s) && !strings.ContainsAny(s, `/\`) }
 		switch {
 		case len(parts) == 5 && parts[0] == "repos" && parts[3] == "releases" && parts[4] == "latest" && ok(parts[1]) && ok(parts[2]):
 			repoDir := filepath.Join(*dir, parts[1], parts[2])

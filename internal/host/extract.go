@@ -43,7 +43,7 @@ func extractTarGz(file, dst string, maxTotal int64) error {
 		if name == "." {
 			continue
 		}
-		if path.IsAbs(name) || name == ".." || strings.HasPrefix(name, "../") || strings.Contains(name, "\\") {
+		if !filepath.IsLocal(name) || strings.Contains(name, "\\") {
 			return fmt.Errorf("package entry %q leaves the package", h.Name)
 		}
 		target := filepath.Join(dst, filepath.FromSlash(name))
