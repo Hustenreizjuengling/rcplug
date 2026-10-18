@@ -18,3 +18,5 @@ func interruptGroup(cmd *exec.Cmd) error {
 
 // killGroup is a no-op without process groups.
 func killGroup(cmd *exec.Cmd) {}
+
+func killGroupIfIn(pgid int, dir string) bool { return false }

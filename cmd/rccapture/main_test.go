@@ -3,6 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
+	"io"
+	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -47,5 +51,35 @@ func TestCaptureTimesOutWithoutDesk(t *testing.T) {
 	defer cancel()
 	if _, err := capture(ctx, "127.0.0.1:1", false); err == nil {
 		t.Fatal("expected an error without a desk")
+	}
+}
+
+// On a desk that serves one client, the capture pushes the device's screen
+// off; with the guard on, that is reported.
+func TestCaptureReportsDisplacedClient(t *testing.T) {
+	if _, err := os.Stat("/proc/net/tcp"); err != nil {
+		t.Skip("the guard needs /proc/net/tcp")
+	}
+	sim, err := rcsim.NewDuo(rcsim.Options{Exclusive: true, Logf: func(string, ...interface{}) {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sim.Listen("127.0.0.1:0"); err != nil {
+		t.Fatal(err)
+	}
+	defer sim.Close()
+	gui, err := net.Dial("tcp", sim.Addr())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gui.Close()
+	go func() { _, _ = io.Copy(io.Discard, gui) }()
+	time.Sleep(200 * time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	tree, err := capture(ctx, sim.Addr(), true)
+	if !errors.Is(err, errDisplaced) || tree == nil {
+		t.Fatalf("capture = %v, %v; want the tree and errDisplaced", tree != nil, err)
 	}
 }

@@ -3,6 +3,8 @@ package host
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
+	"html"
 	"io/fs"
 	"net"
 	"net/http"
@@ -30,6 +32,9 @@ type Server struct {
 	AllowHosts []string
 	// Updates checks for and installs updates; nil switches the API off.
 	Updates *Updater
+	// Rescan reloads the plugins for POST /api/reload (and logs what it
+	// found); nil means Manager.Load.
+	Rescan func() ([]string, error)
 
 	mu      sync.Mutex
 	proxies map[string]*httputil.ReverseProxy // key: name@target
@@ -131,11 +136,14 @@ func (s *Server) checkHost(next http.Handler) http.Handler {
 // sameOrigin rejects state-changing requests that a browser sends on behalf
 // of a foreign web page (CSRF): if an Origin header is present it must match
 // the host the request was sent to. Requests without Origin (curl, scripts)
-// pass; plugins add their own header check on top (see sdk.CSRF).
+// pass; plugins add their own header check on top (see sdk.CSRF). WebSocket
+// handshakes count as state-changing: browsers cannot add X-Rcplug to them,
+// so the Origin is all that keeps a foreign page from opening one.
 func sameOrigin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet, http.MethodHead, http.MethodOptions:
+		switch {
+		case (r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions) &&
+			!strings.EqualFold(r.Header.Get("Upgrade"), "websocket"):
 		default:
 			if o := r.Header.Get("Origin"); o != "" {
 				u, err := url.Parse(o)
@@ -157,7 +165,7 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 
 func (s *Server) handlePlugins(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
-	invalid := append([]string(nil), s.invalid...)
+	invalid := append([]string{}, s.invalid...)
 	s.mu.Unlock()
 	writeJSON(w, map[string]interface{}{"plugins": s.m.List(), "invalid": invalid})
 }
@@ -297,12 +305,17 @@ func (s *Server) handleUpdateInstall(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
-	invalid, err := s.m.Load()
+	var invalid []string
+	var err error
+	if s.Rescan != nil {
+		invalid, err = s.Rescan()
+	} else if invalid, err = s.m.Load(); err == nil {
+		s.SetInvalid(invalid)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.SetInvalid(invalid)
 	writeJSON(w, map[string]interface{}{"ok": true, "invalid": invalid})
 }
 
@@ -329,21 +342,45 @@ func (s *Server) proxyFor(p *Plugin) (*httputil.ReverseProxy, error) {
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(u)
 			pr.SetXForwarded() // plugins see the browser's address and host
+			// Strip the prefix from the escaped path, so that an encoded
+			// slash (%2F) reaches the plugin as it was sent.
 			pr.Out.URL.Path = strings.TrimPrefix(pr.In.URL.Path, prefix)
+			pr.Out.URL.RawPath = strings.TrimPrefix(pr.In.URL.EscapedPath(), prefix)
 			if pr.Out.URL.Path == "" {
-				pr.Out.URL.Path = "/"
+				pr.Out.URL.Path, pr.Out.URL.RawPath = "/", ""
 			}
-			pr.Out.URL.RawPath = ""
+			if pr.Out.URL.RawPath == pr.Out.URL.Path {
+				pr.Out.URL.RawPath = ""
+			}
 			pr.Out.Header.Set("X-Forwarded-Prefix", prefix)
 		},
 		// Flush immediately so SSE/streaming responses from plugins work.
 		FlushInterval: -1,
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
-			http.Error(w, "plugin "+name+" is not reachable (starting or stopped)", http.StatusBadGateway)
+			unreachable(w, r, name)
 		},
 	}
 	s.proxies[key] = rp
 	return rp, nil
+}
+
+// unreachable answers for a plugin that does not answer (starting, stopped,
+// crashed). Browsers get a page in the dashboard's colours that tries again
+// every two seconds, so a plugin page opens by itself once the plugin is up.
+func unreachable(w http.ResponseWriter, r *http.Request, name string) {
+	if r.Method != http.MethodGet || !strings.Contains(r.Header.Get("Accept"), "text/html") {
+		http.Error(w, "plugin "+name+" is not reachable (starting or stopped)", http.StatusBadGateway)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusBadGateway)
+	fmt.Fprintf(w, `<!DOCTYPE html><meta charset="utf-8"><meta http-equiv="refresh" content="2">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>%[1]s</title>
+<body style="margin:0;background:#0d1015;color:#9aa8b6;font:14px/1.5 system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;text-align:center">
+<p><b style="color:#e7edf3">%[1]s</b> is not answering yet (starting, or stopped).<br>This page tries again every two seconds.<br><br>
+<span lang="de"><b style="color:#e7edf3">%[1]s</b> antwortet noch nicht (startet oder ist gestoppt).<br>Die Seite versucht es alle zwei Sekunden erneut.</span></p>`,
+		html.EscapeString(name))
 }
 
 // handleProxy reverse-proxies /plugins/<name>/... to the plugin's loopback
@@ -357,7 +394,11 @@ func (s *Server) handleProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	// /plugins/<name> → /plugins/<name>/ so relative asset URLs resolve.
 	if r.URL.Path == "/plugins/"+name {
-		http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
+		to := r.URL.Path + "/"
+		if r.URL.RawQuery != "" {
+			to += "?" + r.URL.RawQuery
+		}
+		http.Redirect(w, r, to, http.StatusMovedPermanently)
 		return
 	}
 	rp, err := s.proxyFor(p)

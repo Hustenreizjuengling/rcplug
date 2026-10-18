@@ -91,7 +91,7 @@ EOF
   wait_result "$prev"
   grep -qv '^0 ' "$SB/rcplug/logs/update.result" || fail "the failed update was not recorded"
   wait_version 0.9.0
-  grep -q 'going back to the previous one' "$SB/rcplug/logs/update.log" || fail "no rollback in the log"
+  grep -q 'going back to the previous version' "$SB/rcplug/logs/update.log" || fail "no rollback in the log"
   api /api/updates | grep -q '"last":{"ok":false' || fail "the dashboard does not show the failed update"
 
   echo "OK"

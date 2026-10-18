@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -135,25 +136,44 @@ func WriteDiagnostics(ctx context.Context, w io.Writer, in DiagnosticsInput) err
 	}
 	add("problems.txt", []byte(problems.String()))
 
-	// Plugin contributions.
+	// Plugin contributions, asked for all at once (each may take up to 5 s).
 	if in.Fetch != nil {
-		for _, p := range in.Plugins {
+		type answer struct {
+			ct   string
+			body []byte
+			err  error
+		}
+		answers := make([]*answer, len(in.Plugins))
+		var wg sync.WaitGroup
+		for i, p := range in.Plugins {
 			if !p.Running || !p.HasUI {
 				continue
 			}
-			fctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			ct, body, err := in.Fetch(fctx, p.Name)
-			cancel()
+			answers[i] = &answer{}
+			wg.Add(1)
+			go func(a *answer, name string) {
+				defer wg.Done()
+				fctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+				a.ct, a.body, a.err = in.Fetch(fctx, name)
+			}(answers[i], p.Name)
+		}
+		wg.Wait()
+		for i, p := range in.Plugins {
+			a := answers[i]
+			if a == nil {
+				continue
+			}
 			base := "plugins/" + p.Name + "/"
 			switch {
-			case err != nil:
-				add(base+"error.txt", []byte(err.Error()+"\n"))
-			case strings.HasPrefix(ct, "application/zip"):
-				copyZip(body, base, add)
-			case strings.HasPrefix(ct, "application/json"):
-				add(base+"diagnostics.json", body)
+			case a.err != nil:
+				add(base+"error.txt", []byte(a.err.Error()+"\n"))
+			case strings.HasPrefix(a.ct, "application/zip"):
+				copyZip(a.body, base, add)
+			case strings.HasPrefix(a.ct, "application/json"):
+				add(base+"diagnostics.json", a.body)
 			default:
-				add(base+"diagnostics.txt", body)
+				add(base+"diagnostics.txt", a.body)
 			}
 		}
 	}
@@ -181,15 +201,20 @@ attach it to a public issue.
 	return b.String()
 }
 
-// problemLine matches what is worth a look in a log.
-var problemLine = regexp.MustCompile(`(?i)panic:|fatal error|SIGSEGV|segmentation|exited \(|restarting in|out of memory|guard:|desync|refused|failed`)
+// problemLine matches what is worth a look in a log; policyRefusal is the
+// console refusing a write the user's control level does not allow, which is
+// the console doing its job.
+var (
+	problemLine   = regexp.MustCompile(`(?i)panic:|fatal error|SIGSEGV|segmentation|exited \(|restarting in|out of memory|guard:|desync|refused|failed`)
+	policyRefusal = regexp.MustCompile(`console: write .* refused: `)
+)
 
 func scanProblems(name string, log []byte) string {
 	var hits []string
 	sc := bufio.NewScanner(bytes.NewReader(log))
 	sc.Buffer(make([]byte, 64<<10), 1<<20)
 	for sc.Scan() {
-		if problemLine.MatchString(sc.Text()) {
+		if problemLine.MatchString(sc.Text()) && !policyRefusal.MatchString(sc.Text()) {
 			hits = append(hits, sc.Text())
 		}
 	}
@@ -250,15 +275,52 @@ func copyZip(body []byte, prefix string, add func(string, []byte)) {
 // secretKey matches setting names whose values are masked.
 var secretKey = regexp.MustCompile(`(?i)pin|pass|token|secret|key|psk`)
 
+// harmless matches setting values that cannot carry a secret: numbers and
+// durations, switches, loopback addresses and plain paths. Operator settings
+// may hold webhook URLs, tokens or names, and the bundle ends up in public
+// bug reports, so every other value is masked.
+var harmless = regexp.MustCompile(`(?i)^(-?[0-9]+(\.[0-9]+)?(ms|s|m|h|%|db|hz)?|true|false|on|off|yes|no|auto|always|never|` +
+	`((127\.[0-9]+\.[0-9]+\.[0-9]+|localhost|\[::1\])?:[0-9]{1,5})|127\.[0-9]+\.[0-9]+\.[0-9]+|/[A-Za-z0-9._/-]*)?$`)
+
+// shownSettings are rcplug's own host settings, which hold no secrets.
+var shownSettings = map[string]bool{"RCPLUG_ALLOW_HOST": true, "RCPLUG_UPDATES": true, "RCPLUG_UPDATE_REPO": true,
+	"RCPLUG_UPDATE_KEYS": true, "RCPLUG_MIXER": true, "RCPLUG_ROOT": true}
+
+// maskValue shows a harmless value as it is, a URL with its scheme and host
+// only, and anything else as ***.
+func maskValue(v string) string {
+	switch {
+	case harmless.MatchString(v):
+		return v
+	case urlLike.FindString(v) == v:
+		return maskURLs(v)
+	default:
+		return "***"
+	}
+}
+
 func maskUserConfig(raw []byte) []byte {
 	var c UserConfig
 	if json.Unmarshal(raw, &c) != nil {
 		return []byte("(unreadable, not included)\n")
 	}
 	c.Args = maskArgs(c.Args)
-	for k := range c.Env {
+	for i, a := range c.Args {
+		switch {
+		case a == "***":
+		case strings.HasPrefix(a, "-"):
+			if k, v, ok := strings.Cut(a, "="); ok && v != "***" {
+				c.Args[i] = k + "=" + maskValue(v)
+			}
+		default:
+			c.Args[i] = maskValue(a)
+		}
+	}
+	for k, v := range c.Env {
 		if secretKey.MatchString(k) {
 			c.Env[k] = "***"
+		} else if !shownSettings[k] {
+			c.Env[k] = maskValue(v)
 		}
 	}
 	out, _ := json.MarshalIndent(c, "", "  ")
@@ -268,8 +330,14 @@ func maskUserConfig(raw []byte) []byte {
 func maskEnvFile(raw []byte) []byte {
 	var b strings.Builder
 	for _, line := range strings.Split(string(raw), "\n") {
-		if k, _, ok := strings.Cut(line, "="); ok && secretKey.MatchString(k) {
+		k, v, ok := strings.Cut(line, "=")
+		k = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(k), "export "))
+		switch {
+		case !ok || strings.HasPrefix(k, "#"):
+		case secretKey.MatchString(k):
 			line = k + "=***"
+		case !shownSettings[k]:
+			line = k + "=" + maskValue(strings.Trim(strings.TrimSpace(v), `"'`))
 		}
 		b.WriteString(line + "\n")
 	}

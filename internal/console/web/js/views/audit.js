@@ -14,7 +14,7 @@ export const audit = {
       if (!w.length) { box.replaceChildren(h('p', { class: 'muted' }, t('audit.empty'))); return; }
       const tb = h('tbody');
       for (const e of w) {
-        tb.append(h('tr', null, h('td', null, e.time), h('td', { class: 'n' }, e.node + ' [' + (Array.isArray(e.path) ? e.path.join(',') : '') + ']'), h('td', { class: 'n' }, e.name), h('td', { class: 'v' }, e.value),
+        tb.append(h('tr', null, h('td', null, e.time), h('td', { class: 'n' }, e.node + (Array.isArray(e.path) && e.path.length ? ' [' + e.path.join(',') + ']' : '')), h('td', { class: 'n' }, e.name), h('td', { class: 'v' }, e.value),
           h('td', { class: 'small muted' }, e.remote), h('td', null, e.error ? h('span', { class: 'tag red', title: errorText({ code: e.code, message: e.error }) }, t('audit.refused')) : h('span', { class: 'tag on' }, 'ok'))));
       }
       box.replaceChildren(h('div', { class: 'tablewrap' }, h('table', { class: 'props' },

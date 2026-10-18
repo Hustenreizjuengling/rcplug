@@ -26,11 +26,12 @@ saved as `config/console.json`, then restart the console.
 | `--allow-host` | `RCPLUG_ALLOW_HOST` | | Extra host names accepted in the `Host` header, comma-separated; `.example.com` allows a suffix |
 | `--base-port` | | `9100` | First loopback port assigned to plugins |
 | `--low-prio` | | `true` | Run everything at nice 19 |
-| `--updates` | `RCPLUG_UPDATES` | on | Offer updates of rcplug and its plugins from signed GitHub releases; `RCPLUG_UPDATES=off` switches them off. See [updates.md](updates.md) |
+| `--updates` | `RCPLUG_UPDATES` | on | Offer updates of rcplug and its plugins from signed GitHub releases; `RCPLUG_UPDATES=off` (or `0`, `false`, `no`) switches them off. See [updates.md](updates.md) |
 | `--update-repo` | `RCPLUG_UPDATE_REPO` | `Hustenreizjuengling/rcplug` | GitHub repository (`owner/name`) of rcplug's own releases |
 | | `RCPLUG_UPDATE_API` | `https://api.github.com` | GitHub API base URL, for tests and mirrors. Plain `http://` only to the loopback interface |
 | | `RCPLUG_UPDATE_KEYS` | | Release keys trusted in addition to the built-in ones (base64 Ed25519, comma-separated), for forks and tests |
 | `--diagnostics FILE` | | | Write a diagnostics zip (`-` = stdout) and exit: from the running host if it answers at `--addr`, otherwise from the files on disk |
+| `--call "METHOD /path"` | | | Call the running host's API (e.g. `POST /api/reload`) and print the answer, then exit; for scripts on the device. Exit status 0 on success, 1 on an error answer, 2 on a bad call |
 | `--check` | | | Print whether the host answers and the problems found in the logs, then exit (used by the wizard) |
 | `--version` | | | Print the version |
 
@@ -44,8 +45,8 @@ saved as `config/console.json`, then restart the console.
 | `--read-only` | off | Refuse every write, whatever the control level |
 | `--allow-untested-model` | off | Offer control on models without a verified profile |
 | `--guard` | on | The GUI guard, see [safety.md](safety.md) |
-| `--boot-grace` | `75s` | Wait until the system has been up this long before connecting |
-| `--handshake` | `auto` | Session-open message: `auto` (only if the desk stays silent), `always`, `never` |
+| `--boot-grace` | `75s` | Wait until the system has been up this long before connecting (only with the guard on and a desk on this machine, where the device's own screen may still be connecting) |
+| `--handshake` | `auto` | Session-open message: `auto` (only if no full sync arrives within 3 s), `always`, `never` |
 | `--screen` | `auto` | Screen mirror source: `auto`, `fb`, `drm` or `off`. Users still have to switch it on. |
 | `--fb`, `--drm` | `/dev/fb0`, `/dev/dri/card0` | Devices for the screen mirror |
 | `--fps` | `2` | Maximum screen mirror frames per second |
@@ -72,7 +73,8 @@ private), `--timeout` (`30s`), `--guard` (on). See [adding-a-model.md](adding-a-
 
 `rcsim`: `--addr` (`127.0.0.1:2345`), `--fixture <file>`, `--meter-hz` (`15`),
 `--animate` (on), `--exclusive` (drop older clients like a single-client desk),
-`--wait-handshake`.
+`--wait-handshake` (withhold the full sync until the client sends the session-open
+handshake; meter changes flow before it, as they may on a real desk).
 
 ## Installing and setup tools
 

@@ -407,21 +407,21 @@ func (c *Client) session(ctx context.Context) error {
 	ownLocal := conn.LocalAddr().String()
 
 	fr := rcproto.NewFrameReader(conn)
-	var gotFrame atomic.Bool
+	var gotSync atomic.Bool
 	_ = conn.SetReadDeadline(time.Now().Add(c.cfg.SyncTimeout))
 	switch c.cfg.Handshake {
 	case "always":
 		c.sendHandshake(conn)
 	case "never":
-	default: // auto: only if the desk stays silent
+	default: // auto: only if no full sync arrives in time (other messages may)
 		done := make(chan struct{})
 		defer close(done)
 		go func() {
 			select {
 			case <-done:
 			case <-time.After(c.handshakeAfter()):
-				if !gotFrame.Load() {
-					c.cfg.Logf("desk: desk silent after connect, sending session-open handshake")
+				if !gotSync.Load() {
+					c.cfg.Logf("desk: no full sync after connect, sending session-open handshake")
 					c.sendHandshake(conn)
 				}
 			}
@@ -430,6 +430,8 @@ func (c *Client) session(ctx context.Context) error {
 
 	synced := false
 	conflict := make(chan struct{})
+	ended := make(chan struct{}) // the guard check is moot once the session is over
+	defer close(ended)
 	var checked atomic.Bool // the delayed guard check has run
 	for {
 		body, err := fr.Next()
@@ -453,7 +455,6 @@ func (c *Client) session(ctx context.Context) error {
 			}
 			return sessionErr("disconnected", "connection closed: %w", err)
 		}
-		gotFrame.Store(true)
 		c.mu.Lock()
 		c.stats.FramesIn++
 		c.stats.BytesIn += uint64(len(body)) + 8
@@ -501,6 +502,7 @@ func (c *Client) session(ctx context.Context) error {
 			continue
 		}
 		synced = true
+		gotSync.Store(true)
 		fr.Resyncs = 0 // junk before the first full sync is harmless
 		_ = conn.SetReadDeadline(time.Time{})
 		c.setState(StateLive, "", "")
@@ -508,7 +510,7 @@ func (c *Client) session(ctx context.Context) error {
 		c.mirror.View(func(s Snapshot) { nodes, props = s.Root.Count() })
 		c.cfg.Logf("desk: live, full sync %d bytes, %d nodes, %d properties", len(body), nodes, props)
 		if before != nil {
-			go c.guardCheck(time.After(c.cfg.GuardSettle), before, ownLocal, conn, conflict, &checked)
+			go c.guardCheck(time.After(c.cfg.GuardSettle), ended, before, ownLocal, conn, conflict, &checked)
 		}
 	}
 }
@@ -541,8 +543,12 @@ func (c *Client) sendHandshake(conn net.Conn) {
 
 // guardCheck runs once after the settle delay and kills the session if a
 // pre-existing client of the mixer lost its connection when we joined.
-func (c *Client) guardCheck(at <-chan time.Time, before map[string]bool, own string, conn net.Conn, conflict chan struct{}, checked *atomic.Bool) {
-	<-at
+func (c *Client) guardCheck(at <-chan time.Time, ended <-chan struct{}, before map[string]bool, own string, conn net.Conn, conflict chan struct{}, checked *atomic.Bool) {
+	select {
+	case <-at:
+	case <-ended:
+		return
+	}
 	lost := c.lostPeers(before, own)
 	checked.Store(true)
 	if len(lost) > 0 {
@@ -553,7 +559,8 @@ func (c *Client) guardCheck(at <-chan time.Time, before map[string]bool, own str
 }
 
 // lostPeers lists connections to the mixer that existed before we joined and
-// are gone now.
+// were dropped by the mixer since. A client that left by itself (it closed
+// its end first) was not displaced by us.
 func (c *Client) lostPeers(before map[string]bool, own string) []string {
 	after, err := serverPeers(c.Port())
 	if err != nil {
@@ -561,9 +568,14 @@ func (c *Client) lostPeers(before map[string]bool, own string) []string {
 	}
 	var lost []string
 	for peer := range before {
-		if peer != own && !after[peer] {
-			lost = append(lost, peer)
+		if peer == own || after[peer] {
+			continue
 		}
+		if closedBy(c.Port(), peer) == "client" {
+			c.cfg.Logf("desk: guard: client %s left by itself", peer)
+			continue
+		}
+		lost = append(lost, peer)
 	}
 	return lost
 }

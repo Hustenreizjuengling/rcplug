@@ -93,7 +93,8 @@ rcplug, its settings and your SSH key are gone afterwards.
 The dashboard's **System** page has a **Download diagnostics** button. The zip contains
 the logs of the host and all plugins (kept on the device across reboots), versions,
 the device's vitals, processes and kernel log, the console's connection statistics
-and a sanitized copy of the desk state. Passwords, PINs and keys are masked. Attach it
+and a sanitized copy of the desk state. Passwords, PINs, keys and the values of your
+settings are masked (URLs down to their host). Attach it
 to a bug report. If the web interface does not respond, the toolkit gets the same
 bundle over SSH.
 
@@ -106,7 +107,9 @@ bundle over SSH.
 - Some things are never allowed: firmware update, reset, power off, deleting or
   formatting storage, network and account settings. Passwords and keys never leave
   the device.
-- Physical faders are shown but cannot be moved remotely (they are not motorised).
+- Physical faders are not motorised: at *Control* they are shown but not moved
+  remotely. *Expert* allows it, but the real fader stays where it is and takes over
+  again as soon as someone touches it.
 - The **Log** tab lists the last changes the console sent to the device (kept in
   memory until the console restarts).
 - You can set a **PIN** for changes (System → Console). The PIN protects changes to the

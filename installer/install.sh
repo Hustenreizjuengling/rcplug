@@ -75,14 +75,53 @@ mkdir -p "$DIR/plugins" "$DIR/data" "$DIR/config"
 # Stage everything first, while the old version keeps running. The staging
 # directory is outside plugins/, so the host never sees half-copied plugins.
 STAGE="$DIR/.staging"
-STOPPED=0
+# What this install replaces is kept here until the new version runs, so any
+# failure can be undone. In-app updates rely on this: there may be nobody with
+# SSH at hand when one goes wrong.
+PREV="$DIR/.previous"
+STOPPED=0  # the running instance was stopped
+SWAPPED=0  # files of the installation were replaced; $PREV holds the old ones
+
+# restore_previous puts back the host, VERSION, rccapture, the init script and
+# the plugins this install replaced, and removes the plugins it added.
+# $PREV is kept if anything cannot be put back.
+restore_previous() {
+  [ -f "$PREV/rcplugd" ] || return 0 # a first installation has nothing to go back to
+  echo "rcplug: going back to the previous version" >&2
+  ok=1
+  for f in rcplugd VERSION rccapture; do
+    if [ -f "$PREV/$f" ]; then cp -p "$PREV/$f" "$DIR/$f" || ok=0; fi
+  done
+  if [ -f "$PREV/new-plugins" ]; then
+    while read -r name; do
+      if [ -n "$name" ]; then rm -rf "${DIR:?}/plugins/$name"; fi
+    done < "$PREV/new-plugins"
+  fi
+  for p in "$PREV"/plugins/*/; do
+    [ -d "$p" ] || continue
+    name="$(basename "$p")"
+    rm -rf "${DIR:?}/plugins/$name"
+    mv "$p" "$DIR/plugins/$name" || ok=0
+  done
+  if [ -f "$PREV/initd" ]; then cp -p "$PREV/initd" "$INITDIR/rcplug" || ok=0; fi
+  if [ $ok = 0 ]; then
+    echo "rcplug: not everything could be put back; the previous files are in $PREV" >&2
+    KEEP_PREV=1
+  fi
+}
+
+KEEP_PREV=0
 cleanup() {
   rc=$?
   rm -rf "$STAGE"
-  if [ $rc -ne 0 ] && [ $STOPPED = 1 ] && [ -x "$INITDIR/rcplug" ]; then
-    echo "rcplug: installation failed; starting the previous state again" >&2
-    "$INITDIR/rcplug" start >&2 || true
+  if [ $rc -ne 0 ]; then
+    if [ $SWAPPED = 1 ]; then restore_previous; fi
+    if [ $STOPPED = 1 ] && [ -x "$INITDIR/rcplug" ]; then
+      echo "rcplug: installation failed; starting the previous version again" >&2
+      "$INITDIR/rcplug" start >&2 || true
+    fi
   fi
+  if [ $KEEP_PREV = 0 ]; then rm -rf "$PREV"; fi
   exit $rc
 }
 trap cleanup EXIT
@@ -103,16 +142,15 @@ if [ -x "$INITDIR/rcplug" ]; then
   "$INITDIR/rcplug" stop >/dev/null 2>&1 || true
 fi
 
-# Keep what this install replaces, so a new version that does not start can
-# be swapped back (see the end). In-app updates rely on this: there may be
-# nobody with SSH at hand when one goes wrong.
-PREV="$DIR/.previous"
+# Keep what this install replaces (see restore_previous).
 rm -rf "$PREV"
-mkdir -p "$PREV/plugins"
-if [ -f "$DIR/rcplugd" ]; then cp -p "$DIR/rcplugd" "$PREV/rcplugd" || fail "saving the previous rcplugd failed"; fi
-if [ -f "$DIR/VERSION" ]; then cp -p "$DIR/VERSION" "$PREV/VERSION"; fi
-if [ -f "$INITDIR/rcplug" ]; then cp -p "$INITDIR/rcplug" "$PREV/initd"; fi
-: > "$PREV/new-plugins"
+mkdir -p "$PREV/plugins" || fail "creating $PREV failed"
+for f in rcplugd VERSION rccapture; do
+  if [ -f "$DIR/$f" ]; then cp -p "$DIR/$f" "$PREV/$f" || fail "saving the previous $f failed"; fi
+done
+if [ -f "$INITDIR/rcplug" ]; then cp -p "$INITDIR/rcplug" "$PREV/initd" || fail "saving the previous init script failed"; fi
+: > "$PREV/new-plugins" || fail "writing to $PREV failed"
+SWAPPED=1
 
 chmod 0755 "$STAGE/rcplugd"
 mv -f "$STAGE/rcplugd" "$DIR/rcplugd" || fail "installing rcplugd failed"
@@ -156,31 +194,23 @@ if [ -z "${RCPLUG_INITDIR:-}" ] && command -v update-rc.d >/dev/null 2>&1; then
   update-rc.d rcplug defaults >/dev/null 2>&1 || true
 fi
 
-STOPPED=0 # a failed start is not retried by the cleanup
 if ! "$INITDIR/rcplug" start; then
-  if [ -f "$PREV/rcplugd" ]; then
-    echo "rcplug: the new version did not start; going back to the previous one" >&2
-    "$INITDIR/rcplug" stop >/dev/null 2>&1 || true
-    cp -p "$PREV/rcplugd" "$DIR/rcplugd"
-    if [ -f "$PREV/VERSION" ]; then cp -p "$PREV/VERSION" "$DIR/VERSION"; fi
-    while read -r name; do
-      [ -n "$name" ] && rm -rf "${DIR:?}/plugins/$name"
-    done < "$PREV/new-plugins"
-    for p in "$PREV"/plugins/*/; do
-      [ -d "$p" ] || continue
-      name="$(basename "$p")"
-      rm -rf "${DIR:?}/plugins/$name"
-      mv "$p" "$DIR/plugins/$name"
-    done
-    if [ -f "$PREV/initd" ]; then cp -p "$PREV/initd" "$INITDIR/rcplug"; fi
-    "$INITDIR/rcplug" start >&2 || true
-  fi
+  # The cleanup puts the previous version back and starts it.
+  "$INITDIR/rcplug" stop >/dev/null 2>&1 || true
+  STOPPED=0
+  if [ -f "$PREV/rcplugd" ]; then STOPPED=1; fi
   fail "the new version did not start, see $DIR/logs/"
 fi
+SWAPPED=0
 rm -rf "$PREV"
 
-ip="$(ip -4 addr show 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | grep -v '^127\.' | head -1 || true)"
-[ -n "$ip" ] || ip="<device-ip>"
+# The address to open: the one rcplugd listens on, or this device's own.
+ip="${ADDR%:*}"
+case "$ip" in
+  ""|0.0.0.0)
+    ip="$(ip -4 addr show 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | grep -v '^127\.' | head -1 || true)"
+    [ -n "$ip" ] || ip="<device-ip>";;
+esac
 port="${ADDR##*:}"
 ver="$(cat "$SRC/VERSION" 2>/dev/null || echo '?')"
 echo ""

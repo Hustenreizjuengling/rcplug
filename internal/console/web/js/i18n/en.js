@@ -44,6 +44,13 @@ export default {
   'err.capture_failed': 'Could not read the picture: {msg}', 'err.busy': 'Too many open picture streams.',
   'err.panel_disabled': 'Front-panel emulation is not enabled.', 'err.expert_required': 'Expert level only.',
   'err.send_failed': 'Sending to the mixer failed.',
+  'err.bad_request': 'Invalid request: {msg}', 'err.no_node': 'This part of the device no longer exists – the view is reloading.',
+  'err.invalid_change': 'This change cannot be sent: {msg}', 'err.invalid_level': 'Unknown control level.',
+  'err.not_found': 'Unknown request: {msg}', 'err.internal': 'Internal error: {msg}',
+  'pc.listen': 'Listen {n}', 'pc.mute': 'Mute {n}', 'pc.settings': 'Settings {n}', 'pc.fader': 'Fader {n}', 'pc.pad': 'Pad {n} ({pos})',
+  'pc.pos1': 'top left', 'pc.pos2': 'middle left', 'pc.pos3': 'bottom left', 'pc.pos4': 'top right', 'pc.pos5': 'middle right', 'pc.pos6': 'bottom right',
+  'pc.pageLeft': 'Page ◀', 'pc.pageRight': 'Page ▶', 'pc.wheel': 'Wheel', 'pc.wheelPress': 'Push wheel',
+  'pc.groupChannel': 'Channel {n}', 'pc.groupNavigation': 'Navigation', 'pc.groupPads': 'SMART Pads',
 
   'fader.physical': 'Fader {n}', 'fader.virtual': 'Virtual {n}', 'output.n': 'Bus {n}',
   'fader.dragHint': 'drag or use the arrow keys', 'fader.physicalHint': 'physical fader – display only', 'meter.side': 'Level {side}',
@@ -57,7 +64,7 @@ export default {
   'mixer.device': 'Device & show', 'mixer.show': 'Show', 'mixer.quick': 'Quick access', 'mixer.channels': 'Channels', 'mixer.outputLevels': 'Output levels',
   'mixer.physical': 'physical', 'mixer.virtual': 'virtual', 'mixer.source': 'Source', 'mixer.noSource': '— none —', 'mixer.empty': 'empty',
   'mixer.sourceConfirm': 'Change the source of this channel?', 'mixer.faderHint': 'Fader position (0–{max}) and approximate level relative to the 0 dB detent',
-  'mixer.physicalNote': 'The physical faders are not motorised and can only be moved on the device (virtual faders can be controlled remotely).',
+  'mixer.physicalNote': 'The physical faders are not motorised: they are moved on the device, virtual faders remotely. The Expert level can set a physical fader too, but the real one takes over again as soon as it is touched.',
   'mixer.inputOf': 'Input: {src}', 'mixer.sendsOf': 'Sends of this source',
   'mixer.normalised': 'Values are the device’s normalised values (0–100 %). Their mapping to dB/Hz/ms is not documented by the manufacturer.',
 

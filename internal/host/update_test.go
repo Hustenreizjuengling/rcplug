@@ -351,6 +351,9 @@ func TestUpdateRefusesBadReleases(t *testing.T) {
 			if man, _ := LoadManifest(filepath.Join(root, "plugins", "echoer")); man == nil || man.Version != "0.1.0" {
 				t.Fatal("the old plugin was replaced")
 			}
+			if _, err := os.Stat(filepath.Join(root, ".update")); !os.IsNotExist(err) {
+				t.Fatal(".update left behind after a failed install")
+			}
 		})
 	}
 }

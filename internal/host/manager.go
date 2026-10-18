@@ -35,6 +35,7 @@ type Manager struct {
 	order    []string
 	nextPort int
 	saveMu   sync.Mutex
+	groups   *groupLog // process groups of running plugins (groups.go)
 }
 
 type persistState struct {
@@ -50,6 +51,7 @@ func NewManager(root string, basePort int) *Manager {
 		basePort:   basePort,
 		nextPort:   basePort,
 		plugins:    map[string]*Plugin{},
+		groups:     &groupLog{path: filepath.Join(root, ".groups")},
 		HostURL:    "http://127.0.0.1:8080",
 		Version:    "dev",
 	}
@@ -74,17 +76,14 @@ func (m *Manager) loadState() persistState {
 	return ps
 }
 
-func (m *Manager) saveState() {
+// saveState records the user's choice for one plugin. Plugins the user
+// never started or stopped stay unlisted, so their manifest's autostart
+// remains the default (a new version may change it).
+func (m *Manager) saveState(name string, enabled bool) {
 	m.saveMu.Lock()
 	defer m.saveMu.Unlock()
-	ps := m.loadState() // keep entries of plugins that are currently not installed
-	m.mu.Lock()
-	for name, p := range m.plugins {
-		p.mu.Lock()
-		ps.Enabled[name] = p.enabled
-		p.mu.Unlock()
-	}
-	m.mu.Unlock()
+	ps := m.loadState()
+	ps.Enabled[name] = enabled
 	_ = sdk.SaveJSON(m.stateFile(), ps)
 }
 
@@ -99,7 +98,7 @@ func (m *Manager) Load() ([]string, error) {
 		return nil, err
 	}
 	ps := m.loadState()
-	var invalid, added []string
+	invalid, added := []string{}, []string(nil)
 	found := map[string]*Manifest{}
 	for _, e := range entries {
 		if !e.IsDir() {
@@ -151,7 +150,11 @@ func (m *Manager) Load() ([]string, error) {
 
 	for _, p := range removed {
 		p.stop()
-		p.log.add("removed: plugin folder no longer exists")
+		if _, err := os.Stat(filepath.Join(p.dir, "plugin.json")); err == nil {
+			p.log.add("stopped: its plugin.json is invalid now (see the Plugins page)")
+		} else {
+			p.log.add("removed: plugin folder no longer exists")
+		}
 	}
 	for _, name := range added {
 		p := m.get(name)
@@ -222,7 +225,7 @@ func (m *Manager) Enable(name string) bool {
 		return false
 	}
 	p.start()
-	m.saveState()
+	m.saveState(name, true)
 	return true
 }
 
@@ -233,7 +236,7 @@ func (m *Manager) Disable(name string) bool {
 		return false
 	}
 	p.stop()
-	m.saveState()
+	m.saveState(name, false)
 	return true
 }
 
@@ -269,9 +272,9 @@ func (m *Manager) Manifests() []*Manifest {
 // unpacked, checked package) and starts it again if it was running. The
 // plugin's data and its operator config stay untouched. If the swap fails,
 // the previous code is put back.
-func (m *Manager) ReplacePlugin(name, staged string) error {
+func (m *Manager) ReplacePlugin(name, staged string) (started bool, err error) {
 	if !validName.MatchString(name) {
-		return fmt.Errorf("invalid plugin name %q", name)
+		return false, fmt.Errorf("invalid plugin name %q", name)
 	}
 	p := m.get(name)
 	wasEnabled := false
@@ -293,22 +296,22 @@ func (m *Manager) ReplacePlugin(name, staged string) error {
 	if _, err := os.Stat(target); err == nil {
 		if err := os.Rename(target, backup); err != nil {
 			restore()
-			return err
+			return false, err
 		}
 		hadOld = true
 	}
 	if err := os.MkdirAll(m.pluginsDir, 0o755); err != nil {
-		return err
+		return false, err
 	}
 	if err := os.Rename(staged, target); err != nil {
 		if hadOld {
 			_ = os.Rename(backup, target)
 		}
 		restore()
-		return err
+		return false, err
 	}
 	if _, err := m.Load(); err != nil {
-		return err
+		return false, err
 	}
 	if np := m.get(name); np != nil && wasEnabled {
 		np.start()
@@ -317,7 +320,7 @@ func (m *Manager) ReplacePlugin(name, staged string) error {
 		np.log.add("updated to version " + np.Manifest().Version)
 	}
 	_ = os.RemoveAll(backup)
-	return nil
+	return wasEnabled, nil
 }
 
 // Logs returns the recent log lines of a plugin.

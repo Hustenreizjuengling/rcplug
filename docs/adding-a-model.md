@@ -16,9 +16,13 @@ scp root@<device-ip>:/tmp/pro2-fw1.6.8.frame .
 
 Use your install directory if it differs; the wizard prints it.
 
-`rccapture` joins the control port **read-only**, with the same GUI guard as the
-console, takes the first full sync and exits. It never writes to the desk. It prints
-the detected model, the firmware version and the size of the tree.
+`rccapture` joins the control port **read-only**, takes the first full sync and exits.
+It never changes the desk's state; like the console, it sends the session-open
+handshake (a protocol message, not a write) only if no full sync arrives on its own.
+With the GUI guard on (the default) it stays two more seconds to see whether joining
+pushed another client off the desk; if so, it still writes the capture, prints a
+warning and exits with status 1. It prints the detected model, the firmware version
+and the size of the tree.
 
 The capture is **sanitized**: every string except structural ones (the firmware
 version, routing levels) becomes `"<redacted>"`, and binary values are zeroed. Numbers

@@ -14,7 +14,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug/internal/console"
@@ -50,6 +53,14 @@ func main() {
 		fmt.Println(version)
 		return
 	}
+	for _, f := range []struct{ name, value, allowed string }{
+		{"screen", *screenSrc, "auto fb drm off"}, {"handshake", *handshake, "auto always never"},
+	} {
+		if !strings.Contains(" "+f.allowed+" ", " "+f.value+" ") {
+			fmt.Fprintf(os.Stderr, "console: --%s must be one of %s, not %q\n", f.name, strings.ReplaceAll(f.allowed, " ", ", "), f.value)
+			os.Exit(2)
+		}
+	}
 	_ = sdk.LowPriority() // no-op when started by rcplugd (already nice 19)
 	log.SetFlags(log.LstdFlags)
 	ctx, stop := sdk.SignalContext()
@@ -77,6 +88,8 @@ func main() {
 	dataDir := os.Getenv("RCPLUG_DATA_DIR")
 	if dataDir == "" {
 		log.Printf("console: RCPLUG_DATA_DIR not set, settings and PIN are kept in memory only")
+	} else if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		log.Fatalf("console: data directory: %v", err)
 	}
 	opts := console.Options{
 		Client: client, DataDir: dataDir, AllowUntested: *untested, LegacyPIN: *legacyPIN, Version: version,
@@ -90,7 +103,11 @@ func main() {
 	go c.Run(ctx)
 
 	log.Printf("console %s on %s, desk %s (guard=%v read-only=%v panel=%v)", version, *addr, *deskAddr, *guard, *readOnly, *panel)
-	if err := sdk.Serve(ctx, *addr, c.Handler()); err != nil {
+	h := c.Handler()
+	if sdk.Name() == "" {
+		h = localHostsOnly(h) // run alone, without rcplugd's checks in front
+	}
+	if err := sdk.Serve(ctx, *addr, h); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -100,4 +117,23 @@ func envOr(k, d string) string {
 		return v
 	}
 	return d
+}
+
+// localHostsOnly answers only requests addressed to an IP address or
+// localhost, as rcplugd does for everything behind it. Run alone (during
+// development), the console would otherwise be reachable from any web page
+// through DNS rebinding.
+func localHostsOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+		host = strings.Trim(host, "[]")
+		if host != "localhost" && net.ParseIP(host) == nil {
+			http.Error(w, "unknown host name "+r.Host+"; open the console by IP address", http.StatusMisdirectedRequest)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

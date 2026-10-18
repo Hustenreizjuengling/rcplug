@@ -102,7 +102,8 @@ Auf der Seite **System** im Dashboard gibt es den Knopf **Diagnose herunterladen
 ZIP enthält die Logs des Hosts und aller Plugins (auf dem Gerät dauerhaft gespeichert,
 auch über Neustarts hinweg), Versionen, Gerätewerte, Prozesse und Kernel-Log, die
 Verbindungsstatistik der Konsole und eine bereinigte Kopie des Pult-Zustands.
-Passwörter, PINs und Schlüssel sind maskiert. Häng es an einen Fehlerbericht.
+Passwörter, PINs, Schlüssel und die Werte deiner Einstellungen sind maskiert (URLs bis auf
+den Host). Häng es an einen Fehlerbericht.
 Antwortet die Weboberfläche nicht mehr, holt das Toolkit dasselbe Paket per SSH.
 
 ## Die Konsole bedienen
@@ -114,8 +115,9 @@ Antwortet die Weboberfläche nicht mehr, holt das Toolkit dasselbe Paket per SSH
 - Manches ist nie erlaubt: Firmware-Update, Zurücksetzen, Ausschalten, Speicher löschen
   oder formatieren, Netzwerk- und Kontoeinstellungen. Passwörter und Schlüssel verlassen
   das Gerät nie.
-- Physische Fader werden angezeigt, lassen sich aber nicht fernbewegen (sie sind nicht
-  motorisiert).
+- Physische Fader sind nicht motorisiert: Auf *Steuern* werden sie angezeigt, aber
+  nicht fernbewegt. *Experte* erlaubt es, doch der echte Fader bleibt, wo er ist, und
+  übernimmt wieder, sobald ihn jemand anfasst.
 - Der Reiter **Protokoll** listet die letzten Änderungen, die die Konsole ans Gerät
   geschickt hat (im Speicher, bis die Konsole neu startet).
 - Für Änderungen lässt sich eine **PIN** setzen (System → Konsole). Sie schützt nur

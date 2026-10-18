@@ -75,7 +75,11 @@ export function renderHeader() {
   const pill = $('#conn');
   const live = liveState.open && conn && conn.state === 'live';
   pill.className = 'conn ' + (!liveState.open ? 'bad' : !conn ? '' : live ? 'live' : conn.state === 'conflict' ? 'bad' : 'warn');
-  $('.txt', pill).textContent = !liveState.open ? t('header.offline') : !conn ? '…' : live ? t('header.live', { n: (conn.changesPerSecond || 0).toFixed(0) }) : connText(conn);
+  // The banner explains a conflict at length; the pill stays short.
+  $('.txt', pill).textContent = !liveState.open ? t('header.offline') : !conn ? '…' : live ? t('header.live', { n: (conn.changesPerSecond || 0).toFixed(0) })
+    : conn.state === 'conflict' ? t('code.guard_conflict') : connText(conn);
+  // Without a live connection the meters would freeze at their last levels.
+  document.body.classList.toggle('notlive', !live);
   $$('button', pill).forEach((b) => b.remove());
   if (conn && (conn.state === 'conflict' || conn.state === 'backoff')) pill.append(h('button', { class: 'btn small', type: 'button', onclick: reconnectNow }, t('conn.reconnect')));
   if (store.loaded) {

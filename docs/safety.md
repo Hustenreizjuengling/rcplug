@@ -45,7 +45,7 @@ recommended.
 
 | Level | Allows |
 |---|---|
-| **Read only** (default) | Nothing. |
+| **Read only** (default) | No change to the desk. The console's own switches stay available: the screen mirror and reconnecting (both protected by the PIN, if one is set). |
 | **Control** | A curated list of everyday controls, each with a type and a valid range (see below). |
 | **Expert** | Every existing property that is not on the deny list, with type checks and the node's own limits (such as a fader's min and max) but without the curated ranges. |
 
@@ -73,7 +73,11 @@ At every level, including *Expert*:
 - every property whose name contains `path` (the desk runs as root, so a writable path
   could point anywhere);
 - every secret (see below);
-- meter readings and other values only the desk writes.
+- meter readings and other values only the desk writes (recorder state and time,
+  playback and pad progress, auto-mute states, a wireless microphone's serial
+  number);
+- the limits a node checks values against (a fader's or pot's minimum and maximum),
+  since writing them would lift the limits.
 
 The list is `denied` in [`internal/console/policy.go`](../internal/console/policy.go).
 
@@ -105,10 +109,17 @@ was loaded. It can therefore never hit the wrong node.
 
 ### Audit log
 
-Every write, allowed or refused, is listed on the console's *Log* tab with time, node,
-property, value and client address. The log keeps the last 300 writes in memory and
+Every write to the desk, allowed or refused, and every change to the console itself
+(control level, screen mirror, PIN, reconnect, front panel) is listed on the console's
+*Log* tab with time, node, property, value and client address; PINs are never
+recorded. Requests refused before they reach the console's checks (a missing
+`X-Rcplug` header) are not listed. The log keeps the last 300 entries in memory and
 starts empty when the console restarts; the plugin log on the dashboard has a line for
 each write as well.
+
+The PIN lockout (five wrong attempts within five minutes) applies to everyone: someone
+on the network who tries wrong PINs locks everybody out for a minute. That is the price
+of having no user accounts.
 
 ## Secrets
 
@@ -123,6 +134,13 @@ API sends `"••••••"` instead. The list is
 Captures made with `rccapture` replace every string except structural ones, see
 [adding-a-model.md](adding-a-model.md).
 
+The **diagnostics bundle** is meant to be attached to bug reports, also public ones.
+It masks the values of the operator settings (`config/*.json`, `config/rcplugd.env`)
+unless they are plainly harmless (numbers, durations, switches, loopback addresses,
+paths) or one of rcplug's own host settings, shows URLs only with their scheme and
+host, everywhere including the process list, and leaves out secret-looking command-line
+arguments. Review a bundle before you post it anyway.
+
 ## Web security
 
 - **No cross-site control.** Every state-changing request needs the header
@@ -136,6 +154,10 @@ Captures made with `rccapture` replace every string except structural ones, see
   [configuration.md](configuration.md)). A foreign domain that resolves to the device
   gets 421.
 - **Plugins listen on loopback only**; the host is the single entry point.
+- **WebSockets.** Browsers cannot add `X-Rcplug` to a WebSocket handshake, so the host
+  refuses handshakes whose `Origin` belongs to another site.
+- **The console run on its own** (during development, without rcplugd in front)
+  answers only requests addressed to an IP address or `localhost`.
 - **PIN.** An optional PIN protects every change in the console, including the control
   level and reconnecting. It is stored in the console's data directory with mode 0600,
   compared in constant time, and five wrong attempts within five minutes lock it for

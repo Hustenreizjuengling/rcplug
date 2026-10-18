@@ -40,7 +40,7 @@ Responses are JSON, except the screen images. Errors look like `{"error": "human
 | `connection.state` | `waiting` (boot grace), `connecting`, `syncing`, `live`, `backoff` (retrying), `conflict` (the GUI guard stepped back, see [safety.md](safety.md)), `stopped` |
 | `control` | The current control level: `off`, `basic` or `expert` |
 | `controlLimit` | Why control is limited even if a level is set: `read_only` (started with `--read-only`), `untested_model` (no verified profile), or empty |
-| `epoch` | Changes whenever the tree's structure changes. Writes must carry it. |
+| `epoch` | Changes whenever the tree's structure changes (it starts at a random value; the examples here use 1). Writes must carry it. |
 | `seq` | Increases with every change the console has applied |
 | `stale` | `true` while the console is disconnected and shows the last known state |
 | `supported` | Whether the model has a verified profile that allows control |
@@ -102,7 +102,9 @@ parent node, the family's members are its children `first` … `first+count-1`. 
 instead of hard-coding indices; firmware versions may reorder the tree.
 
 `meta.control.writable` lists, per node type, the properties writable at the current
-level. It is empty when control is off.
+level. It is empty when control is off. Some nodes of a listed type still refuse values
+at *Control*: `FADER.faderLevel` is listed for the virtual faders, and a physical one
+answers `out_of_range` (they are not motorised; *Expert* allows it).
 
 A **path** is the list of child indices from the root, e.g. `[28]` for the first
 `CHANNEL` above. Paths are only valid for the epoch they were read in.
@@ -127,7 +129,8 @@ time.
 | Request | Content |
 |---|---|
 | `GET api/clients` | `{"port", "clients": [...]}`: connections to the desk's control port with the process behind each (`pid`, `comm`), e.g. the device's GUI and the console |
-| `GET api/audit` | `{"writes": [...]}`: the last writes with time, node type, path, property, value, client address and, for refused writes, the error code |
+| `GET api/audit` | `{"writes": [...]}`: the last 300 writes and changes to the console itself (node `console`: control level, screen mirror, PIN without its value, reconnect, panel), with time, node type, path, property, value, client address and, for refused ones, the error code |
+| `GET api/diagnostics` | A zip with the console's connection statistics, status, clients, audit log, summary, layout and a sanitized copy of the tree; the host adds it to its diagnostics bundle |
 | `GET api/hw` | Screen mirror and front-panel status |
 | `GET api/screen.jpg`, `api/screen.png`, `api/screen.mjpg` | The device's screen, if the user switched the mirror on |
 
@@ -238,7 +241,9 @@ if errors.As(err, &apiErr) && apiErr.Code == "control_off" {
 | `stale_epoch` | 409 | The tree changed since you read the path. Reload and retry. |
 | `pin_locked` | 429 | Too many wrong PINs; wait a minute |
 | `rate_limited` | 429 | Try again in a few seconds |
-| `not_synced` | 503 | The console has no state yet |
+| `not_synced` | 503 | The console has no state yet (reads; writes before the first sync answer `offline`) |
+| `not_found` | 404 | No such endpoint, or the wrong method for it |
+| `internal` | 500 | An unexpected error, for example the data directory cannot be written |
 | `offline` | 503 | The console is not connected to the desk |
 | `send_failed` | 503 | The connection broke while sending |
 | `busy`, `too_many_clients`, `capture_failed` | 503 | Limits of the screen mirror or the event stream |

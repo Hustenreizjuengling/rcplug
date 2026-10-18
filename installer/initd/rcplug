@@ -56,7 +56,7 @@ do_start() {
     -x /bin/sh -- -c "exec \"$BIN\" --root \"$RCPLUG_DIR\" --addr \"$RCPLUG_ADDR\" >>\"$LOG\" 2>&1" || return 1
   # Report a host that exits right away (e.g. the port is taken).
   sleep 1
-  running || { echo "rcplug: failed to start, see $LOG" >&2; return 1; }
+  running || { echo "rcplug: failed to start, see $RCPLUG_DIR/logs/rcplugd.log (and $LOG)" >&2; return 1; }
 }
 
 do_stop() {

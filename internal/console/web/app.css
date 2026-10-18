@@ -142,7 +142,8 @@ select:disabled,input[type=text]:disabled,input[type=number]:disabled{opacity:1;
 .fader.can .cap{background:linear-gradient(180deg,#f3f7fa,#c3ccd5);border-color:var(--accent)}
 .fader:focus-visible .cap{outline:2px solid var(--blue)}
 .strip .db{text-align:center;font-family:var(--mono);font-size:12px}
-.strip .btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.strip .btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:6px}
+body.notlive .meter .lv,body.notlive .meter .pk,body.notlive .hbar i{visibility:hidden}
 .strip .btns .tog{justify-content:center;padding:4px 6px;font-size:11px;gap:5px}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
 .actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}

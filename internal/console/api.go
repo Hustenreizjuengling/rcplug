@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug/internal/desk"
@@ -40,11 +41,18 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/reconnect", c.withPIN(c.handleReconnect))
 	mux.HandleFunc("POST /api/panel", c.withPIN(c.handlePanel))
 	mux.HandleFunc("POST /api/pin", c.handlePIN) // verifies the current PIN itself
+	// Everything else under api/ is an error in the API's own format.
+	notFound := func(w http.ResponseWriter, r *http.Request) {
+		sdk.WriteError(w, sdk.NewError(http.StatusNotFound, "not_found", "no such API endpoint (or wrong method): "+r.Method+" "+r.URL.Path))
+	}
+	mux.HandleFunc("GET /api/", notFound)
+	mux.HandleFunc("POST /api/", notFound)
 }
 
 func (c *Console) withPIN(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := c.pin.check(r); err != nil {
+			c.auditAction(r, strings.TrimPrefix(r.URL.Path, "/api/"), "", err)
 			sdk.WriteError(w, err)
 			return
 		}
@@ -250,6 +258,15 @@ func (c *Console) write(remote string, epoch uint64, path []int, name string, va
 	if path == nil {
 		path = []int{} // the audit log always has a path
 	}
+	if nodeType == "?" { // refused before the desk was asked (read-only, untested model)
+		c.mirror.View(func(s desk.Snapshot) {
+			if s.Root != nil {
+				if n := s.Root.At(path); n != nil {
+					nodeType = n.Type
+				}
+			}
+		})
+	}
 	e := AuditEntry{Time: time.Now().Format("15:04:05"), Node: nodeType, Path: path, Name: name, Remote: remote}
 	if ch != nil {
 		e.Value = ch.Value.String()
@@ -265,13 +282,31 @@ func (c *Console) write(remote string, epoch uint64, path []int, name string, va
 	} else {
 		c.opts.Logf("console: write %s%v.%s=%s (from %s)", nodeType, path, name, e.Value, remote)
 	}
+	c.appendAudit(e)
+	return ch, err
+}
+
+func (c *Console) appendAudit(e AuditEntry) {
 	c.mu.Lock()
 	c.audit = append(c.audit, e)
 	if len(c.audit) > 300 {
 		c.audit = c.audit[len(c.audit)-300:]
 	}
 	c.mu.Unlock()
-	return ch, err
+}
+
+// auditAction records a change to the console itself (control level, screen
+// mirror, PIN, reconnect, front panel), allowed or refused, like a write.
+// value never holds a PIN.
+func (c *Console) auditAction(r *http.Request, name, value string, err error) {
+	e := AuditEntry{Time: time.Now().Format("15:04:05"), Node: "console", Path: []int{}, Name: name, Value: value, Remote: remoteOf(r)}
+	if err != nil {
+		e.Error = err.Error()
+		if ae, ok := err.(*sdk.APIError); ok {
+			e.Code = ae.Code
+		}
+	}
+	c.appendAudit(e)
 }
 
 func (c *Console) handleSet(w http.ResponseWriter, r *http.Request) {
@@ -455,16 +490,21 @@ func (c *Console) handleControl(w http.ResponseWriter, r *http.Request) {
 	}
 	lv, err := ParseLevel(req.Level)
 	if err != nil {
+		c.auditAction(r, "control", req.Level, err)
 		sdk.WriteError(w, err)
 		return
 	}
 	if lv != LevelOff {
+		var refused error
 		switch _, limit := c.Level(); limit {
 		case "read_only":
-			sdk.WriteError(w, desk.ErrReadOnly)
-			return
+			refused = desk.ErrReadOnly
 		case "untested_model":
-			sdk.WriteError(w, errUntestedModel)
+			refused = errUntestedModel
+		}
+		if refused != nil {
+			c.auditAction(r, "control", lv.String(), refused)
+			sdk.WriteError(w, refused)
 			return
 		}
 	}
@@ -473,6 +513,7 @@ func (c *Console) handleControl(w http.ResponseWriter, r *http.Request) {
 	c.saveSettingsLocked()
 	c.mu.Unlock()
 	c.opts.Logf("console: control level set to %s by %s", lv, remoteOf(r))
+	c.auditAction(r, "control", lv.String(), nil)
 	c.notifyControl()
 	sdk.WriteJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "control": lv.String()})
 }
@@ -490,7 +531,9 @@ func (c *Console) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Screen != nil {
 		if *req.Screen && c.opts.Screen == nil {
-			sdk.WriteError(w, sdk.NewError(http.StatusConflict, "screen_unavailable", "the screen mirror is disabled (--screen off)"))
+			err := sdk.NewError(http.StatusConflict, "screen_unavailable", "the screen mirror is disabled (--screen off)")
+			c.auditAction(r, "screen", "true", err)
+			sdk.WriteError(w, err)
 			return
 		}
 		c.mu.Lock()
@@ -498,6 +541,7 @@ func (c *Console) handleSettings(w http.ResponseWriter, r *http.Request) {
 		c.saveSettingsLocked()
 		c.mu.Unlock()
 		c.opts.Logf("console: screen mirror %v by %s", *req.Screen, remoteOf(r))
+		c.auditAction(r, "screen", strconv.FormatBool(*req.Screen), nil)
 	}
 	c.notifyControl()
 	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
@@ -509,11 +553,20 @@ func (c *Console) handlePIN(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	what := "set"
+	switch {
+	case req.New == "":
+		what = "removed"
+	case req.Current != "":
+		what = "changed"
+	}
 	if err := c.pin.change(req.Current, req.New); err != nil {
+		c.auditAction(r, "pin", what, err)
 		sdk.WriteError(w, err)
 		return
 	}
-	c.opts.Logf("console: PIN %s by %s", map[bool]string{true: "set", false: "removed"}[req.New != ""], remoteOf(r))
+	c.opts.Logf("console: PIN %s by %s", what, remoteOf(r))
+	c.auditAction(r, "pin", what, nil)
 	c.notifyControl()
 	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
@@ -526,13 +579,16 @@ func (c *Console) handleReconnect(w http.ResponseWriter, r *http.Request) {
 	wait := 10*time.Second - time.Since(c.lastReconnect)
 	if wait > 0 {
 		c.mu.Unlock()
-		sdk.WriteError(w, sdk.NewError(http.StatusTooManyRequests, "rate_limited",
-			"reconnect is limited to once per 10 s; try again in "+strconv.Itoa(int(wait.Seconds())+1)+" s"))
+		err := sdk.NewError(http.StatusTooManyRequests, "rate_limited",
+			"reconnect is limited to once per 10 s; try again in "+strconv.Itoa(int(wait.Seconds())+1)+" s")
+		c.auditAction(r, "reconnect", "", err)
+		sdk.WriteError(w, err)
 		return
 	}
 	c.lastReconnect = time.Now()
 	c.mu.Unlock()
 	c.opts.Logf("console: reconnect requested by %s", remoteOf(r))
+	c.auditAction(r, "reconnect", "", nil)
 	c.client.Reconnect()
 	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
@@ -625,18 +681,26 @@ func (c *Console) handleMJPEG(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
 		return
 	}
+	// The first frame before the headers, so a screen that cannot be read
+	// gets an error answer instead of an empty stream.
+	b, err := s.JPEG()
+	if err != nil {
+		sdk.WriteError(w, sdk.NewError(http.StatusServiceUnavailable, "capture_failed", err.Error()))
+		return
+	}
 	const boundary = "rcplugframe"
 	w.Header().Set("Content-Type", "multipart/x-mixed-replace; boundary="+boundary)
 	w.Header().Set("Cache-Control", "no-store")
 	t := time.NewTicker(s.Interval())
 	defer t.Stop()
-	for {
-		if _, err := c.screen(); err != nil {
-			return // turned off meanwhile
-		}
-		b, err := s.JPEG()
-		if err != nil {
-			return
+	for first := true; ; first = false {
+		if !first {
+			if _, err := c.screen(); err != nil {
+				return // turned off meanwhile
+			}
+			if b, err = s.JPEG(); err != nil {
+				return
+			}
 		}
 		if _, err := fmt.Fprintf(w, "--%s\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n", boundary, len(b)); err != nil {
 			return
@@ -669,9 +733,11 @@ func (c *Console) handlePanel(w http.ResponseWriter, r *http.Request) {
 	}
 	val, _ := req.Value.(float64)
 	if err := c.opts.Panel.Do(req.Control, int(val)); err != nil {
+		c.auditAction(r, "panel "+req.Control, fmt.Sprint(val), errBadRequest(err.Error()))
 		sdk.WriteError(w, errBadRequest(err.Error()))
 		return
 	}
 	c.opts.Logf("console: panel %s value=%v (from %s)", req.Control, val, remoteOf(r))
+	c.auditAction(r, "panel "+req.Control, fmt.Sprint(val), nil)
 	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

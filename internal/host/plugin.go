@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -129,12 +130,25 @@ func validateActions(m *Manifest) error {
 			return fmt.Errorf("action %q: invalid context %q", a.ID, a.Context)
 		case strings.TrimSpace(a.Title) == "":
 			return fmt.Errorf("action %q: title is empty", a.ID)
-		case schemeLike.MatchString(a.Path) || strings.HasPrefix(a.Path, "/") || strings.HasPrefix(a.Path, "\\") || strings.ContainsAny(a.Path, "\r\n"):
+		case schemeLike.MatchString(a.Path) || strings.HasPrefix(a.Path, "/") || strings.HasPrefix(a.Path, "\\") || strings.ContainsAny(a.Path, "\r\n") || leavesDir(a.Path):
 			return fmt.Errorf("action %q: path %q must be relative to the plugin's UI", a.ID, a.Path)
 		}
 		seen[a.ID] = true
 	}
 	return nil
+}
+
+// leavesDir reports whether a relative URL path has a "." or ".." segment,
+// also percent-encoded (browsers resolve %2e%2e like ..), or a backslash.
+func leavesDir(p string) bool {
+	p, _, _ = strings.Cut(p, "?")
+	p, _, _ = strings.Cut(p, "#")
+	for _, seg := range strings.Split(p, "/") {
+		if d, err := url.PathUnescape(seg); err != nil || d == "." || d == ".." || strings.ContainsAny(d, "/\\") {
+			return true
+		}
+	}
+	return false
 }
 
 // LoadManifest reads and validates plugin.json from dir.
@@ -242,7 +256,8 @@ func expand(s string, port int, dir string) string {
 }
 
 // maskArgs hides values that follow secret-looking flags (--pin, --password,
-// --token, --secret), so command lines can be logged safely.
+// --token, --secret, --key…) and the paths and queries of URLs, which often
+// carry tokens, so command lines can be logged safely.
 func maskArgs(args []string) []string {
 	out := make([]string, len(args))
 	copy(out, args)
@@ -258,6 +273,7 @@ func maskArgs(args []string) []string {
 	for i := 0; i < len(out); i++ {
 		a := out[i]
 		if !strings.HasPrefix(a, "-") || !secret(a) {
+			out[i] = maskURLs(a)
 			continue
 		}
 		if j := strings.IndexByte(a, '='); j >= 0 {
@@ -268,4 +284,22 @@ func maskArgs(args []string) []string {
 		}
 	}
 	return out
+}
+
+var urlLike = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://[^\s,;"']+`)
+
+// maskURLs keeps only the scheme and host of every URL in s:
+// https://user:pw@hooks.example/abc?t=1 becomes https://hooks.example/***.
+func maskURLs(s string) string {
+	return urlLike.ReplaceAllStringFunc(s, func(raw string) string {
+		u, err := url.Parse(raw)
+		if err != nil || u.Host == "" {
+			return raw[:strings.Index(raw, "://")+3] + "***"
+		}
+		out := u.Scheme + "://" + u.Host
+		if (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+			out += "/***"
+		}
+		return out
+	})
 }

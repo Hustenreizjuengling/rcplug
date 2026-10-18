@@ -134,3 +134,29 @@ func TestLoadSkipsInvalidManifest(t *testing.T) {
 		t.Fatalf("invalid plugin should not be listed")
 	}
 }
+
+func TestLineWriter(t *testing.T) {
+	log := newRingLog(100, nil)
+	w := &lineWriter{log: log}
+	w.Write([]byte("2026/10/18 04:58:30 from Go's log\nplain line\n2026/10/18 04:58:30.123456 micro\n"))
+	long := strings.Repeat("x", 2*maxLine+10)
+	for i := 0; i < len(long); i += 32 << 10 { // arrives in pipe-sized chunks
+		w.Write([]byte(long[i:min(i+32<<10, len(long))]))
+	}
+	w.Write([]byte("\n"))
+	w.Write([]byte("no newline at the end"))
+	w.flush()
+	var got []string
+	for _, l := range log.snapshot() {
+		got = append(got, l[len("15:04:05 "):])
+	}
+	want := []string{"from Go's log", "plain line", "micro", strings.Repeat("x", maxLine), strings.Repeat("x", maxLine), "xxxxxxxxxx", "no newline at the end"}
+	if len(got) != len(want) {
+		t.Fatalf("%d lines, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("line %d: %.40q…, want %.40q…", i, got[i], want[i])
+		}
+	}
+}

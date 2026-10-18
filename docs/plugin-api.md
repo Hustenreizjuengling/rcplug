@@ -131,9 +131,11 @@ line:
   `GET /api/plugins/<name>/logs`);
 - `<root>/logs/<name>.log` keeps it on the device across reboots, rotated at 512 KB
   with one older file;
+- every line gets the date and time; a timestamp in the default format of Go's `log`
+  package at the start of a line is dropped, so it does not appear twice;
 - the host adds its own lines (`started pid=…`, `exited (…), restarting in 4s`,
-  `stopped by host`), with secret-looking arguments masked;
-- lines longer than 64 KB are split;
+  `stopped by host`), with secret-looking arguments and the paths of URLs masked;
+- lines longer than 64 KB are split into pieces of 64 KB;
 - the logs go into the [diagnostics bundle](#diagnostics).
 
 Write plain lines. Never write secrets: logs are shown to everyone who can open the
@@ -150,7 +152,9 @@ updated, and when the host itself stops:
    that kept running).
 
 Exit promptly on SIGINT (and SIGTERM). If the host dies without stopping its
-plugins, they get SIGTERM. Shell scripts need a `trap` for SIGINT, because a
+plugins, the plugin's own process gets SIGTERM; helpers it started are not reached by
+that, and the next start of the host removes whatever is left of the plugin's process
+group. Shell scripts need a `trap` for SIGINT, because a
 background `sleep` in a non-interactive shell ignores it; Python must flush its
 output and handle SIGINT, see the [guide](plugin-guide.md#12-other-languages).
 
@@ -212,14 +216,19 @@ it from `{{port}}` or `RCPLUG_PORT`.
 The host forwards every request below `/plugins/<name>/` to the plugin:
 
 - The prefix is removed: the plugin sees `/`, `/api/state`, … Query strings are kept.
-- `/plugins/<name>` redirects to `/plugins/<name>/` (301), so relative URLs resolve.
+- `/plugins/<name>` redirects to `/plugins/<name>/` (301, query kept), so relative URLs
+  resolve. Encoded characters in the path (`%2F`) reach the plugin as they were sent.
 - Request headers are passed through, with `X-Forwarded-For`, `X-Forwarded-Host`,
   `X-Forwarded-Proto` and `X-Forwarded-Prefix: /plugins/<name>`. The `Host` header is
   the plugin's own address.
 - Responses are passed through and flushed at once: **Server-Sent Events**, MJPEG and
-  other streams work. **WebSocket** upgrades work as well.
-- If the plugin does not answer (starting, stopped, crashed), the host answers 502.
-  For an unknown plugin or one without `httpProxy`: 404.
+  other streams work. **WebSocket** upgrades work as well; the host refuses handshakes
+  from pages of other sites (their `Origin`), because browsers cannot add `X-Rcplug` to
+  them.
+- If the plugin does not answer (starting, stopped, crashed), the host answers 502;
+  browsers get a page that tries again every two seconds, so a page opened while the
+  plugin starts appears by itself. For an unknown plugin or one without `httpProxy`:
+  404.
 - The host has no timeouts for responses and no body size limit; protect your own
   handlers (`http.MaxBytesReader`).
 
@@ -357,7 +366,9 @@ without special bits; links and paths outside the package are refused.
 
 A rescan (**Rescan** on the Plugins page, `POST /api/reload`, SIGHUP) picks up new and
 removed plugins and changed manifests, but a running plugin keeps its process until it
-is restarted.
+is restarted. A plugin whose manifest has become invalid is stopped and listed with the
+reason. Skipped plugins and unknown manifest fields are written to the host's log at
+every rescan.
 
 ## Host API
 

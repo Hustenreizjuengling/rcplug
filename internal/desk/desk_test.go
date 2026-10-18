@@ -294,6 +294,25 @@ func TestGuardQuietWithMultiClientDesk(t *testing.T) {
 	}
 }
 
+// A client that leaves by itself while the console joins a multi-client desk
+// was not displaced: the guard must not step back.
+func TestGuardIgnoresClientLeavingByItself(t *testing.T) {
+	sim := startSim(t, rcsim.Options{})
+	other, err := net.Dial("tcp", sim.Addr())
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() { _, _ = bytes.NewBuffer(nil).ReadFrom(other) }()
+	time.Sleep(100 * time.Millisecond) // the guard's first look sees it
+	c, _ := run(t, Config{Addr: sim.Addr(), Guard: true, GuardSettle: 500 * time.Millisecond})
+	waitFor(t, "live", live(c))
+	other.Close() // it leaves on its own before the guard looks again
+	time.Sleep(1200 * time.Millisecond)
+	if st := c.Status(); st.State != StateLive {
+		t.Fatalf("state %s (%s)", st.State, st.Error)
+	}
+}
+
 func TestReconnectAfterDeskRestart(t *testing.T) {
 	sim := startSim(t, rcsim.Options{})
 	addr := sim.Addr()
@@ -320,6 +339,14 @@ func TestReconnectAfterDeskRestart(t *testing.T) {
 
 func TestHandshakeFallback(t *testing.T) {
 	sim := startSim(t, rcsim.Options{WaitHandshake: true})
+	c, _ := run(t, Config{Addr: sim.Addr(), SyncTimeout: 2 * time.Second})
+	waitFor(t, "live", live(c))
+}
+
+// A desk that sends other messages (meters) before it gets the handshake is
+// not silent, but it still needs the handshake for its full sync.
+func TestHandshakeFallbackWithTrafficBeforeSync(t *testing.T) {
+	sim := startSim(t, rcsim.Options{WaitHandshake: true, MeterHz: 15, Animate: true})
 	c, _ := run(t, Config{Addr: sim.Addr(), SyncTimeout: 2 * time.Second})
 	waitFor(t, "live", live(c))
 }
@@ -408,5 +435,32 @@ func TestGuardCatchesFastReconnectingGUI(t *testing.T) {
 	}
 	if n > 1 {
 		t.Errorf("GUI displaced %d times before the guard stepped back", n)
+	}
+}
+
+// Which side closed a connection decides whether a vanished client was
+// displaced: the end that closed first lingers in FIN_WAIT or TIME_WAIT,
+// the other one in CLOSE_WAIT.
+func TestClosedBy(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "tcp")
+	content := "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n" +
+		// client 127.0.0.1:41394 (A1B2) left by itself: its end is in TIME_WAIT
+		"   0: 0100007F:A1B2 0100007F:0929 06 00000000:00000000 03:00000F9A 00000000     0        0 0 3\n" +
+		// client 127.0.0.1:41395 (A1B3) was dropped by the server: the server's end is in TIME_WAIT
+		"   1: 0100007F:0929 0100007F:A1B3 06 00000000:00000000 03:00000F9A 00000000     0        0 0 3\n" +
+		// client 127.0.0.1:41396 (A1B4): the server closed, the client has not yet (CLOSE_WAIT)
+		"   2: 0100007F:A1B4 0100007F:0929 08 00000000:00000000 00:00000000 00000000     0        0 104 1\n"
+	if err := os.WriteFile(f, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	old := procNetFiles
+	procNetFiles = []string{f}
+	defer func() { procNetFiles = old }()
+	for client, want := range map[string]string{
+		"127.0.0.1:41394": "client", "127.0.0.1:41395": "server", "127.0.0.1:41396": "server", "127.0.0.1:41397": "",
+	} {
+		if got := closedBy(2345, client); got != want {
+			t.Errorf("closedBy(%s) = %q, want %q", client, got, want)
+		}
 	}
 }

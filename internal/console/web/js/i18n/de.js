@@ -44,6 +44,13 @@ export default {
   'err.capture_failed': 'Bild konnte nicht gelesen werden: {msg}', 'err.busy': 'Zu viele offene Bildströme.',
   'err.panel_disabled': 'Die Bedienfeld-Emulation ist nicht aktiviert.', 'err.expert_required': 'Nur in der Stufe „Experte“.',
   'err.send_failed': 'Senden an das Mischpult fehlgeschlagen.',
+  'err.bad_request': 'Ungültige Anfrage: {msg}', 'err.no_node': 'Diesen Teil des Geräts gibt es nicht mehr – die Ansicht wird neu geladen.',
+  'err.invalid_change': 'Diese Änderung lässt sich nicht senden: {msg}', 'err.invalid_level': 'Unbekannte Steuerungsstufe.',
+  'err.not_found': 'Unbekannte Anfrage: {msg}', 'err.internal': 'Interner Fehler: {msg}',
+  'pc.listen': 'Listen {n}', 'pc.mute': 'Mute {n}', 'pc.settings': 'Einstellungen {n}', 'pc.fader': 'Fader {n}', 'pc.pad': 'Pad {n} ({pos})',
+  'pc.pos1': 'oben links', 'pc.pos2': 'Mitte links', 'pc.pos3': 'unten links', 'pc.pos4': 'oben rechts', 'pc.pos5': 'Mitte rechts', 'pc.pos6': 'unten rechts',
+  'pc.pageLeft': 'Seite ◀', 'pc.pageRight': 'Seite ▶', 'pc.wheel': 'Drehrad', 'pc.wheelPress': 'Drehrad drücken',
+  'pc.groupChannel': 'Kanal {n}', 'pc.groupNavigation': 'Navigation', 'pc.groupPads': 'SMART Pads',
 
   'fader.physical': 'Fader {n}', 'fader.virtual': 'Virtuell {n}', 'output.n': 'Bus {n}',
   'fader.dragHint': 'ziehen oder Pfeiltasten', 'fader.physicalHint': 'physischer Fader – nur Anzeige', 'meter.side': 'Pegel {side}',
@@ -61,7 +68,7 @@ export default {
   'mixer.device': 'Gerät & Show', 'mixer.show': 'Show', 'mixer.quick': 'Schnellzugriff', 'mixer.channels': 'Kanäle', 'mixer.outputLevels': 'Ausgangspegel',
   'mixer.physical': 'physisch', 'mixer.virtual': 'virtuell', 'mixer.source': 'Quelle', 'mixer.noSource': '— keine —', 'mixer.empty': 'leer',
   'mixer.sourceConfirm': 'Quelle dieses Kanals ändern?', 'mixer.faderHint': 'Faderposition (0–{max}) und ungefährer Pegel relativ zur 0-dB-Rastung',
-  'mixer.physicalNote': 'Die physischen Fader sind nicht motorisiert und lassen sich nur am Gerät bewegen (virtuelle Fader sind fernsteuerbar).',
+  'mixer.physicalNote': 'Die physischen Fader sind nicht motorisiert: Sie werden am Gerät bewegt, virtuelle Fader aus der Ferne. Die Stufe Experte kann auch einen physischen Fader setzen, doch der echte übernimmt wieder, sobald er berührt wird.',
   'mixer.inputOf': 'Eingang: {src}', 'mixer.sendsOf': 'Sends dieser Quelle',
   'mixer.normalised': 'Werte sind die normierten Gerätewerte (0–100 %). Die Umrechnung in dB/Hz/ms ist vom Hersteller nicht dokumentiert.',
 

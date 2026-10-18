@@ -75,10 +75,19 @@ var denied = map[string]map[string]bool{
 		"badPadDetected", "usbHostUnspportedFirmware", "transferModeType", "rcSyncModeRequest",
 		"rcSyncState", "rcSyncDeviceModel", "systemMainMode", "lastRecordingID", "shareAnom",
 		"shareResource", "systemBetaMode", "powerOffRequest", "disableAllPhysicalButtons", "usb1Connected"),
-	"STORAGEVOLUME":      nil,
-	"RECORDINGS":         nil,
-	"RECORDING":          nil,
-	"PADRECORDER":        set("padRecordClear"),
+	"STORAGEVOLUME": nil,
+	"RECORDINGS":    nil,
+	"RECORDING":     nil,
+	"PADRECORDER":   set("padRecordClear", "padRecordMemoryFull"),
+	// Readings only the desk writes, and the limits the node checks values
+	// against (writing those would lift the limits).
+	"RECORDER":           set("recordState", "recordTimeMs", "recordBytesPerSecond"),
+	"OUTPUT":             set("outputMonAutoMuteActive", "outputBTAutoMuteActive"),
+	"PAD":                set("padActive", "padProgress", "padSIPFlashState"),
+	"PLAYER":             set("playerProgress", "playerFileSize"),
+	"FADER":              set("faderMin", "faderMax"),
+	"POT":                set("potMin", "potMax"),
+	"INPUTSOURCE":        set("inputWirelessSN"), // identity of a paired wireless microphone
 	"BUILD":              nil,
 	"TEST":               nil,
 	"OAUTH":              nil,

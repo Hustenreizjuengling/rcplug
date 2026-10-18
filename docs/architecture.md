@@ -44,8 +44,13 @@ statically linked Go programs that are copied there and started as a service.
 - **Proxy.** `/plugins/<name>/…` is forwarded to the plugin with the prefix removed,
   `X-Forwarded-*` headers and `X-Forwarded-Prefix`. Streaming responses (SSE, MJPEG)
   are flushed immediately.
-- **State.** Which plugins are enabled is stored in `<root>/state.json`. The
-  `autostart` field of a manifest is the default for plugins that are not listed there.
+- **State.** The plugins the user started or stopped are stored in
+  `<root>/state.json`. The `autostart` field of a manifest is the default for the
+  others, so a new version can change it.
+- **Leftovers.** The process group of every running plugin is recorded in
+  `<root>/.groups`. If rcplugd dies without stopping its plugins, the next start
+  removes what is left of those groups (from the same boot, still working in the
+  plugins directory) before it starts anything.
 - **Dashboard.** `cmd/rcplugd/web` is a single static page. Plugin UIs are shown in an
   iframe; the plugin marked `primary` is the start page.
 - **Updates.** On request, `internal/host/update.go` asks GitHub for the latest
@@ -84,7 +89,8 @@ something need the header `X-Rcplug: 1`.
   plugins/<name>/       plugin code: plugin.json + executable (replaced on update)
   data/<name>/          plugin data, RCPLUG_DATA_DIR (kept)
   config/<name>.json    operator settings per plugin (kept)
-  state.json            enabled plugins (kept)
+  state.json            plugins the user started or stopped (kept)
+  .groups               process groups of running plugins
   logs/                 rcplugd.log, <plugin>.log, rcplugd.out (raw output, e.g. a
                         crash trace); each rotated at 512 KB, one older file kept;
                         update.log and update.result from in-app updates

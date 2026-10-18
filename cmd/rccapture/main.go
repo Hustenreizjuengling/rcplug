@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -46,7 +47,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
 	tree, err := capture(ctx, *addr, *guard)
-	if err != nil {
+	displaced := errors.Is(err, errDisplaced)
+	if err != nil && !displaced {
 		log.Fatal(err)
 	}
 	if !*raw {
@@ -64,7 +66,16 @@ func main() {
 	if *raw {
 		fmt.Println("WARNING: unsanitized capture – keep it private")
 	}
+	if displaced {
+		fmt.Fprintln(os.Stderr, "WARNING: "+errDisplaced.Error())
+		os.Exit(1)
+	}
 }
+
+// errDisplaced reports that the guard saw another client of the desk lose
+// its connection when the capture joined.
+var errDisplaced = errors.New("joining the desk displaced another of its clients (probably the device's own screen); " +
+	"the capture is complete, but check the device, and run captures only while it is idle")
 
 // capture connects read-only and returns a copy of the first complete tree.
 func capture(ctx context.Context, addr string, guard bool) (*rcproto.Node, error) {
@@ -86,6 +97,18 @@ func capture(ctx context.Context, addr string, guard bool) (*rcproto.Node, error
 			}
 		})
 		if tree != nil {
+			if c.Status().Guard == "active" {
+				// Stay until the guard has checked whether joining pushed
+				// another client off a desk that serves only one, so that
+				// it can be reported.
+				select {
+				case <-ctx.Done():
+				case <-time.After(2500 * time.Millisecond):
+				}
+				if c.Status().State == desk.StateConflict {
+					return tree, errDisplaced
+				}
+			}
 			return tree, nil
 		}
 		select {

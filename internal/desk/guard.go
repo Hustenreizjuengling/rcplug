@@ -163,6 +163,47 @@ func listener(port int) string {
 	return ""
 }
 
+// closedBy tells which side closed a connection between the local server on
+// port and client that is no longer established: "server" if the server
+// dropped the client, "client" if the client left by itself, "" if that
+// cannot be seen (any more). TCP keeps the end that closed first in
+// FIN_WAIT or TIME_WAIT for a minute, and the other end in CLOSE_WAIT until
+// it closes too; on the device both ends are local, so both are listed.
+func closedBy(port int, client string) string {
+	for _, f := range procNetFiles {
+		file, err := os.Open(f)
+		if err != nil {
+			continue
+		}
+		sc := bufio.NewScanner(file)
+		sc.Buffer(make([]byte, 64*1024), 1024*1024)
+		for sc.Scan() {
+			fields := strings.Fields(sc.Text())
+			if len(fields) < 4 {
+				continue
+			}
+			lip, lport, ok1 := splitHexAddr(fields[1])
+			rip, rport, ok2 := splitHexAddr(fields[2])
+			if !ok1 || !ok2 {
+				continue
+			}
+			local, remote := fmt.Sprintf("%s:%d", lip, lport), fmt.Sprintf("%s:%d", rip, rport)
+			closing := fields[3] == "04" || fields[3] == "05" || fields[3] == "06" || fields[3] == "0B" // FIN_WAIT1/2, TIME_WAIT, CLOSING
+			waiting := fields[3] == "08"                                                                // CLOSE_WAIT: the other end closed
+			switch {
+			case lport == port && remote == client && closing, local == client && rport == port && waiting:
+				file.Close()
+				return "server"
+			case local == client && rport == port && closing, lport == port && remote == client && waiting:
+				file.Close()
+				return "client"
+			}
+		}
+		file.Close()
+	}
+	return ""
+}
+
 // serverPeers returns the remote endpoints of all clients connected to the
 // local server on port (the mixer's ends of the connections).
 func serverPeers(port int) (map[string]bool, error) {

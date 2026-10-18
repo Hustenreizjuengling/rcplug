@@ -282,6 +282,14 @@ func TestWritePolicy(t *testing.T) {
 		{"SIPREGISTRATION", "sipRegistrationDetails", "x", "denied"},
 		{"STREAMERXMIXPRESET", "streamerXPresetCreated", true, "denied"},
 		{"PAD", "padName", "a\x00b", "invalid_value"},
+		// Readings only the desk writes, node limits and identities.
+		{"RECORDER", "recordState", 2, "denied"},
+		{"RECORDER", "recordTimeMs", 5, "denied"},
+		{"OUTPUT", "outputMonAutoMuteActive", true, "denied"},
+		{"FADER", "faderMax", 1000, "denied"},
+		{"POT", "potMin", 0, "denied"},
+		{"INPUTSOURCE", "inputWirelessSN", "SN-1", "denied"},
+		{"PAD", "padProgress", 1, "denied"},
 	} {
 		path := r.pathOf(c.node)
 		if path == nil {
@@ -417,6 +425,9 @@ func TestScreenMirrorIsOptIn(t *testing.T) {
 	}
 	// Enabled, but the device has no framebuffer here: a capture error, not 403.
 	if res := r.do(t, http.MethodGet, "/api/screen.jpg", nil); res.code != 503 || res.body["code"] != "capture_failed" {
+		t.Fatalf("screen enabled: %d %s", res.code, res.raw)
+	}
+	if res := r.do(t, http.MethodGet, "/api/screen.mjpg", nil); res.code != 503 || res.body["code"] != "capture_failed" {
 		t.Fatalf("screen enabled: %d %s", res.code, res.raw)
 	}
 }
@@ -576,5 +587,33 @@ func TestPINRules(t *testing.T) {
 	}
 	if err := p.change("2468", "open sesame!"); err != nil {
 		t.Errorf("printable ASCII PIN refused: %v", err)
+	}
+}
+
+func TestUnknownEndpointsAnswerInJSON(t *testing.T) {
+	r := newRig(t, rcsim.Options{})
+	for _, c := range []struct{ method, path string }{{http.MethodGet, "/api/nope"}, {http.MethodGet, "/api/set"}, {http.MethodPost, "/api/status"}} {
+		if res := r.do(t, c.method, c.path, nil, "X-Rcplug", "1"); res.code != 404 || res.body["code"] != "not_found" {
+			t.Errorf("%s %s: %d %s", c.method, c.path, res.code, res.raw)
+		}
+	}
+}
+
+// Changes to the console itself are in the audit log too; PINs never are.
+func TestAuditListsConsoleActions(t *testing.T) {
+	r := newRig(t, rcsim.Options{})
+	r.control(t, "basic")
+	if res := r.post(t, "/api/pin", map[string]string{"new": "pin-4711-x"}); res.code != 200 {
+		t.Fatalf("set PIN: %d %s", res.code, res.raw)
+	}
+	r.post(t, "/api/control", map[string]string{"level": "expert"}) // without the PIN: refused
+	res := r.do(t, http.MethodGet, "/api/audit", nil)
+	if strings.Contains(string(res.raw), "pin-4711-x") {
+		t.Fatalf("the PIN is in the audit log: %s", res.raw)
+	}
+	for _, want := range []string{`"name":"control","value":"basic"`, `"name":"pin","value":"set"`, `"code":"pin_required"`} {
+		if !strings.Contains(string(res.raw), want) {
+			t.Errorf("audit lacks %s: %s", want, res.raw)
+		}
 	}
 }

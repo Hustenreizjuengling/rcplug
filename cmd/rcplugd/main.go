@@ -43,7 +43,7 @@ func main() {
 		diag     = flag.String("diagnostics", "", "write a diagnostics bundle (zip) to this file (\"-\" = stdout) and exit; works without a running host")
 		check    = flag.Bool("check", false, "print problems found in the logs and whether the host answers, then exit")
 		call     = flag.String("call", "", "call the running host's API (\"POST /api/reload\") and print the answer, then exit; for scripts on the device")
-		updates  = flag.Bool("updates", os.Getenv("RCPLUG_UPDATES") != "off", "offer updates of rcplug and its plugins from signed GitHub releases (env RCPLUG_UPDATES=off switches them off)")
+		updates  = flag.Bool("updates", !isOff(os.Getenv("RCPLUG_UPDATES")), "offer updates of rcplug and its plugins from signed GitHub releases (env RCPLUG_UPDATES=off switches them off)")
 		updRepo  = flag.String("update-repo", envOr("RCPLUG_UPDATE_REPO", host.DefaultUpdateRepo), "GitHub repository (owner/name) of rcplug's releases")
 	)
 	flag.Parse()
@@ -110,7 +110,14 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
-	reload := func() {
+	// The dashboard's port first: plugins are then never handed it.
+	ln, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatalf("listen %s: %v", *addr, err)
+	}
+
+	// reload (re)scans the plugins: at start, on SIGHUP and from the API.
+	reload := func() ([]string, error) {
 		invalid, err := m.Load()
 		if err != nil {
 			log.Printf("warning: loading plugins: %v", err)
@@ -124,13 +131,14 @@ func main() {
 			}
 		}
 		srv.SetInvalid(invalid)
+		return invalid, err
+	}
+	srv.Rescan = reload
+	if left := m.ReapLeftovers(); len(left) > 0 {
+		log.Printf("removed processes an earlier rcplugd left running for %s", strings.Join(left, ", "))
 	}
 	reload()
 
-	ln, err := net.Listen("tcp", *addr)
-	if err != nil {
-		log.Fatalf("listen %s: %v", *addr, err)
-	}
 	// Requests (notably proxied SSE streams) see this context cancelled at
 	// shutdown, so Shutdown does not wait out long-lived connections.
 	baseCtx, cancelRequests := context.WithCancel(context.Background())
@@ -146,7 +154,7 @@ func main() {
 	for s := range sig {
 		if s == syscall.SIGHUP {
 			log.Printf("SIGHUP: rescanning plugins")
-			reload()
+			_, _ = reload()
 			continue
 		}
 		break
@@ -284,6 +292,15 @@ func defaultRoot() string {
 		return filepath.Dir(exe)
 	}
 	return "."
+}
+
+// isOff reports whether an environment setting switches something off.
+func isOff(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "off", "0", "false", "no":
+		return true
+	}
+	return false
 }
 
 func envOr(name, def string) string {

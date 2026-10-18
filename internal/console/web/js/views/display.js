@@ -62,15 +62,16 @@ function panelCard(hw) {
   for (const [g, list] of Object.entries(groups)) {
     const grid = h('div', { class: 'panelgrid' });
     for (const ctl of list) {
-      if (ctl.kind === 'button') grid.append(h('button', { class: 'btn', type: 'button', disabled, onclick: () => panel(ctl.id) }, ctl.label));
-      else if (ctl.kind === 'wheel') grid.append(h('button', { class: 'btn', type: 'button', disabled, onclick: () => panel(ctl.id, -1) }, ctl.label + ' ◀'), h('button', { class: 'btn', type: 'button', disabled, onclick: () => panel(ctl.id, 1) }, ctl.label + ' ▶'));
+      const label = panelLabel(ctl);
+      if (ctl.kind === 'button') grid.append(h('button', { class: 'btn', type: 'button', disabled, onclick: () => panel(ctl.id) }, label));
+      else if (ctl.kind === 'wheel') grid.append(h('button', { class: 'btn', type: 'button', disabled, onclick: () => panel(ctl.id, -1) }, label + ' ◀'), h('button', { class: 'btn', type: 'button', disabled, onclick: () => panel(ctl.id, 1) }, label + ' ▶'));
       else if (ctl.kind === 'fader') {
-        const inp = h('input', { type: 'range', min: 0, max: 127, value: 90, disabled, 'aria-label': ctl.label });
+        const inp = h('input', { type: 'range', min: 0, max: 127, value: 90, disabled, 'aria-label': label });
         inp.addEventListener('change', () => panel(ctl.id, Number(inp.value)));
-        grid.append(h('label', { class: 'small muted' }, t('panel.faderLabel', { name: ctl.label }), inp));
+        grid.append(h('label', { class: 'small muted' }, t('panel.faderLabel', { name: label }), inp));
       }
     }
-    c.append(h('h4', { class: 'section-title' }, g), grid);
+    c.append(h('h4', { class: 'section-title' }, panelGroup(g)), grid);
   }
   c.append(h('p', { class: 'muted small' }, t('panel.note')));
   return c;
@@ -88,3 +89,18 @@ export const display = {
     return [wrap];
   },
 };
+
+// The server names the panel's controls in English; known ones are
+// translated by their id, others keep the server's name.
+function panelLabel(ctl) {
+  const m = /^(listen|mute|settings|fader|pad)([1-6])$/.exec(ctl.id);
+  if (m) return t('pc.' + m[1], { n: m[2], pos: t('pc.pos' + m[2]) });
+  if (['pageLeft', 'pageRight', 'wheel', 'wheelPress'].includes(ctl.id)) return t('pc.' + ctl.id);
+  return ctl.label;
+}
+
+function panelGroup(g) {
+  const m = /^Channel (\d+)$/.exec(g);
+  if (m) return t('pc.groupChannel', { n: m[1] });
+  return { Navigation: t('pc.groupNavigation'), 'SMART Pads': t('pc.groupPads') }[g] || g;
+}

@@ -112,6 +112,13 @@ func sign(args []string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", keyEnv, err)
 	}
+	// Public and private keys look alike (32 bytes in base64); catch the
+	// easy mix-up of the two files.
+	for _, k := range release.BuiltinKeys {
+		if strings.TrimSpace(keyText) == k {
+			return fmt.Errorf("%s holds a public key (rcplug-release.pub); it needs the private one (rcplug-release.key)", keyEnv)
+		}
+	}
 	m := release.Manifest{Format: 1, Project: *project, Version: strings.TrimPrefix(*ver, "v"),
 		Published: time.Now().UTC().Format(time.RFC3339)}
 	for _, f := range files {

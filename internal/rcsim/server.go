@@ -373,8 +373,12 @@ func (s *Server) faderMovedLocked(strip int, level int64) {
 	if strip < 0 {
 		return
 	}
+	// The strip's meter mirrors the fader where the fixture has that
+	// property; the simulator never adds properties the desk does not have.
 	if p := s.layout.StripMeters.Path(strip); p != nil {
-		s.setLocked(p, "faderLevel", rcproto.Int(level))
+		if m := s.root.At(p); m != nil && m.Has("faderLevel") {
+			s.setLocked(p, "faderLevel", rcproto.Int(level))
+		}
 	}
 	ch := s.layout.Node(s.root, "CHANNEL", strip)
 	if ch == nil {

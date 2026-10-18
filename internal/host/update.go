@@ -495,6 +495,10 @@ func (u *Updater) run(j *updateJob, fu *foundUpdate) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 	state, err := u.install(ctx, j, fu)
+	if err != nil {
+		// Nothing of a failed attempt stays (the package may be hundreds of MB).
+		_ = os.RemoveAll(filepath.Join(u.m.Root(), ".update"))
+	}
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	if err != nil {
@@ -582,11 +586,16 @@ func (u *Updater) installPlugin(j *updateJob, fu *foundUpdate, dir, pkg string) 
 		return fmt.Errorf("the package's plugin.json says version %s, the manifest %s", man.Version, fu.asset.Version)
 	}
 	j.logf("replacing %s %s with %s", name, fu.target.Current, man.Version)
-	if err := u.m.ReplacePlugin(name, staged); err != nil {
+	started, err := u.m.ReplacePlugin(name, staged)
+	if err != nil {
 		return err
 	}
 	_ = os.RemoveAll(dir)
-	j.logf("%s %s installed and restarted; its data and settings are kept", name, man.Version)
+	if started {
+		j.logf("%s %s installed and restarted; its data and settings are kept", name, man.Version)
+	} else {
+		j.logf("%s %s installed; it stays stopped, as it was. Its data and settings are kept", name, man.Version)
+	}
 	u.mu.Lock()
 	delete(u.found, fu.target.Target)
 	for i := range u.status.Targets {

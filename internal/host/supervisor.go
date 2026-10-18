@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -147,7 +148,7 @@ func (p *Plugin) start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	prev, done := p.loop, make(chan struct{})
 	p.cancel, p.loop = cancel, done
-	p.enabled, p.state = true, StateStarting
+	p.enabled, p.state, p.pid = true, StateStarting, 0
 	p.mu.Unlock()
 
 	go func() {
@@ -266,9 +267,11 @@ func (p *Plugin) runOnce(ctx context.Context) error {
 		return err
 	}
 	p.setState(StateRunning, cmd.Process.Pid)
+	p.host.groupStarted(p.Manifest().Name, cmd.Process.Pid) // its process group
 	p.log.add(fmt.Sprintf("started pid=%d: %s", cmd.Process.Pid, strings.Join(maskArgs(args), " ")))
 	err = cmd.Wait()
 	killGroup(cmd)
+	p.host.groupEnded(p.Manifest().Name)
 	out.flush()
 	return err
 }
@@ -281,6 +284,13 @@ type lineWriter struct {
 	buf bytes.Buffer
 }
 
+// maxLine is the longest log line; longer output is split into pieces.
+const maxLine = 64 * 1024
+
+// goLogStamp is the date and time Go's log package puts in front of every
+// line by default. The host stamps each line itself, so it is dropped.
+var goLogStamp = regexp.MustCompile(`^[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)? `)
+
 func (w *lineWriter) Write(b []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -292,20 +302,29 @@ func (w *lineWriter) Write(b []byte) (int, error) {
 			w.buf.WriteString(line)
 			break
 		}
-		w.log.add(strings.TrimRight(line, "\r\n"))
+		w.addLine(strings.TrimRight(line, "\r\n"))
 	}
-	if w.buf.Len() > 64*1024 { // runaway line without newline
-		w.log.add(w.buf.String())
-		w.buf.Reset()
+	for w.buf.Len() > maxLine { // a runaway line without newline
+		w.addLine(string(w.buf.Next(maxLine)))
 	}
 	return len(b), nil
+}
+
+// addLine adds one line of output, in pieces of maxLine if it is longer.
+func (w *lineWriter) addLine(line string) {
+	line = goLogStamp.ReplaceAllString(line, "")
+	for len(line) > maxLine {
+		w.log.add(line[:maxLine])
+		line = line[maxLine:]
+	}
+	w.log.add(line)
 }
 
 func (w *lineWriter) flush() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.buf.Len() > 0 {
-		w.log.add(w.buf.String())
+		w.addLine(w.buf.String())
 		w.buf.Reset()
 	}
 }

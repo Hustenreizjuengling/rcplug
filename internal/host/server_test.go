@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"github.com/Hustenreizjuengling/rcplug/sdk"
 	"io"
 	"net"
 	"net/http"
@@ -57,7 +58,7 @@ func TestSameOriginAndProxyHeaders(t *testing.T) {
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
 	backend := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, r.URL.Path+"|"+r.Header.Get("X-Forwarded-Prefix")+"|"+r.Header.Get("X-Forwarded-Host")+"|"+r.Header.Get("X-Forwarded-For"))
+		io.WriteString(w, r.URL.EscapedPath()+"|"+r.Header.Get("X-Forwarded-Prefix")+"|"+r.Header.Get("X-Forwarded-Host")+"|"+r.Header.Get("X-Forwarded-For"))
 	})}
 	go backend.Serve(ln)
 	defer backend.Close()
@@ -119,6 +120,77 @@ func TestSameOriginAndProxyHeaders(t *testing.T) {
 	r.Body.Close()
 	if r.StatusCode != http.StatusForbidden {
 		t.Errorf("reload without X-Rcplug: %d", r.StatusCode)
+	}
+
+	// An encoded slash reaches the plugin as it was sent.
+	if b := get(t, srv.URL+"/plugins/echo/a%2Fb"); !strings.HasPrefix(b, "/a%2Fb|") {
+		t.Errorf("escaped path: %q", b)
+	}
+	// The redirect to the trailing slash keeps the query.
+	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	if r, err := noRedirect.Get(srv.URL + "/plugins/echo?strip=physical1"); err != nil || r.Header.Get("Location") != "/plugins/echo/?strip=physical1" {
+		t.Errorf("redirect: %v %v", r.Header.Get("Location"), err)
+	}
+	// A WebSocket handshake from a foreign page is refused, from the same origin passed on.
+	ws := func(origin string) int {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/plugins/echo/ws", nil)
+		req.Header.Set("Upgrade", "websocket")
+		req.Header.Set("Connection", "Upgrade")
+		req.Header.Set("Origin", origin)
+		r, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Body.Close()
+		return r.StatusCode
+	}
+	if c := ws("http://evil.example"); c != http.StatusForbidden {
+		t.Errorf("cross-site WebSocket: %d", c)
+	}
+	if c := ws(srv.URL); c == http.StatusForbidden {
+		t.Errorf("same-origin WebSocket refused")
+	}
+}
+
+func get(t *testing.T, u string) string {
+	t.Helper()
+	r, err := http.Get(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Body.Close()
+	b, _ := io.ReadAll(r.Body)
+	return string(b)
+}
+
+// A plugin that does not answer gets a page that retries, for browsers.
+func TestUnreachablePlugin(t *testing.T) {
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	port := ln.Addr().(*net.TCPAddr).Port
+	ln.Close() // nothing listens there
+	root := t.TempDir()
+	writePlugin(t, root, "down", "#!/bin/sh\nexit 0\n", `{"exec":["./run.sh"],"httpProxy":"127.0.0.1:`+strconv.Itoa(port)+`"}`)
+	m := NewManager(root, 9450)
+	if _, err := m.Load(); err != nil {
+		t.Fatal(err)
+	}
+	defer m.StopAll()
+	srv := httptest.NewServer(NewServer(m, nil, "test").Handler())
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/plugins/down/", nil)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml")
+	r, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(r.Body)
+	r.Body.Close()
+	if r.StatusCode != http.StatusBadGateway || !strings.Contains(string(b), `http-equiv="refresh"`) || !strings.Contains(string(b), "<b style=\"color:#e7edf3\">down</b>") {
+		t.Errorf("page for browsers: %d %s", r.StatusCode, b)
+	}
+	if b := get(t, srv.URL+"/plugins/down/api/x"); !strings.Contains(b, "not reachable") || strings.Contains(b, "<") {
+		t.Errorf("answer for scripts: %q", b)
 	}
 }
 
@@ -246,9 +318,11 @@ func TestStopStartDoNotOverlap(t *testing.T) {
 }
 
 func TestMaskArgs(t *testing.T) {
-	got := strings.Join(maskArgs([]string{"./x", "--pin", "1", "--token=abc", "--addr", "a", "-password", "p"}), " ")
-	if got != "./x --pin *** --token=*** --addr a -password ***" {
-		t.Fatal(got)
+	got := strings.Join(maskArgs([]string{"./x", "--pin", "1", "--token=abc", "--addr", "a", "-password", "p",
+		"--hook", "https://u:pw@hooks.example/abc?t=1", "--api=http://127.0.0.1:8080", "--x=https://h.example/p"}), " ")
+	want := "./x --pin *** --token=*** --addr a -password *** --hook https://hooks.example/*** --api=http://127.0.0.1:8080 --x=https://h.example/***"
+	if got != want {
+		t.Fatalf("\n got %s\nwant %s", got, want)
 	}
 }
 
@@ -374,6 +448,8 @@ func TestManifestActions(t *testing.T) {
 		"absolute path": `[{"id":"a","context":"channel","title":"A","path":"/api/plugins"}]`,
 		"protocol rel.": `[{"id":"a","context":"channel","title":"A","path":"//evil.example"}]`,
 		"script URL":    `[{"id":"a","context":"channel","title":"A","path":"javascript:alert(1)"}]`,
+		"dot segments":  `[{"id":"a","context":"channel","title":"A","path":"../console/"}]`,
+		"encoded dots":  `[{"id":"a","context":"channel","title":"A","path":"x/%2e%2e/%2E./console/"}]`,
 		"empty title":   `[{"id":"a","context":"channel","title":" ","path":""}]`,
 		"duplicate id":  `[{"id":"a","context":"channel","title":"A","path":""},{"id":"a","context":"channel","title":"B","path":""}]`,
 	} {
@@ -403,8 +479,10 @@ func TestDiagnosticsMasksSecrets(t *testing.T) {
 	root := t.TempDir()
 	_ = os.MkdirAll(filepath.Join(root, "config"), 0o755)
 	_ = os.MkdirAll(filepath.Join(root, "logs"), 0o755)
-	_ = os.WriteFile(filepath.Join(root, "config", "console.json"), []byte(`{"args":["--pin","4711","--read-only"],"env":{"MY_TOKEN":"abc","LEVEL":"3"}}`), 0o644)
-	_ = os.WriteFile(filepath.Join(root, "config", "rcplugd.env"), []byte("RCPLUG_ALLOW_HOST=studio\nAPI_KEY=xyz\n"), 0o644)
+	// Unique strings: the bundle also lists every process of this machine.
+	_ = os.WriteFile(filepath.Join(root, "config", "console.json"), []byte(`{"args":["--pin","pin-s3cr3t","--read-only","--webhook","https://hooks.example/arg-s3cr3t","--interval=2s","--name","name-s3cr3t"],`+
+		`"env":{"MY_TOKEN":"token-s3cr3t","LEVEL":"3","HOOK":"https://user:pw-s3cr3t@hooks.example/env-s3cr3t?x=1","MIXER":"127.0.0.1:2345"}}`), 0o644)
+	_ = os.WriteFile(filepath.Join(root, "config", "rcplugd.env"), []byte("RCPLUG_ALLOW_HOST=studio\nAPI_KEY=key-s3cr3t\nWEBHOOK_URL=\"https://hooks.example/file-s3cr3t\"\n# a comment\n"), 0o644)
 	_ = os.WriteFile(filepath.Join(root, "logs", "sonar.log"), []byte("ok\npanic: boom\n"), 0o644)
 	var buf bytes.Buffer
 	if err := WriteDiagnostics(context.Background(), &buf, DiagnosticsInput{Root: root, Version: "test"}); err != nil {
@@ -421,12 +499,13 @@ func TestDiagnosticsMasksSecrets(t *testing.T) {
 		rc.Close()
 		all += "\n### " + f.Name + "\n" + string(b)
 	}
-	for _, secret := range []string{"4711", "abc", "xyz"} {
+	for _, secret := range []string{"pin-s3cr3t", "arg-s3cr3t", "name-s3cr3t", "token-s3cr3t", "pw-s3cr3t", "env-s3cr3t", "key-s3cr3t", "file-s3cr3t"} {
 		if strings.Contains(all, secret) {
 			t.Errorf("secret %q leaked into the bundle", secret)
 		}
 	}
-	for _, want := range []string{"--read-only", `"LEVEL": "3"`, "RCPLUG_ALLOW_HOST=studio", "panic: boom", "### rcplug.json"} {
+	for _, want := range []string{"--read-only", `"LEVEL": "3"`, "RCPLUG_ALLOW_HOST=studio", "panic: boom", "### rcplug.json",
+		"--interval=2s", `"MIXER": "127.0.0.1:2345"`, "https://hooks.example/***", "WEBHOOK_URL=https://hooks.example/***", "# a comment"} {
 		if !strings.Contains(all, want) {
 			t.Errorf("bundle lacks %q", want)
 		}
@@ -449,5 +528,34 @@ func TestPortsSkipBusyOnes(t *testing.T) {
 	defer m.StopAll()
 	if got := m.get("web").Port(); got == port || got == 0 {
 		t.Fatalf("plugin got port %d, busy one is %d", got, port)
+	}
+}
+
+// Starting one plugin must not freeze the autostart default of the others.
+func TestStateRecordsOnlyUserChoices(t *testing.T) {
+	root := t.TempDir()
+	loop := "#!/bin/sh\ntrap 'exit 0' INT TERM\nwhile true; do sleep 1; done\n"
+	writePlugin(t, root, "a", loop, `{"exec":["./run.sh"],"autostart":false}`)
+	writePlugin(t, root, "b", loop, `{"exec":["./run.sh"],"autostart":true}`)
+	m := NewManager(root, 9460)
+	if _, err := m.Load(); err != nil {
+		t.Fatal(err)
+	}
+	defer m.StopAll()
+	m.Enable("a")
+	var ps persistState
+	if err := sdk.LoadJSON(filepath.Join(root, "state.json"), &ps); err != nil {
+		t.Fatal(err)
+	}
+	if len(ps.Enabled) != 1 || !ps.Enabled["a"] {
+		t.Fatalf("state.json = %+v, want only a", ps.Enabled)
+	}
+}
+
+func TestScanProblemsIgnoresPolicyRefusals(t *testing.T) {
+	log := "console: write SYSTEM[15].systemName=\"My desk\" refused: control is off\nexited (exit status 1), restarting in 2s\n"
+	got := scanProblems("console.log", []byte(log))
+	if strings.Contains(got, "control is off") || !strings.Contains(got, "restarting in") {
+		t.Fatal(got)
 	}
 }

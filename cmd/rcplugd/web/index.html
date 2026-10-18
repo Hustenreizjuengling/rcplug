@@ -29,6 +29,7 @@
   nav a .st{width:7px;height:7px;border-radius:50%;background:var(--muted)}
   nav a .st.running{background:var(--accent)}
   nav a .st.backoff{background:var(--warn)}
+  body.offline nav a .st, body.offline .tag.running, body.offline .tag.starting, body.offline .tag.backoff{background:var(--muted);color:var(--muted);border-color:var(--line);opacity:.5}
   nav .sep{flex:1}
   #view{flex:1;min-height:0;display:flex;flex-direction:column}
   iframe{flex:1;border:0;width:100%;background:var(--bg)}
@@ -98,7 +99,7 @@ const T = {
     diagTitle: 'Diagnostics', diagText: 'If something does not work: download this bundle (logs, versions, device state; passwords and keys masked) and attach it to a bug report. Review it before posting it publicly.',
     diagButton: 'Download diagnostics',
     updTitle: 'Updates', updDesc: 'rcplug and plugins update from signed releases on GitHub. Nothing is downloaded until you check, nothing is installed until you click. Settings and plugin data are kept.',
-    updOff: 'Updates are switched off on this device (RCPLUG_UPDATES=off).', updCheck: 'Check for updates', updChecking: 'checking…',
+    updOff: 'Updates are switched off on this device (RCPLUG_UPDATES=off or --updates=false).', updCheck: 'Check for updates', updChecking: 'checking…',
     updNever: 'Not checked yet.', updChecked: 'Last checked: {at}', updCurrent: 'up to date', updAvail: 'update available',
     updInstall: 'Install {v}', updNotes: 'Release notes', updRelease: 'release page ↗', updNoTargets: 'Nothing to check.',
     updConfirmHost: 'Update rcplug to {v}?\n\nrcplug and all plugins restart (about half a minute). The RØDECaster itself and its audio keep running. If the new version does not start, the previous one comes back automatically.',
@@ -124,7 +125,7 @@ const T = {
     diagTitle: 'Diagnose', diagText: 'Wenn etwas nicht funktioniert: dieses Paket herunterladen (Logs, Versionen, Gerätezustand; Passwörter und Schlüssel maskiert) und an einen Fehlerbericht hängen. Vor dem öffentlichen Teilen bitte durchsehen.',
     diagButton: 'Diagnose herunterladen',
     updTitle: 'Updates', updDesc: 'rcplug und Plugins aktualisieren sich aus signierten Releases auf GitHub. Heruntergeladen wird erst nach „Nach Updates suchen“, installiert erst nach deinem Klick. Einstellungen und Plugin-Daten bleiben erhalten.',
-    updOff: 'Updates sind auf diesem Gerät abgeschaltet (RCPLUG_UPDATES=off).', updCheck: 'Nach Updates suchen', updChecking: 'suche…',
+    updOff: 'Updates sind auf diesem Gerät abgeschaltet (RCPLUG_UPDATES=off oder --updates=false).', updCheck: 'Nach Updates suchen', updChecking: 'suche…',
     updNever: 'Noch nicht gesucht.', updChecked: 'Zuletzt gesucht: {at}', updCurrent: 'aktuell', updAvail: 'Update verfügbar',
     updInstall: '{v} installieren', updNotes: 'Versionshinweise', updRelease: 'Release-Seite ↗', updNoTargets: 'Nichts zu prüfen.',
     updConfirmHost: 'rcplug auf {v} aktualisieren?\n\nrcplug und alle Plugins starten neu (etwa eine halbe Minute). Der RØDECaster selbst und sein Audio laufen weiter. Startet die neue Version nicht, kommt automatisch die vorherige zurück.',
@@ -181,9 +182,11 @@ async function refresh() {
     else if (sys.version !== bootVersion) { location.reload(); return; }
     $('#vitals').innerHTML = v.join(' · ');
     $('#title').textContent = 'rcplug · ' + (sys.host || 'RØDECaster');
+    document.body.classList.remove('offline');
   } catch (e) {
     $('#dot').classList.add('off');
     $('#vitals').textContent = t('offline');
+    document.body.classList.add('offline'); // the plugins' states are unknown now
   }
   try { const d = await jget('api/plugins'); plugins = d.plugins || []; invalid = d.invalid || []; loaded = true; } catch (e) { /* keep last */ }
   if (route === 'system' || route === 'plugins' || !route) await loadUpdates();
@@ -210,7 +213,10 @@ function frameRoute() {
   const i = rest.search(/[/?]/);
   const name = dec(i < 0 ? rest : rest.slice(0, i));
   let sub = i < 0 ? '' : rest.slice(i).replace(/^\//, '');
-  if (sub.split(/[/?#]/).includes('..')) sub = ''; // stay inside the plugin
+  // Stay inside the plugin: no "." or ".." segment, also not percent-encoded
+  // (browsers resolve %2e%2e like ..), and no backslashes.
+  const path = sub.split(/[?#]/)[0];
+  if (path.split('/').some((seg) => { const d = dec(seg); return d === '.' || d === '..' || d.includes('/') || d.includes('\\'); })) sub = '';
   return { name, sub };
 }
 const currentPlugin = () => (route.startsWith('p/') ? frameRoute().name : null);
@@ -259,10 +265,16 @@ function renderFrame(name, sub = '') {
   frameFor = name + '|' + sub;
   view.innerHTML = `<iframe src="plugins/${encodeURIComponent(name)}/${esc(sub)}" title="${esc(tr(p, 'title'))}" allow="fullscreen"></iframe>`;
 }
+let stoppedSig = '';
 function checkFrame() {
   const { name, sub } = frameRoute();
   const p = plugins.find((x) => x.name === name);
-  if (!p || (frameFor === name + '|' + sub) !== !!p.running) renderFrame(name, sub);
+  if (!p || (frameFor === name + '|' + sub) !== !!p.running) { stoppedSig = ''; renderFrame(name, sub); return; }
+  // The page shown instead of a stopped plugin follows its state.
+  if (!p.running) {
+    const sig = JSON.stringify([p.state, p.enabled, p.lastErr, lang]);
+    if (sig !== stoppedSig) { stoppedSig = sig; renderFrame(name, sub); }
+  }
 }
 
 async function act(name, action, btn) {

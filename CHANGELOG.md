@@ -62,6 +62,53 @@ Sonar is no longer part of the device package; install it from rcplug-plugins.
   update removes it (see the README).
 
 ### Fixed
+Found by end-to-end tests of every option (host, dashboard, console, simulator, tools):
+- `install.sh`: a failure after the old version was stopped (for example a plugin
+  folder that cannot be moved) now puts the previous version back completely before
+  starting it, instead of starting a half-updated installation; `.previous` no longer
+  stays behind.
+- A failed plugin update no longer leaves its download (up to hundreds of MB) in
+  `.update/`. Updating a stopped plugin no longer claims it was restarted.
+- The diagnostics bundle masks the values of operator settings unless they are plainly
+  harmless, and shows URLs (also in command lines and logs) only with scheme and host;
+  webhook URLs and tokens under other names used to appear in clear.
+- The console's write policy refuses values only the desk writes (recorder state and
+  time, progress, auto-mute states, a wireless microphone's serial number) and the
+  fader and pot limits at every level, as safety.md always said.
+- The GUI guard no longer steps back when another client of a multi-client desk left
+  by itself while the console joined: it now looks at which side closed the
+  connection.
+- `--handshake auto` sends the handshake when no full sync arrives, also if the desk
+  sends other messages first; `rccapture` waits for its guard check and reports a
+  displaced client (exit status 1).
+- Dashboard: a plugin page that is opened while the plugin starts shows a readable
+  page that retries by itself; the page shown for a stopped plugin follows its state;
+  percent-encoded `..` in deep links and action paths is refused; plugin states are
+  dimmed while the host is unreachable.
+- Proxy: cross-site WebSocket handshakes are refused; the redirect to
+  `/plugins/<name>/` keeps the query; encoded characters in paths reach the plugin
+  unchanged.
+- If rcplugd itself is killed, helpers its plugins started no longer survive the next
+  start (process groups are recorded in `.groups`).
+- `state.json` records only the plugins the user started or stopped, so a new version
+  can change a plugin's `autostart` default.
+- `POST /api/reload` logs skipped plugins and unknown fields like SIGHUP; `invalid` is
+  `[]`, not `null`; the dashboard port is taken before plugins get ports.
+- Log lines of Go plugins no longer carry two timestamps; long lines are split at
+  exactly 64 KB; `rcplugd --check` no longer reports the console refusing a write as
+  a problem; plugin diagnostics are collected in parallel.
+- `RCPLUG_UPDATES` also accepts `0`, `false` and `no`; `rcplug-release sign` refuses a
+  public key given as the signing key; the init script names the right log file when
+  rcplugd does not start.
+- Console: changes of the control level, screen mirror, PIN (never its value),
+  reconnects, panel input and refused PINs are in the audit log; `api/screen.mjpg`
+  answers `capture_failed` when the screen cannot be read; unknown `api/` paths answer
+  in JSON; `--screen` and `--handshake` refuse unknown values; a missing data directory
+  is created; run on its own, the console answers only IP addresses and `localhost`.
+- Console UI: meters no longer freeze at their last level when the desk is gone; front
+  panel controls and four error messages are translated; strip buttons wrap instead of
+  being cut off.
+- rcsim no longer adds a property the desk does not have when a fader moves.
 - rcplugd registers its signal handlers before it starts any plugin. Started with
   SIGINT ignored (as a background job of a shell is), it passed that on to the first
   plugins, which then could not stop cleanly and were killed after 3 seconds.
