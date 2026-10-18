@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.7.3 - Unreleased
+## 0.7.3 - 2026-10-18
 
 ### Added
 - Reading along, the console plays the **SMART pads** of the bank the device shows:
