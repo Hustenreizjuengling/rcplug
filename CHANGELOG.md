@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.6.6 - Unreleased
+## 0.6.6 - 2026-10-18
 
 ### Changed
 - Device notes: what the update logs of 0.6.4 and 0.6.5 showed about the USB audio
