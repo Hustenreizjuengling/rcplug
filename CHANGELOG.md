@@ -118,6 +118,8 @@ Found by end-to-end tests of every option (host, dashboard, console, simulator, 
   panel controls and four error messages are translated; strip buttons wrap instead of
   being cut off.
 - rcsim no longer adds a property the desk does not have when a fader moves.
+- `rcplugd --root` accepts a relative directory: plugins run in their own folder and
+  got relative paths (`RCPLUG_DATA_DIR` and the like) that pointed nowhere there.
 - rcplugd registers its signal handlers before it starts any plugin. Started with
   SIGINT ignored (as a background job of a shell is), it passed that on to the first
   plugins, which then could not stop cleanly and were killed after 3 seconds.

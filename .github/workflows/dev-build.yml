@@ -22,8 +22,8 @@ jobs:
     name: Build and publish the pre-release "dev"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: stable
       - name: Build
@@ -47,5 +47,5 @@ jobs:
           notes="Development build of commit ${GITHUB_SHA::7}, for testing. Use a release for anything else; devices never update to this by themselves."
           gh release delete dev --cleanup-tag --yes 2>/dev/null || true
           gh release create dev --prerelease --target "$GITHUB_SHA" --title "Development build $DEV_VERSION" --notes "$notes" \
-            dist/rcplug-*-aarch64.tar.gz dist/rcplug-examples-*-aarch64.tar.gz dist/SHA256SUMS \
+            "dist/rcplug-$DEV_VERSION-aarch64.tar.gz" "dist/rcplug-examples-$DEV_VERSION-aarch64.tar.gz" dist/SHA256SUMS \
             dist/release.json dist/release.json.sig

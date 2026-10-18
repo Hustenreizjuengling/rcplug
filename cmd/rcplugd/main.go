@@ -51,6 +51,11 @@ func main() {
 		fmt.Println(version)
 		return
 	}
+	// Plugins run in their own directory, so every path handed to them (and
+	// the leftover check, which compares working directories) is absolute.
+	if abs, err := filepath.Abs(*root); err == nil {
+		*root = abs
+	}
 	if *diag != "" {
 		os.Exit(writeDiagnostics(*diag, *root, *addr))
 	}

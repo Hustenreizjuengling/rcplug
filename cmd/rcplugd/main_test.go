@@ -126,6 +126,12 @@ while :; do sleep 0.1; done
 		return err == nil && helper > 0
 	})
 	defer syscall.Kill(helper, syscall.SIGKILL)
+	// The helper can be quicker than the host recording the plugin's process
+	// group (under qemu-user it often is).
+	waitFor("the process group to be recorded", func() bool {
+		b, err := os.ReadFile(filepath.Join(root, ".groups"))
+		return err == nil && strings.Contains(string(b), `"spawner"`)
+	})
 	host.Process.Kill() // like a crash: no plugin is stopped
 	host.Wait()
 	time.Sleep(300 * time.Millisecond)
