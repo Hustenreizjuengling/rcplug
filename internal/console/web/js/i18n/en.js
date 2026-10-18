@@ -68,7 +68,7 @@ export default {
   'mixer.physicalNote': 'The physical faders are not motorised: they are moved on the device, virtual faders remotely. The Expert level can set a physical fader too, but the real one takes over again as soon as it is touched.',
   'mixer.inputOf': 'Input: {src}', 'mixer.sendsOf': 'Sends of this source',
   'mixer.normalised': 'Values are the device’s normalised values (0–100 %). Their mapping to dB/Hz/ms is not documented by the manufacturer.',
-  'proc.aphex': 'APHEX', 'proc.gate': 'Noise gate', 'proc.hpf': 'High-pass filter', 'proc.deess': 'De-esser', 'proc.comp': 'Compressor', 'proc.eq': 'Equaliser',
+  'proc.aphex': 'APHEX', 'proc.gate': 'Noise gate', 'proc.hpf': 'High-pass filter', 'proc.deess': 'De-esser', 'proc.comp': 'Compressor', 'eq.perOctave': 'dB/oct', 'eq.curve': 'Frequency response of the EQ and the high-pass filter', 'eq.approx': 'The curve and the units are close estimates: the desk stores these settings without units.', 'proc.eq': 'Equaliser',
   'proc.tone': 'Tone & pan', 'proc.bypass': 'Bypass processing',
   'p.aeMix': 'Exciter mix', 'p.aeTune': 'Exciter tune', 'p.bbDrive': 'Big Bottom drive', 'p.bbTune': 'Big Bottom tune', 'p.threshold': 'Threshold',
   'p.range': 'Range', 'p.attack': 'Attack', 'p.hold': 'Hold', 'p.release': 'Release', 'p.hysteresis': 'Hysteresis', 'p.frequency': 'Frequency',

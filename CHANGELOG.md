@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.8.4 - Unreleased
 
+### Added
+- **EQ curve** in a channel's details: the frequency response of the three EQ bands
+  and the high-pass filter, drawn as a small SVG from the standard filter formulas and
+  redrawn as the settings change, with a dot per band. The EQ and high-pass sliders
+  show Hz, dB, Q and dB/octave instead of percent. The desk stores these settings as
+  0–1 without units; the scales are estimates that fit a real Duo's values (gain 0.5
+  is 0 dB, ±12 dB; logarithmic frequencies; Q 0.1–10) and live in one place
+  (`curves.js`), to be confirmed against the device's own read-outs.
+
 ## 0.8.3 - 2026-10-18
 
 ### Changed

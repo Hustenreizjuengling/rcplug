@@ -277,3 +277,12 @@ dialog.drawer{width:min(760px,calc(100vw - 24px));max-width:none;max-height:calc
 /* strip header: the fader's name stays on one line, the kind is a small mark */
 .strip .sh b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .strip .sh .tag{font-size:10px;padding:1px 6px;flex:none}
+/* EQ curve (curves.js) */
+.card.wide{grid-column:1/-1}
+.eqcurve{width:100%;height:auto;max-height:200px;display:block;background:#0a0d11;border:1px solid var(--line);border-radius:10px}
+.eqcurve .grid line{stroke:#1f2731;stroke-width:1}
+.eqcurve .grid line.zero{stroke:#36414f}
+.eqcurve .grid text{fill:var(--dim);font-size:11px}
+.eqcurve .line{fill:none;stroke:var(--accent);stroke-width:2}
+.eqcurve .area{fill:var(--accent);opacity:.12}
+.eqcurve circle{stroke:#0a0d11;stroke-width:2}

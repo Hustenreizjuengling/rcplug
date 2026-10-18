@@ -258,9 +258,9 @@ func MakeRealistic(root *rcproto.Node) {
 		set(n, "eqLowShelf", 0.3)
 		set(n, "eqMidBell", 0.5)
 		set(n, "eqHighBell", 0.7)
-		set(n, "eqLowQ", 0.5)
-		set(n, "eqMidQ", 0.5)
-		set(n, "eqHighQ", 0.5)
+		set(n, "eqLowQ", 2.0/99) // as on a Duo with firmware 1.7.6
+		set(n, "eqMidQ", 4.0/99)
+		set(n, "eqHighQ", 2.0/99)
 	})
 	each("EFFECTS_PARAMETERS", func(i int, n *rcproto.Node) {
 		set(n, "effectsIdx", i)

@@ -6,6 +6,7 @@ import { canWrite } from '../policy.js';
 import { toggle, slider, vfader, selectCtl, chip, kv, card } from '../controls.js';
 import { hMeter, vMeter, grMeter, hReduction } from '../meters.js';
 import { openDrawer } from '../dialogs.js';
+import { eqCurve, FORMATS } from '../curves.js';
 import { PROC, faders, faderLabel, faderDb, sourceLabel, sourceColour, sources, stripSource, unityFader, mixLevel, sourceIndexes } from '../device.js';
 import { recorderCard, monitorCard, inputCard, routingRow } from './parts.js';
 import { actionButtons } from '../plugins.js';
@@ -100,9 +101,12 @@ export function openChannel(i) {
     for (const p of PROC) {
       const head = h('h3', null, t(p.title));
       if (p.on && val(ch, p.on) !== undefined) head.append(h('span', { class: 'spacer' }), toggle(scope, ch, p.on, t('on')));
-      const c = h('section', { class: 'card' }, head);
+      const c = h('section', { class: 'card' + (p.title === 'proc.eq' ? ' wide' : '') }, head);
+      // The EQ shows its curve (with the high-pass filter), as the device's
+      // screen does; scales in curves.js.
+      if (p.title === 'proc.eq') c.append(eqCurve(scope, ch), h('p', { class: 'muted small', style: 'margin:2px 0 8px' }, t('eq.approx')));
       for (const [prop, key] of p.toggles || []) if (val(ch, prop) !== undefined) c.append(h('div', { class: 'row', style: 'margin:4px 0' }, toggle(scope, ch, prop, t(key))));
-      for (const [prop, key] of p.params) if (val(ch, prop) !== undefined) c.append(slider(scope, ch, prop, { label: t(key) }));
+      for (const [prop, key] of p.params) if (val(ch, prop) !== undefined) c.append(slider(scope, ch, prop, { label: t(key), fmt: FORMATS[prop] }));
       grid.append(c);
     }
     body.append(grid);
