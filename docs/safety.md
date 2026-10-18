@@ -18,10 +18,11 @@ The touch screen is a client of the same control port the console uses, and the
 firmware serves **one client at a time** (1.7.3 and 1.7.6, seen on a real Duo; see
 [protocol.md](protocol.md)): while the screen is connected nobody else gets in, and a
 client that connects before the screen would lock it out. On a RØDECaster the console
-therefore **does not connect at all**: it reads along with the screen's connection
-(`--desk-mode auto`, see [protocol.md](protocol.md#reading-along)), which cannot
-disturb it, and changes the desk only through the front panel – unless a user switches
-on the experimental *full control* (below). *Read the state
+therefore never competes with the screen for the connection: it takes the mixer's
+place and serves the screen through itself (*full control*, below), or, where that is
+not possible, reads along with the screen's connection
+([protocol.md](protocol.md#reading-along)), which cannot disturb it, and changes the
+desk through the front panel. *Read the state
 again* restarts the screen app once (about three seconds; RØDE's own scripts restart
 it the same way, and the mixer keeps running); it is rate-limited and needs the PIN
 if one is set. To go on after its own restart, the console keeps the mirrored tree in
@@ -221,31 +222,37 @@ release of rcplug or a plugin (never anything unsigned or older, see
 protects against others on a network you trust, not against someone who can read that
 network's traffic. Do not expose port 8080 to the internet.
 
-## Experimental features
+## How the console reaches the desk
 
-- **Device buttons** (front-panel emulation): reading along, the console changes mute,
-  listen and the physical faders by injecting the same messages that the panel's
-  microcontroller sends into the input queue of its serial line (`/dev/ttyAML3`, with
-  `TIOCSTI`). It is off until a user switches it on (*System* page, with a
-  confirmation) or the console runs with `--panel`; the control levels apply as to
-  every write (a physical fader needs *Expert*). Every press is in the console's log.
-  A fader set this way jumps back when the real one moves.
+Since 0.8.0 there are no switches for these: each is either needed to control the
+whole device from the browser, or gone. All of them were tried on a real Duo first.
+
 - **Full control** lets the console take the mixer's one connection and serve the
   device's screen through itself, so every setting can be changed
-  ([protocol.md](protocol.md#full-control)). It is off until a user switches it on at
-  the *Expert* level (*System* page, with a warning); switching it on restarts the
-  screen app once. The console always closes its own listener before it lets go of the
-  mixer, also when it crashes, so the mixer can listen again, and then restarts the
-  screen app so it connects to the mixer afresh;
-  a screen that does not keep up is disconnected rather than ever holding up the
-  mixer; without the screen for 30 seconds the console steps back. Audio does not pass
-  through this connection. Switching it off (or `--desk-mode connect`) returns to
-  reading along.
-- **Audio taps** (dashboard → System, off by default) give plugins the desk's inputs
-  and outputs through one JACK client, `rcplug-taps`, which runs only while a plugin
-  listens ([plugin-api.md](plugin-api.md#audio)). It is a client in RØDE's audio graph
-  like any other, at the host's low priority; dropouts it reports show on the System
-  page. Only plugins get audio, never the network directly.
+  ([protocol.md](protocol.md#full-control)). The console does this by itself when it
+  starts on the device, which restarts the screen app once (about three seconds); the
+  control levels still decide what a browser may change. The console always closes
+  its own listener before it lets go of the mixer, also when it crashes, so the mixer
+  can listen again, and then restarts the screen app so it connects to the mixer
+  afresh; a screen that does not keep up is disconnected rather than ever holding up
+  the mixer; without the screen for 30 seconds the console steps back. Audio does not
+  pass through this connection. If full control misbehaves (say after a firmware
+  update), the console's setting *Connection to the mixer: Read along only* (Plugins →
+  Console → Settings) returns to reading along for good.
+- **Device buttons** (front-panel emulation): reading along, the console changes mute,
+  listen, the physical faders and the SMART pads by injecting the same messages that
+  the panel's microcontroller sends into the input queue of its serial line
+  (`/dev/ttyAML3`, with `TIOCSTI`); physical faders are always set this way. It is
+  used wherever that serial line exists; the control levels apply as to every write
+  (a physical fader needs *Expert*). Every press is in the console's log. A fader set
+  this way jumps back when the real one moves.
+- **Audio taps** give plugins with the permission `audio` the desk's inputs and
+  outputs through one JACK client, `rcplug-taps`, which runs only while a plugin
+  listens ([plugin-api.md](plugin-api.md#audio)). The permission is shown before a
+  plugin is installed, and that is the choice. On a Duo the bridge costs about 1 % of
+  the device; it is a client in RØDE's audio graph like any other, at the host's low
+  priority, and dropouts it reports show on the System page. Never the network
+  directly.
 - **Meters** come from the shared memory in which the mixer keeps them for its screen
   ([protocol.md](protocol.md#meters-and-fader-positions)). The console attaches it
   read-only, like the screen app, and only copies it; it is on by default because it

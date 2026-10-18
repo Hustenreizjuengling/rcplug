@@ -4,7 +4,28 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.7.5 - Unreleased
+## 0.8.0 - Unreleased
+
+### Changed
+- **Full control is how the console works on the device.** Tried on a real Duo
+  (firmware 1.7.6): the console took the mixer's connection in four seconds, the
+  device's screen worked normally through it, and everything changed in the browser
+  showed on the device. So it is no longer an experimental switch: on a RØDECaster the
+  console takes the mixer's place by itself when it starts (the device's screen
+  restarts once, about three seconds), and reads along only when that is not possible;
+  it tries again when the mixer's place becomes free, never in a loop. The control
+  levels still decide what a browser may change, and full control no longer needs
+  the *Expert* level. The way back, should a firmware update break it: Plugins →
+  Console → Settings → *Connection to the mixer: Read along only*.
+- **The device buttons are no switch either:** the console uses the front-panel
+  emulation wherever its serial line exists (physical faders, and mute, listen and the
+  SMART pads while reading along). `--panel` is ignored.
+- The console's *System* page shows how it reaches the desk (full control since …,
+  reading along and why, or connected) instead of the two switch cards.
+- **Audio taps:** no switch in the dashboard any more. A plugin with the permission
+  `audio`, which users see before installing it, gets audio; the bridge costs about
+  1 % of a Duo. `POST /api/audio/enable` is gone; `GET /api/audio` reports `enabled`
+  as always true.
 
 ## 0.7.4 - 2026-10-18
 

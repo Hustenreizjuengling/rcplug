@@ -16,12 +16,6 @@ import (
 // plugin's data directory, kept across reinstalls).
 type Settings struct {
 	Control string `json:"control"` // off | basic | expert
-	// Panel switches the front-panel emulation on (--panel does it for good).
-	Panel bool `json:"panel,omitempty"`
-	// FullControl (experimental, reading along only): the console takes the
-	// mixer's one place and serves the device's screen in turn, so every
-	// setting can be written (see desk/relay.go).
-	FullControl bool `json:"fullControl,omitempty"`
 	// ReadOnly refuses every write, like --read-only, but switchable in the
 	// UI (behind the PIN, if one is set).
 	ReadOnly bool `json:"readOnly,omitempty"`

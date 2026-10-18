@@ -3,17 +3,13 @@ export default {
   'page.title': 'Konsole · RØDECaster',
   yes: 'ja', no: 'nein', empty: '(leer)', ok: 'OK', cancel: 'Abbrechen', on: 'an', mute: 'Mute', listen: 'Listen',
   details: 'Details…', loading: 'lade…', 'loading.none': 'Noch kein Gerätezustand verfügbar.', connected: 'verbunden', disconnected: 'getrennt',
-  'full.title': 'Volle Steuerung', 'full.intro': 'Beim Mitlesen kann die Konsole nur ändern, wofür das Gerät eine Taste hat. Mit voller Steuerung übernimmt sie die eine Verbindung des Mixers selbst und reicht alles an den Gerätebildschirm weiter: Dann lässt sich jede Einstellung von hier ändern, und der Bildschirm zeigt sie an. Der Gerätebildschirm startet dafür einmal neu (etwa drei Sekunden).', 'full.enable': 'Einschalten', 'full.disable': 'Ausschalten', 'full.retry': 'Erneut versuchen', 'full.refresh': 'Aktualisieren', 'full.enableConfirm': 'Volle Steuerung einschalten? Der Gerätebildschirm startet einmal neu (etwa drei Sekunden) und läuft dann über die Konsole. Hält die Konsole an, verbindet sich der Bildschirm von selbst wieder mit dem Mixer; der Ton ist nicht betroffen. Experimentell: zuerst ausprobieren, wenn gerade nichts aufgenommen wird.', 'full.expertOnly': 'Nur auf der Stufe „Experte“.', 'full.active': 'Aktiv: Der Gerätebildschirm läuft über die Konsole (seit {time}). Jede Einstellung lässt sich ändern.', 'full.noScreen': 'Aktiv; der Gerätebildschirm ist noch nicht verbunden (er verbindet sich in wenigen Sekunden neu).', 'full.starting': 'Übernimmt die Verbindung des Mixers…', 'full.failed': 'Nicht aktiv: {err}', 'full.lastEnd': 'Zuletzt: {err}', 'full.note': 'Ausgeschaltet liest die Konsole wieder mit, und der Bildschirm verbindet sich mit dem Mixer. Die Einstellung bleibt gespeichert: Nach einem Neustart des Geräts übernimmt die Konsole wieder.', 'state.liveRelay': 'Live (volle Steuerung)', 'header.liveRelay': 'Live (volle Steuerung) · {n}/s', 'code.relay_busy': 'der Gerätebildschirm hält die Verbindung des Mixers', 'code.relay_race': 'der Gerätebildschirm war schneller; bitte erneut versuchen', 'code.relay_no_mixer': 'der Mixer nimmt keine Verbindung an', 'code.relay_no_screen': 'der Gerätebildschirm hat sich nicht über die Konsole verbunden, daher zurückgegeben', 'code.relay_failed': 'Übernahme fehlgeschlagen (siehe Protokoll)', 'code.relay_ended': 'beendet',
+'state.liveRelay': 'Live (volle Steuerung)', 'header.liveRelay': 'Live (volle Steuerung) · {n}/s', 'code.relay_busy': 'der Gerätebildschirm hält die Verbindung des Mixers', 'code.relay_race': 'der Gerätebildschirm war schneller; bitte erneut versuchen', 'code.relay_no_mixer': 'der Mixer nimmt keine Verbindung an', 'code.relay_no_screen': 'der Gerätebildschirm hat sich nicht über die Konsole verbunden, daher zurückgegeben', 'code.relay_failed': 'Übernahme fehlgeschlagen (siehe Protokoll)', 'code.relay_ended': 'beendet',
   'ro.label': 'Schreibschutz', 'ro.on': 'Einschalten', 'ro.off': 'Ausschalten', 'ro.isOn': 'an – nichts lässt sich ändern', 'ro.isOff': 'aus', 'ro.forced': 'an (mit --read-only gestartet)', 'ro.offConfirm': 'Schreibschutz ausschalten? Dann sind wieder Änderungen auf der gewählten Steuerstufe möglich.', 'pin.forgot': 'PIN vergessen?', 'pin.resetStart': 'Starten', 'pin.resetConfirm': 'PIN am Gerät entfernen? Nach dem Start hast du eine Minute: Drücke am Gerät viermal schnell hintereinander die Listen-Taste von Kanal 1 (danach ist sie wieder wie vorher). Dann wird die PIN entfernt und die Steuerstufe auf „Nur lesen“ gesetzt.', 'pin.resetPress': 'Jetzt am Gerät viermal schnell die Listen-Taste von Kanal 1 drücken ({n}/{need}) – noch {s} s.', 'pin.resetDone': 'PIN am Gerät entfernt. Die Steuerstufe ist „Nur lesen“.', 'pin.resetExpired': 'Zeit abgelaufen; die PIN wurde nicht geändert.',
-  'panel.intro': 'Beim Mitlesen ändert die Konsole Mute, Listen und die physischen Fader, indem sie dieselben Signale sendet wie die Tasten und Fader am Gerät. Ein so gesetzter Fader springt zurück, sobald der echte bewegt wird.',
-  'panel.isOn': 'Eingeschaltet.',
-  'panel.levelNote': 'Wirkt ab der Steuerstufe „Steuern“, physische Fader erst bei „Experte“.',
-  'panel.forced': 'Dauerhaft eingeschaltet (mit --panel gestartet).',
-  experimental: 'experimentell', 'readonly.hint': 'nur Anzeige', 'render.error': 'Fehler beim Anzeigen: {err}',
 
+
+  'readonly.hint': 'nur Anzeige', 'render.error': 'Fehler beim Anzeigen: {err}',
   'tab.mixer': 'Mixer', 'tab.routing': 'Routing', 'tab.inputs': 'Eingänge', 'tab.outputs': 'Ausgänge & Master', 'tab.effects': 'Effekte',
   'tab.pads': 'SMART Pads', 'tab.recorder': 'Aufnahme', 'tab.system': 'System', 'tab.explorer': 'Explorer', 'tab.audit': 'Protokoll',
-
   'header.live': 'Live · {n}/s', 'header.liveTap': 'Live (liest mit) · {n}/s', 'header.offline': 'Konsole nicht erreichbar – verbinde neu…', 'header.firmware': 'Firmware {v}',
   'header.show': 'Show „{name}“', 'header.language': 'Sprache wechseln',
   'level.group': 'Steuerung', 'level.off': 'Nur lesen', 'level.basic': 'Steuern', 'level.expert': 'Experte',
@@ -24,11 +20,9 @@ export default {
   'level.expertText': 'Erlaubt das Schreiben fast aller Eigenschaften im Explorer, ohne Wertebereichsprüfung. Gesperrt bleiben Firmware-Update/Reset, Ausschalten, Speicher, Netzwerk, Konten, Dateipfade und Zugangsdaten. Nur verwenden, wenn du weißt, was eine Eigenschaft bewirkt.',
   'level.expertOk': 'Expertenmodus aktivieren',
   'level.now.off': 'Nur-Lesen-Modus', 'level.now.basic': 'Steuerung aktiv', 'level.now.expert': 'Expertenmodus aktiv',
-
   'banner.lastKnown': 'angezeigt wird der zuletzt bekannte Zustand.',
   'banner.untested': 'Für {model} ist rcplug nicht geprüft: die Konsole bleibt nur lesend (Freigabe mit --allow-untested-model).',
   'banner.readOnly': 'Schreibzugriff ist für dieses Gerät gesperrt (--read-only).', 'banner.locked': 'Steuerung ist gesperrt',
-
   'state.live': 'Live', 'state.waiting': 'Gerät startet noch', 'state.waitingN': 'Gerät startet noch – Verbindung in {n} s',
   'state.connecting': 'Verbinde…', 'state.syncing': 'Lade Gerätezustand…', 'state.backoff': 'Getrennt', 'state.retryIn': 'neuer Versuch in {n} s',
   'state.conflict': 'Schutz aktiv: Beim Verbinden hat ein anderer Client (vermutlich die Oberfläche am Gerät) seine Verbindung verloren. Die Konsole bleibt getrennt, bis du „Erneut verbinden“ wählst.',
@@ -38,12 +32,14 @@ export default {
   'banner.tapWaiting': 'Die Konsole liest mit, was der Bildschirm des Geräts vom Mischpult bekommt. Den vollständigen Zustand gibt es nur, wenn sich der Bildschirm verbindet – beim Einschalten oder wenn er neu startet.',
   'banner.tapResync': 'Zustand neu einlesen', 'banner.tapResyncOk': 'Der Bildschirm des Geräts startet neu …',
   'banner.tapResyncConfirm': 'Der Bildschirm des Geräts startet dazu einmal neu (etwa 3 Sekunden). Das Mischpult und damit das Audio laufen dabei weiter.',
-  'banner.tapLive': 'Die Konsole liest mit: Mute, Listen, die physischen Fader und die SMART-Pads ändert sie über die Gerätetasten. Alles andere braucht die volle Steuerung.',
+  'banner.tapLive': 'Die Konsole liest nur mit, so in ihren Einstellungen gewählt (Plugins → Konsole → Einstellungen): Mute, Listen, die physischen Fader und die SMART-Pads ändert sie über die Gerätetasten.',
+  'banner.tapFallback': 'Die volle Steuerung ist gerade nicht möglich, daher liest die Konsole mit: Mute, Listen, die physischen Fader und die SMART-Pads ändert sie über die Gerätetasten.',
+  'mode.relay': 'Volle Steuerung: Der Bildschirm des Geräts läuft über die Konsole (seit {time}), jede Einstellung lässt sich von hier ändern.', 'mode.relayStarting': 'Übernehme die Verbindung zum Mischpult (der Bildschirm des Geräts startet einmal neu, etwa drei Sekunden)…',
+  'mode.tapBecause': 'Liest mit: Die volle Steuerung ist nicht möglich ({err}). Sie wird wieder versucht, sobald der Platz am Mischpult frei ist.', 'mode.tapChosen': 'Liest nur mit, so in den Einstellungen der Konsole gewählt (Plugins → Konsole → Einstellungen).', 'mode.connect': 'Direkt mit dem Mischpult verbunden.',
   'banner.tapResumed': 'Nach dem Neustart der Konsole liest sie dort weiter, wo sie aufgehört hat. Änderungen aus den Sekunden dazwischen können fehlen.',
   'code.boot_grace': 'Gerät startet', 'code.connect_failed': 'Mischpult nicht erreichbar', 'code.desk_busy': 'belegt – das Mischpult bedient nur einen Client, und die Oberfläche am Gerät hält ihn', 'code.no_full_sync': 'kein Gerätezustand empfangen',
   'code.disconnected': 'Verbindung beendet', 'code.desync': 'Abweichung erkannt, lade neu', 'code.guard_conflict': 'Schutz aktiv',
   'guard.active': 'aktiv', 'guard.off': 'aus', 'guard.remote': 'nicht nötig (entferntes Gerät)', 'guard.unavailable': 'nicht verfügbar',
-
   'err.network': 'Konsole nicht erreichbar', 'err.not_synced': 'Noch kein Gerätezustand empfangen.',
   'err.stale_epoch': 'Der Gerätezustand hat sich geändert – die Ansicht wird neu geladen, bitte erneut versuchen.',
   'err.offline': 'Nicht mit dem Mischpult verbunden.', 'err.read_only': 'Schreibzugriff ist gesperrt (--read-only).',
@@ -59,27 +55,22 @@ export default {
   'err.bad_request': 'Ungültige Anfrage: {msg}', 'err.no_node': 'Diesen Teil des Geräts gibt es nicht mehr – die Ansicht wird neu geladen.',
   'err.invalid_change': 'Diese Änderung lässt sich nicht senden: {msg}', 'err.invalid_level': 'Unbekannte Steuerungsstufe.',
   'err.not_found': 'Unbekannte Anfrage: {msg}', 'err.internal': 'Interner Fehler: {msg}',
-
   'fader.physical': 'Fader {n}', 'fader.virtual': 'Virtuell {n}', 'output.n': 'Bus {n}',
   'fader.dragHint': 'ziehen oder Pfeiltasten', 'fader.panelHint': 'Ziehen setzt die Stellung über die Gerätetasten – bis der echte Fader bewegt wird.', 'fader.physicalHint': 'physischer Fader – nur Anzeige', 'meter.side': 'Pegel {side}', 'meter.reduction': 'Pegelreduktion (Kompressor)', 'meter.reductionDb': 'Pegelreduktion {db} dB',
-
   'src.combo1': 'Mic 1', 'src.combo2': 'Mic 2', 'src.combo3': 'Mic 3', 'src.combo4': 'Mic 4', 'src.virtuala': 'Virtuell A', 'src.virtualb': 'Virtuell B',
   'out.headphone1': 'Kopfhörer 1', 'out.headphone2': 'Kopfhörer 2', 'out.headphone3': 'Kopfhörer 3', 'out.headphone4': 'Kopfhörer 4',
   'out.speaker': 'Lautsprecher', 'out.recording': 'Aufnahme',
-
   'rec.title': 'Aufnahme', 'rec.none': 'kein Recorder im Gerätezustand', 'rec.record': 'Aufnahme', 'rec.recordHint': 'Aufnahme starten',
   'rec.pause': 'Pause', 'rec.stop': 'Stopp', 'rec.marker': 'Marker', 'rec.markerHint': 'Kapitelmarke setzen',
   'rec.state0': 'bereit', 'rec.state1': 'pausiert', 'rec.state2': 'Aufnahme läuft', 'rec.state3': 'kein Speicherziel', 'rec.stateN': 'Status {n}',
   'mon.title': 'Monitor / Lautsprecher', 'mon.level': 'Lautstärke', 'mon.autoMute': 'Auto-Mute', 'mon.emergency': 'Not-Stumm (alles)',
   'mon.emergencyConfirm': 'Not-Stummschaltung umschalten? Das betrifft alle Ausgänge.',
-
   'mixer.device': 'Gerät & Show', 'mixer.show': 'Show', 'mixer.quick': 'Schnellzugriff', 'mixer.channels': 'Kanäle', 'mixer.levels': 'Pegel', 'mixer.master': 'Master', 'mixer.focusIn': 'Gewählter Kanal: Eingang', 'mixer.focusOut': 'Gewählter Kanal: Ausgang', 'mixer.focusReduction': 'Gewählter Kanal: Pegelreduktion', 'mixer.focusNote': 'Der gewählte Kanal ist der, der gerade auf dem Bildschirm des Geräts geöffnet ist.',
   'mixer.physical': 'physisch', 'mixer.virtual': 'virtuell', 'mixer.source': 'Quelle', 'mixer.noSource': '— keine —', 'mixer.empty': 'leer',
   'mixer.sourceConfirm': 'Quelle dieses Kanals ändern?', 'mixer.faderHint': 'Faderposition (0–{max}) und ungefährer Pegel relativ zur 0-dB-Rastung',
   'mixer.physicalNote': 'Die physischen Fader sind nicht motorisiert: Sie werden am Gerät bewegt, virtuelle Fader aus der Ferne. Die Stufe Experte kann auch einen physischen Fader setzen, doch der echte übernimmt wieder, sobald er berührt wird.',
   'mixer.inputOf': 'Eingang: {src}', 'mixer.sendsOf': 'Sends dieser Quelle',
   'mixer.normalised': 'Werte sind die normierten Gerätewerte (0–100 %). Die Umrechnung in dB/Hz/ms ist vom Hersteller nicht dokumentiert.',
-
   'proc.aphex': 'APHEX', 'proc.gate': 'Noise Gate', 'proc.hpf': 'Hochpass', 'proc.deess': 'De-Esser', 'proc.comp': 'Kompressor', 'proc.eq': 'Equalizer',
   'proc.tone': 'Klang & Panorama', 'proc.bypass': 'Bearbeitung umgehen',
   'p.aeMix': 'Exciter Mix', 'p.aeTune': 'Exciter Tune', 'p.bbDrive': 'Big Bottom Drive', 'p.bbTune': 'Big Bottom Tune', 'p.threshold': 'Schwelle',
@@ -90,7 +81,6 @@ export default {
   'p.high': 'Höhen', 'p.depth': 'Tiefe (Big)', 'p.sparkle': 'Brillanz (Bright)', 'p.punch': 'Punch', 'p.pan': 'Panorama', 'p.panOn': 'Panorama aktiv',
   'p.advanced': 'Erweiterte Bearbeitung', 'p.talkback': 'Talkback', 'p.wirelessMute': 'Funk-Mikro stumm', 'p.mix': 'Mix', 'p.model': 'Modell',
   'p.lowCut': 'Low Cut', 'p.highCut': 'High Cut', 'p.time': 'Zeit', 'p.decay': 'Abklingen', 'p.semitones': 'Halbtöne', 'p.intensity': 'Intensität', 'p.level': 'Pegel',
-
   'mix.active': 'aktiv', 'mix.mute': 'stumm', 'mix.muted': 'stumm', 'mix.disabled': 'deaktiviert', 'mix.linked': 'folgt dem Fader',
   'mix.unlinked': 'eigener Pegel', 'mix.levelAnchor': 'Pegel {level} / Anker {anchor}', 'mix.link': 'mit Fader verknüpfen', 'mix.unlink': 'entkoppeln',
   'mix.linkRequested': 'Verknüpfung angefordert', 'mix.unlinkRequested': 'Entkopplung angefordert', 'mix.level': 'Pegel', 'mix.anchor': 'Anker',
@@ -98,34 +88,28 @@ export default {
   'routing.corner': 'Quelle → Ausgang', 'routing.on': 'auf {strips}', 'routing.unassigned': 'keinem Kanal zugewiesen',
   'routing.onlyUsed': 'nur Quellen, die einem Kanal zugewiesen sind', 'routing.intro': 'Welche Quelle in welchem Ausgangsmix landet. Zelle anklicken für Details.',
   'routing.hatched': 'schraffiert = deaktiviert', 'mm.0': 'Hauptmix', 'mm.1': 'Mix-Minus', 'mm.2': 'Eigener Mix', 'routing.mixMinus': 'Mix-Minus',
-
   'inputs.intro': 'Eingangsquellen (Vorverstärker, Phantomspeisung, Typ). Eine Quelle existiert unabhängig davon, ob sie einem Kanal zugewiesen ist.',
   'input.micGain': 'Mic-Gain', 'input.instGain': 'Instrument-Gain', 'input.digitalGain': 'Digital-Gain', 'input.phase': 'Phase ⟲', 'input.type': 'Typ',
   'input.micType': 'Mikrofontyp', 'input.colour': 'Farbe', 'input.wireless': 'Funk-Seriennr.', 'input.callSlot': 'CallMe-Slot',
   'input.phantomConfirm': 'Phantomspeisung (48 V) einschalten? Nur für Kondensatormikrofone – Bändchenmikrofone können Schaden nehmen.',
   'input.phantomOn': 'Einschalten', 'input.type-1': '—', 'input.type0': 'Mikrofon', 'input.typeN': 'Typ {n}',
-
   'out.bt': 'Bluetooth-Ausgang', 'out.fixed': 'fester Pegel', 'out.autoMuteActive': 'Auto-Mute aktiv', 'out.multitrack': 'Mehrspur & Aufnahmebus',
   'out.multiMode': 'Multi-Out-Modus', 'out.multiBypass': 'Multi-Out Bypass', 'out.prefader': 'Pre-Fader', 'out.trackMode': 'Mehrspur-Modus',
   'out.compression': 'Kompressionsqualität', 'out.procBypass': 'Bearbeitung umgehen', 'out.hp1Level': 'Kopfhörer 1 Pegel', 'out.headphone': 'Kopfhörer {n}',
   'out.hpType': 'Typ', 'out.allHpOff': 'alle Kopfhörer aus', 'out.lineOff': 'Line-Outs aus', 'out.headphones': 'Kopfhörer',
   'out.master': 'Master: Compellor & Delay', 'out.delay': 'Delay (s)', 'out.ducking': 'Ducking', 'out.depth': 'Tiefe', 'out.allMuted': 'alles stumm',
-
   'fx.intro': 'Stimm-Effekte je Kanal-Slot (Reihenfolge wie die Kanäle).', 'fx.slot': 'Effekt-Slot {n}', 'fx.padSlot': 'Pad-Effekt {n}',
   'fx.padTitle': 'Effekte der SMART Pads', 'fx.preset': 'FX-Preset {n}', 'fx.presets': 'FX-Presets', 'fx.index': 'Index', 'fx.content': 'Inhalt',
   'fx.chars': '{n} Zeichen', 'fx.reverb': 'Hall', 'fx.echo': 'Echo', 'fx.pitch': 'Pitch', 'fx.distortion': 'Verzerrung', 'fx.robot': 'Roboter', 'fx.disguise': 'Stimmverfremdung',
-
   'pads.intro': '● = am Gerät aktive Bank. Pad antippen zum Auslösen (bei Steuerung).', 'pads.bank': 'Bank {n}', 'pads.pad': 'Pad {n}',
   'pads.unused': 'nicht belegt', 'pads.trigger': '{name} auslösen', 'pads.details': 'Details zu {name}', 'pads.title': 'SMART Pad: {name}',
   'pads.gain': 'Lautstärke', 'pads.selectBank': 'Bank {n} am Gerät auswählen', 'pads.bankDenied': 'Bankwechsel nicht erlaubt', 'pads.bankOnDevice': 'Beim Mitlesen spielen nur die Pads der Bank, die das Gerät zeigt: Bank {n} am Gerät wählen',
   'pad.type0': 'leer', 'pad.type1': 'Sound', 'pad.type2': 'Effekt', 'pad.type3': 'Mixer', 'pad.type4': 'MIDI', 'pad.type5': 'Video', 'pad.type6': 'CallMe', 'pad.typeN': 'Typ {n}',
-
   'player.title': 'Player', 'player.state': 'Status', 'player.file': 'Datei', 'player.position': 'Position', 'player.speed': 'Geschwindigkeit',
   'storage.title': 'Speicher', 'storage.used': '{used} von {total} belegt', 'storage.unknown': 'keine Angabe', 'storage.n': 'Speicher {n}',
   'storage.recDest': 'Aufnahmeziel', 'storage.storage': 'Speicher', 'storage.inserted': 'Eingelegt', 'storage.mounted': 'Eingebunden',
   'storage.formatted': 'Formatiert', 'storage.state': 'Status', 'recs.title': 'Aufnahmen', 'recs.count': 'Anzahl', 'recs.duration': 'Gesamtdauer',
   'recs.content': 'Inhalt', 'padrec.title': 'Pad-Recorder', 'padrec.state': 'Status', 'padrec.pad': 'Pad', 'padrec.seconds': 'Sekunden',
-
   'conn.title': 'Verbindung zum Mischpult', 'conn.state': 'Status', 'conn.addr': 'Adresse', 'conn.guard': 'GUI-Schutz', 'conn.rate': 'Änderungen/s',
   'conn.received': 'Empfangen', 'conn.receivedN': '{n} Nachrichten, {kib} KiB', 'conn.sent': 'Gesendet', 'conn.sessions': 'Sitzungen',
   'conn.decodeErrors': 'Dekodierfehler', 'conn.applyErrors': 'Anwendungsfehler', 'conn.desyncs': 'Neu synchronisiert', 'conn.reconnect': 'Erneut verbinden',
@@ -135,7 +119,6 @@ export default {
   'console.pinHint': 'Mit PIN muss jede Änderung (auch Steuerstufe und die Schalter der Konsole) bestätigt werden. Vergessen? „PIN vergessen?“ entfernt sie mit vier Tastendrücken am Gerät.',
   'pin.label': 'PIN', 'pin.prompt': 'Für Änderungen ist eine PIN eingerichtet.', 'pin.send': 'Senden', 'pin.current': 'aktuelle PIN', 'pin.new': 'neue PIN',
   'pin.newHint': 'neue PIN (leer = entfernen)', 'pin.save': 'PIN speichern', 'pin.removeConfirm': 'PIN entfernen? Dann kann jeder im Netzwerk die Steuerung einschalten.',
-
   'sys.device': 'Gerät', 'sys.name': 'Name', 'sys.serial': 'Seriennummer', 'sys.firmware': 'Firmware', 'sys.board': 'Board-Typ', 'sys.engine': 'Engine-Modus',
   'sys.midi': 'MIDI-Steuerung', 'sys.selChannel': 'Gewählter Kanal', 'sys.selMix': 'Gewählter Mix', 'sys.haptic': 'Haptik', 'sys.recButton': 'REC-Taste',
   'sys.timezone': 'Zeitzone', 'sys.h24': '24 h', 'sys.dst': 'Sommerzeit', 'sys.beta': 'Beta-Modus', 'sys.usbHost': 'USB-Host', 'sys.presenter': 'Presenter-Modus',
@@ -153,11 +136,8 @@ export default {
   'sys.currentShow': 'Aktuell', 'sys.show': 'Show', 'sys.icon': 'Symbol', 'sys.display': 'Oberfläche & Helligkeit',
   'gui.screen': 'Display-Helligkeit', 'gui.buttons': 'Tasten-Helligkeit', 'gui.buttonsActive': 'Tasten aktiv', 'gui.buttonsInactive': 'Tasten inaktiv',
   'gui.lang': 'Sprache', 'gui.auto': 'Auto-Helligkeit', 'gui.dim': 'Abdunkeln', 'gui.meters': 'Meter senden',
-  'panel.title': 'Gerätetasten',
-  'panel.enable': 'Gerätetasten einschalten', 'panel.disable': 'Gerätetasten ausschalten',
-  'panel.enableConfirm': 'Die Konsole sendet dann dieselben Signale wie die Tasten am Gerät. Selten kann ein Druck mit einem echten Tastendruck im selben Moment zusammenfallen. Bedienbar in der Steuerstufe „Experte“.',
-  'banner.busyHint': 'Über die Seite „System“ schaltest du die Gerätetasten ein, damit die Konsole ändern kann.', 'banner.busyLink': 'Zu „System“',
 
+  'banner.busyHint': 'Der Bildschirm des Geräts hält die Verbindung zum Mischpult. Am Gerät übernimmt die Konsole sie normalerweise selbst (Verbindung „Automatisch“ unter Plugins → Konsole → Einstellungen).', 'banner.busyLink': 'Zu „System“',
   'explorer.tree': 'Gerätezustand', 'explorer.search': 'Eigenschaft oder Wert suchen…', 'explorer.props': '{n} P', 'explorer.children': '{n} Kinder',
   'explorer.root': '{t} (Wurzel)', 'explorer.hits': '{n} Treffer', 'explorer.notFound': 'Knoten nicht gefunden',
   'explorer.pathInfo': 'Pfad [{path}] · {props} Eigenschaften · {children} Kinder', 'explorer.noProps': 'Dieser Knoten hat keine eigenen Eigenschaften – links die Unterknoten aufklappen.',

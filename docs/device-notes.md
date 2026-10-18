@@ -93,13 +93,13 @@ flashing from Windows (below). What is still open:
    the interface again; the computer reset it about 45 seconds later (`ep_stop_xfr:
    timeout`, then a new enumeration), as after the earlier updates. To confirm with the
    first update installed *by* 0.6.5.
-6. **Full control** (0.6.4, experimental). Built on what the analysis of the binaries
-   says (the mixer closes its listener while it has a client and opens it again when
-   the client leaves; the screen app connects to `127.0.0.1:2345`) and tested against
-   the simulator. To confirm on the device: that the screen app connects through the
-   console and works normally, that a setting changed in the console shows on the
-   screen, and that the screen finds the mixer again when full control is switched
-   off or the console stops.
+6. **Full control.** *Confirmed on a real Duo (0.7.4, firmware 1.7.6):* the takeover
+   took four seconds (the session-open handshake was needed), the screen app worked
+   normally through the console, and mute, listen, pads, routing and channel
+   processing changed in the browser showed on the device; nothing was refused. Since
+   0.8.0 it is how the console works on the device. Still to watch: the takeover at
+   boot, and the screen finding the mixer again when the console stops (both behave as
+   designed in the simulator).
 
 ## First test on a real Duo
 
@@ -128,7 +128,7 @@ from Windows to a patched 1.7.6):
   the device, the wheel and the pads worked from the browser. (The *Display* page,
   with a screen mirror and operating the screen by touch, was removed in 0.6.7; the
   console now presses mute and listen and sets the physical faders right from its
-  mixer, and the switch for the device buttons is on its *System* page.)
+  mixer; since 0.8.0 there is no switch for the device buttons.)
 - **The screen mirror worked next to the GUI** (DRM, 2 frames per second; removed in
   0.6.7). The GUI draws its 1280×720 landscape screen into a 720×1280 buffer whose top
   is on the right.

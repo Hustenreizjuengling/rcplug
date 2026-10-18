@@ -475,7 +475,7 @@ The dashboard's API, open to plugins (`$RCPLUG_HOST_URL`) and scripts. POSTs nee
 | `GET /api/diagnostics` | The diagnostics bundle |
 | `GET /api/updates`, `POST /api/updates/check`, `POST /api/updates/install?target=` | Updates, see [updates.md](updates.md) |
 | `GET /api/events`, `GET /api/events/stream`, `POST /api/events` | The event bus, see [Events](#events) |
-| `GET /api/audio`, `GET /api/audio/stream`, `POST /api/audio/enable?on=` | The shared audio taps, see [Audio](#audio) |
+| `GET /api/audio`, `GET /api/audio/stream` | The shared audio taps, see [Audio](#audio) |
 
 ## Events
 
@@ -550,15 +550,16 @@ cheaply as it can: on a Duo, 8 channels at the default quality took about half a
 seconds after the last one hangs up; a port that two plugins want takes one channel.
 
 ```go
-on, ports, err := sdk.AudioPorts(ctx) // switched on? which ports?
+on, ports, err := sdk.AudioPorts(ctx) // available? which ports?
 r, err := sdk.AudioTap(ctx, "system:capture_1", "system:capture_2")
 defer r.Close()
 // r: interleaved signed 16-bit little-endian samples at 48 kHz, here two channels
 ```
 
-- The taps are **off** until a user switches them on (dashboard → System → *Audio
-  taps*), because the bridge adds a client to RØDE's audio graph. Without that,
-  `api/audio/stream` answers 403 `audio_taps_off`.
+- There is no switch (since 0.8.0): declaring the permission `audio` is the choice,
+  shown to users before they install the plugin. On a Duo the bridge costs about 1 % of
+  the device while a plugin listens. (Hosts 0.6.11 to 0.7.4 had a switch and answered
+  403 `audio_taps_off` while it was off.)
 - Only plugins with the permission `audio` get audio (`X-Rcplug-Token: $RCPLUG_TOKEN`,
   which `sdk.AudioTap` sends); a plugin that sends it on to the network (listen in a
   browser) does so itself.
@@ -582,7 +583,7 @@ A plugin that changes the desk declares `"permissions": ["desk:write"]` and send
 token (`X-Rcplug-Token: $RCPLUG_TOKEN`; the SDK's client does). The console then takes
 its writes at the *Control* level's rules, without the PIN and whatever level the
 browsers have; write protection stops it like everyone else, and plugins never change
-the console's own settings (control level, PIN, panel, full control). Without the
+the console's own settings (control level, PIN, write protection). Without the
 permission a write answers 403 `permission_desk_write`, also for requests without a
 token from the device. Say in your plugin's description what it changes.
 Everything else is in [console-api.md](console-api.md); recipes are in the

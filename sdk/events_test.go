@@ -92,10 +92,9 @@ func TestAudioTap(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer m.StopAll()
-	m.SetAudioTaps(true)
 	srv := host.NewServer(m, nil, "test")
 	srv.Events = m.Events
-	srv.Taps = host.NewTaps(&toneBridge{}, m.AudioTaps)
+	srv.Taps = host.NewTaps(&toneBridge{})
 	hs := httptest.NewServer(srv.Handler())
 	defer hs.Close()
 	t.Setenv("RCPLUG_HOST_URL", hs.URL)

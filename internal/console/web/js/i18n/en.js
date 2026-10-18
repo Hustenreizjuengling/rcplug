@@ -3,17 +3,13 @@ export default {
   'page.title': 'Console · RØDECaster',
   yes: 'yes', no: 'no', empty: '(empty)', ok: 'OK', cancel: 'Cancel', on: 'on', mute: 'Mute', listen: 'Listen',
   details: 'Details…', loading: 'loading…', 'loading.none': 'No device state available yet.', connected: 'connected', disconnected: 'disconnected',
-  'full.title': 'Full control', 'full.intro': 'Reading along, the console can only change what has a button on the device. With full control it takes the mixer\'s one connection itself and passes everything on to the device\'s screen: then every setting can be changed from here, and the screen shows it. The device\'s screen restarts once (about three seconds).', 'full.enable': 'Switch on', 'full.disable': 'Switch off', 'full.retry': 'Try again', 'full.refresh': 'Refresh', 'full.enableConfirm': 'Switch on full control? The device\'s screen restarts once (about three seconds) and then runs through the console. If the console stops, the screen connects to the mixer again by itself; audio is not affected. Experimental: try it first when nothing is being recorded.', 'full.expertOnly': 'Only at the Expert level.', 'full.active': 'Active: the device\'s screen runs through the console (since {time}). Every setting can be changed.', 'full.noScreen': 'Active; the device\'s screen is not connected yet (it reconnects within seconds).', 'full.starting': 'Taking over the mixer\'s connection…', 'full.failed': 'Not active: {err}', 'full.lastEnd': 'Last time: {err}', 'full.note': 'Switched off, the console reads along again and the screen connects to the mixer. The setting is kept: after a restart of the device the console takes over again.', 'state.liveRelay': 'Live (full control)', 'header.liveRelay': 'Live (full control) · {n}/s', 'code.relay_busy': 'the device\'s screen holds the mixer\'s connection', 'code.relay_race': 'the device\'s screen was faster; try again', 'code.relay_no_mixer': 'the mixer does not accept connections', 'code.relay_no_screen': 'the device\'s screen did not connect through the console, so it was given back', 'code.relay_failed': 'taking over failed (see the log)', 'code.relay_ended': 'ended',
+'state.liveRelay': 'Live (full control)', 'header.liveRelay': 'Live (full control) · {n}/s', 'code.relay_busy': 'the device\'s screen holds the mixer\'s connection', 'code.relay_race': 'the device\'s screen was faster; try again', 'code.relay_no_mixer': 'the mixer does not accept connections', 'code.relay_no_screen': 'the device\'s screen did not connect through the console, so it was given back', 'code.relay_failed': 'taking over failed (see the log)', 'code.relay_ended': 'ended',
   'ro.label': 'Write protection', 'ro.on': 'Switch on', 'ro.off': 'Switch off', 'ro.isOn': 'on – nothing can be changed', 'ro.isOff': 'off', 'ro.forced': 'on (started with --read-only)', 'ro.offConfirm': 'Switch write protection off? Changes are then possible again at the chosen control level.', 'pin.forgot': 'Forgot the PIN?', 'pin.resetStart': 'Start', 'pin.resetConfirm': 'Remove the PIN at the device? After starting you have one minute: press the Listen button of channel 1 on the device four times in quick succession (it is back as before afterwards). The PIN is then removed and the control level set to Read only.', 'pin.resetPress': 'Now press the Listen button of channel 1 on the device four times in quick succession ({n}/{need}) – {s} s left.', 'pin.resetDone': 'PIN removed at the device. The control level is Read only.', 'pin.resetExpired': 'Time is up; the PIN was not changed.',
-  'panel.intro': 'Reading along, the console changes mute, listen and the physical faders by sending the same signals as the buttons and faders on the device. A fader set this way jumps back as soon as the real one is moved.',
-  'panel.isOn': 'Switched on.',
-  'panel.levelNote': 'Works from the Control level on, physical faders only at Expert.',
-  'panel.forced': 'Switched on for good (started with --panel).',
-  experimental: 'experimental', 'readonly.hint': 'display only', 'render.error': 'Could not render: {err}',
 
+
+  'readonly.hint': 'display only', 'render.error': 'Could not render: {err}',
   'tab.mixer': 'Mixer', 'tab.routing': 'Routing', 'tab.inputs': 'Inputs', 'tab.outputs': 'Outputs & master', 'tab.effects': 'Effects',
   'tab.pads': 'SMART pads', 'tab.recorder': 'Recording', 'tab.system': 'System', 'tab.explorer': 'Explorer', 'tab.audit': 'Log',
-
   'header.live': 'Live · {n}/s', 'header.liveTap': 'Live (reading along) · {n}/s', 'header.offline': 'Console unreachable – reconnecting…', 'header.firmware': 'firmware {v}',
   'header.show': 'show “{name}”', 'header.language': 'Switch language',
   'level.group': 'Control', 'level.off': 'Read only', 'level.basic': 'Control', 'level.expert': 'Expert',
@@ -24,11 +20,9 @@ export default {
   'level.expertText': 'Allows writing almost every property in the explorer, without range checks. Firmware update/reset, power-off, storage, network, accounts, file paths and credentials stay locked. Only use it if you know what a property does.',
   'level.expertOk': 'Enable expert mode',
   'level.now.off': 'Read-only mode', 'level.now.basic': 'Control enabled', 'level.now.expert': 'Expert mode enabled',
-
   'banner.lastKnown': 'showing the last known state.',
   'banner.untested': 'rcplug has not been verified on {model}: the console stays read-only (override with --allow-untested-model).',
   'banner.readOnly': 'Writing is disabled for this device (--read-only).', 'banner.locked': 'Control is locked',
-
   'state.live': 'Live', 'state.waiting': 'Device is starting', 'state.waitingN': 'Device is starting – connecting in {n} s',
   'state.connecting': 'Connecting…', 'state.syncing': 'Loading device state…', 'state.backoff': 'Disconnected', 'state.retryIn': 'retrying in {n} s',
   'state.conflict': 'Protection active: when the console connected, another client (probably the device’s own screen) lost its connection. The console stays disconnected until you choose “Reconnect”.',
@@ -38,12 +32,14 @@ export default {
   'banner.tapWaiting': 'The console reads along with what the device’s screen gets from the mixer. The whole state only comes when the screen connects – at power-on or when it restarts.',
   'banner.tapResync': 'Read the state again', 'banner.tapResyncOk': 'The device’s screen restarts …',
   'banner.tapResyncConfirm': 'The device’s screen restarts once for this (about 3 seconds). The mixer, and with it the audio, keeps running.',
-  'banner.tapLive': 'The console reads along: it changes mute, listen, the physical faders and the SMART pads through the device buttons. Everything else needs full control.',
+  'banner.tapLive': 'The console only reads along, as chosen in its settings (Plugins → Console → Settings): it changes mute, listen, the physical faders and the SMART pads through the device buttons.',
+  'banner.tapFallback': 'Full control is not possible right now, so the console reads along: it changes mute, listen, the physical faders and the SMART pads through the device buttons.',
+  'mode.relay': 'Full control: the device\'s screen runs through the console (since {time}), and every setting can be changed from here.', 'mode.relayStarting': 'Taking over the mixer\'s connection (the device\'s screen restarts once, about three seconds)…',
+  'mode.tapBecause': 'Reading along: full control is not possible ({err}). It is tried again as soon as the mixer\'s place is free.', 'mode.tapChosen': 'Reading along only, as chosen in the console\'s settings (Plugins → Console → Settings).', 'mode.connect': 'Connected to the mixer directly.',
   'banner.tapResumed': 'After its restart the console reads on where it stopped. Changes made in the seconds in between may be missing.',
   'code.boot_grace': 'device starting', 'code.connect_failed': 'mixer not reachable', 'code.desk_busy': 'busy – the mixer serves one client at a time and the device’s own screen holds it', 'code.no_full_sync': 'no device state received',
   'code.disconnected': 'connection closed', 'code.desync': 'out of sync, reloading', 'code.guard_conflict': 'protection active',
   'guard.active': 'active', 'guard.off': 'off', 'guard.remote': 'not needed (remote device)', 'guard.unavailable': 'unavailable',
-
   'err.network': 'Console unreachable', 'err.not_synced': 'No device state received yet.',
   'err.stale_epoch': 'The device state changed – the view is reloading, please try again.',
   'err.offline': 'Not connected to the mixer.', 'err.read_only': 'Writing is disabled (--read-only).',
@@ -59,23 +55,19 @@ export default {
   'err.bad_request': 'Invalid request: {msg}', 'err.no_node': 'This part of the device no longer exists – the view is reloading.',
   'err.invalid_change': 'This change cannot be sent: {msg}', 'err.invalid_level': 'Unknown control level.',
   'err.not_found': 'Unknown request: {msg}', 'err.internal': 'Internal error: {msg}',
-
   'fader.physical': 'Fader {n}', 'fader.virtual': 'Virtual {n}', 'output.n': 'Bus {n}',
   'fader.dragHint': 'drag or use the arrow keys', 'fader.panelHint': 'Dragging sets the position through the device buttons – until the real fader is moved.', 'fader.physicalHint': 'physical fader – display only', 'meter.side': 'Level {side}', 'meter.reduction': 'Gain reduction', 'meter.reductionDb': 'Gain reduction {db} dB',
-
   'rec.title': 'Recording', 'rec.none': 'no recorder in the device state', 'rec.record': 'Record', 'rec.recordHint': 'Start recording',
   'rec.pause': 'Pause', 'rec.stop': 'Stop', 'rec.marker': 'Marker', 'rec.markerHint': 'Drop a chapter marker',
   'rec.state0': 'ready', 'rec.state1': 'paused', 'rec.state2': 'recording', 'rec.state3': 'no destination', 'rec.stateN': 'state {n}',
   'mon.title': 'Monitor / speakers', 'mon.level': 'Level', 'mon.autoMute': 'Auto-mute', 'mon.emergency': 'Emergency mute (all)',
   'mon.emergencyConfirm': 'Toggle the emergency mute? It affects all outputs.',
-
   'mixer.device': 'Device & show', 'mixer.show': 'Show', 'mixer.quick': 'Quick access', 'mixer.channels': 'Channels', 'mixer.levels': 'Levels', 'mixer.master': 'Master', 'mixer.focusIn': 'Selected channel: input', 'mixer.focusOut': 'Selected channel: output', 'mixer.focusReduction': 'Selected channel: gain reduction', 'mixer.focusNote': 'The selected channel is the one open on the device\'s screen.',
   'mixer.physical': 'physical', 'mixer.virtual': 'virtual', 'mixer.source': 'Source', 'mixer.noSource': '— none —', 'mixer.empty': 'empty',
   'mixer.sourceConfirm': 'Change the source of this channel?', 'mixer.faderHint': 'Fader position (0–{max}) and approximate level relative to the 0 dB detent',
   'mixer.physicalNote': 'The physical faders are not motorised: they are moved on the device, virtual faders remotely. The Expert level can set a physical fader too, but the real one takes over again as soon as it is touched.',
   'mixer.inputOf': 'Input: {src}', 'mixer.sendsOf': 'Sends of this source',
   'mixer.normalised': 'Values are the device’s normalised values (0–100 %). Their mapping to dB/Hz/ms is not documented by the manufacturer.',
-
   'proc.aphex': 'APHEX', 'proc.gate': 'Noise gate', 'proc.hpf': 'High-pass filter', 'proc.deess': 'De-esser', 'proc.comp': 'Compressor', 'proc.eq': 'Equaliser',
   'proc.tone': 'Tone & pan', 'proc.bypass': 'Bypass processing',
   'p.aeMix': 'Exciter mix', 'p.aeTune': 'Exciter tune', 'p.bbDrive': 'Big Bottom drive', 'p.bbTune': 'Big Bottom tune', 'p.threshold': 'Threshold',
@@ -86,7 +78,6 @@ export default {
   'p.high': 'High', 'p.depth': 'Depth (Big)', 'p.sparkle': 'Sparkle (Bright)', 'p.punch': 'Punch', 'p.pan': 'Pan', 'p.panOn': 'Pan enabled',
   'p.advanced': 'Advanced processing', 'p.talkback': 'Talkback', 'p.wirelessMute': 'Wireless mic muted', 'p.mix': 'Mix', 'p.model': 'Model',
   'p.lowCut': 'Low cut', 'p.highCut': 'High cut', 'p.time': 'Time', 'p.decay': 'Decay', 'p.semitones': 'Semitones', 'p.intensity': 'Intensity', 'p.level': 'Level',
-
   'mix.active': 'active', 'mix.mute': 'muted', 'mix.muted': 'muted', 'mix.disabled': 'disabled', 'mix.linked': 'follows the fader',
   'mix.unlinked': 'own level', 'mix.levelAnchor': 'level {level} / anchor {anchor}', 'mix.link': 'link to fader', 'mix.unlink': 'unlink',
   'mix.linkRequested': 'Link requested', 'mix.unlinkRequested': 'Unlink requested', 'mix.level': 'Level', 'mix.anchor': 'Anchor',
@@ -94,34 +85,28 @@ export default {
   'routing.corner': 'Source → output', 'routing.on': 'on {strips}', 'routing.unassigned': 'not assigned to a channel',
   'routing.onlyUsed': 'only sources assigned to a channel', 'routing.intro': 'Which source ends up in which output mix. Click a cell for details.',
   'routing.hatched': 'hatched = disabled', 'mm.0': 'Main mix', 'mm.1': 'Mix-minus', 'mm.2': 'Custom', 'routing.mixMinus': 'Mix-minus',
-
   'inputs.intro': 'Input sources (preamp, phantom power, type). A source exists whether or not it is assigned to a channel.',
   'input.micGain': 'Mic gain', 'input.instGain': 'Instrument gain', 'input.digitalGain': 'Digital gain', 'input.phase': 'Phase ⟲', 'input.type': 'Type',
   'input.micType': 'Microphone type', 'input.colour': 'Colour', 'input.wireless': 'Wireless serial', 'input.callSlot': 'CallMe slot',
   'input.phantomConfirm': 'Turn on phantom power (48 V)? Only for condenser microphones – ribbon microphones can be damaged.',
   'input.phantomOn': 'Turn on', 'input.type-1': '—', 'input.type0': 'Microphone', 'input.typeN': 'type {n}',
-
   'out.bt': 'Bluetooth output', 'out.fixed': 'fixed level', 'out.autoMuteActive': 'Auto-mute active', 'out.multitrack': 'Multitrack & recording bus',
   'out.multiMode': 'Multi-out mode', 'out.multiBypass': 'Multi-out bypass', 'out.prefader': 'Pre-fader', 'out.trackMode': 'Multitrack mode',
   'out.compression': 'Compression quality', 'out.procBypass': 'Bypass processing', 'out.hp1Level': 'Headphones 1 level', 'out.headphone': 'Headphones {n}',
   'out.hpType': 'type', 'out.allHpOff': 'all headphones off', 'out.lineOff': 'line outs off', 'out.headphones': 'Headphones',
   'out.master': 'Master: Compellor & delay', 'out.delay': 'Delay (s)', 'out.ducking': 'Ducking', 'out.depth': 'Depth', 'out.allMuted': 'everything muted',
-
   'fx.intro': 'Voice effects per channel slot (same order as the channels).', 'fx.slot': 'Effect slot {n}', 'fx.padSlot': 'Pad effect {n}',
   'fx.padTitle': 'SMART pad effects', 'fx.preset': 'FX preset {n}', 'fx.presets': 'FX presets', 'fx.index': 'Index', 'fx.content': 'Content',
   'fx.chars': '{n} characters', 'fx.reverb': 'Reverb', 'fx.echo': 'Echo', 'fx.pitch': 'Pitch', 'fx.distortion': 'Distortion', 'fx.robot': 'Robot', 'fx.disguise': 'Voice disguise',
-
   'pads.intro': '● = bank active on the device. Tap a pad to trigger it (with control enabled).', 'pads.bank': 'Bank {n}', 'pads.pad': 'Pad {n}',
   'pads.unused': 'unassigned', 'pads.trigger': 'Trigger {name}', 'pads.details': 'Details of {name}', 'pads.title': 'SMART pad: {name}',
   'pads.gain': 'Volume', 'pads.selectBank': 'Select bank {n} on the device', 'pads.bankDenied': 'Changing the bank is not allowed', 'pads.bankOnDevice': 'Reading along, only the pads of the bank the device shows play: select bank {n} on the device',
   'pad.type0': 'empty', 'pad.type1': 'Sound', 'pad.type2': 'Effect', 'pad.type3': 'Mixer', 'pad.type4': 'MIDI', 'pad.type5': 'Video', 'pad.type6': 'CallMe', 'pad.typeN': 'type {n}',
-
   'player.title': 'Player', 'player.state': 'State', 'player.file': 'File', 'player.position': 'Position', 'player.speed': 'Speed',
   'storage.title': 'Storage', 'storage.used': '{used} of {total} used', 'storage.unknown': 'unknown', 'storage.n': 'Storage {n}',
   'storage.recDest': 'recording target', 'storage.storage': 'storage', 'storage.inserted': 'Inserted', 'storage.mounted': 'Mounted',
   'storage.formatted': 'Formatted', 'storage.state': 'State', 'recs.title': 'Recordings', 'recs.count': 'Count', 'recs.duration': 'Total duration',
   'recs.content': 'Content', 'padrec.title': 'Pad recorder', 'padrec.state': 'State', 'padrec.pad': 'Pad', 'padrec.seconds': 'Seconds',
-
   'conn.title': 'Connection to the mixer', 'conn.state': 'State', 'conn.addr': 'Address', 'conn.guard': 'GUI protection', 'conn.rate': 'Changes/s',
   'conn.received': 'Received', 'conn.receivedN': '{n} messages, {kib} KiB', 'conn.sent': 'Sent', 'conn.sessions': 'Sessions',
   'conn.decodeErrors': 'Decode errors', 'conn.applyErrors': 'Apply errors', 'conn.desyncs': 'Resyncs', 'conn.reconnect': 'Reconnect',
@@ -131,7 +116,6 @@ export default {
   'console.pinHint': 'With a PIN every change (including the control level and the console’s switches) needs it. Forgotten? “Forgot the PIN?” removes it with four button presses at the device.',
   'pin.label': 'PIN', 'pin.prompt': 'A PIN is required for changes.', 'pin.send': 'Send', 'pin.current': 'current PIN', 'pin.new': 'new PIN',
   'pin.newHint': 'new PIN (empty = remove)', 'pin.save': 'Save PIN', 'pin.removeConfirm': 'Remove the PIN? Then anyone on the network can enable control.',
-
   'sys.device': 'Device', 'sys.name': 'Name', 'sys.serial': 'Serial number', 'sys.firmware': 'Firmware', 'sys.board': 'Board type', 'sys.engine': 'Engine mode',
   'sys.midi': 'MIDI control', 'sys.selChannel': 'Selected channel', 'sys.selMix': 'Selected mix', 'sys.haptic': 'Haptics', 'sys.recButton': 'REC button',
   'sys.timezone': 'Time zone', 'sys.h24': '24 h', 'sys.dst': 'Daylight saving', 'sys.beta': 'Beta mode', 'sys.usbHost': 'USB host', 'sys.presenter': 'Presenter mode',
@@ -149,11 +133,8 @@ export default {
   'sys.currentShow': 'Current', 'sys.show': 'Show', 'sys.icon': 'Icon', 'sys.display': 'Screen & brightness',
   'gui.screen': 'Screen brightness', 'gui.buttons': 'Button brightness', 'gui.buttonsActive': 'Buttons active', 'gui.buttonsInactive': 'Buttons inactive',
   'gui.lang': 'Language', 'gui.auto': 'Auto brightness', 'gui.dim': 'Dim', 'gui.meters': 'Broadcast meters',
-  'panel.title': 'Device buttons',
-  'panel.enable': 'Switch on the device buttons', 'panel.disable': 'Switch off the device buttons',
-  'panel.enableConfirm': 'The console then sends the same signals as the buttons on the device. Rarely, a press can coincide with a real button press at the same moment. Usable at the expert control level.',
-  'banner.busyHint': 'On the System page you switch on the device buttons, so the console can make changes.', 'banner.busyLink': 'To “System”',
 
+  'banner.busyHint': 'The device\'s screen holds the mixer\'s connection. On the device the console normally takes it over itself (connection “Automatic” in Plugins → Console → Settings).', 'banner.busyLink': 'To “System”',
   'explorer.tree': 'Device state', 'explorer.search': 'Search property or value…', 'explorer.props': '{n} p', 'explorer.children': '{n} children',
   'explorer.root': '{t} (root)', 'explorer.hits': '{n} hits', 'explorer.notFound': 'Node not found',
   'explorer.pathInfo': 'path [{path}] · {props} properties · {children} children', 'explorer.noProps': 'This node has no properties of its own – expand its children on the left.',

@@ -24,8 +24,7 @@ Responses are JSON, except the screen images. Errors look like `{"error": "human
   "readOnlyFlag": false,
   "pinRequired": false,
   "pinReset": {"active": false, "need": 4},
-  "screen": false,
-  "panel": false,
+  "panel": true,
   "version": "0.4.0",
   "epoch": 1,
   "seq": 48210,
@@ -41,7 +40,7 @@ Responses are JSON, except the screen images. Errors look like `{"error": "human
 |---|---|
 | `connection.state` | `waiting` (boot grace; or, reading along, waiting for a full sync: `code` `tap_waiting` or `tap_lost`), `connecting`, `syncing`, `live` (`code` `resumed`: going on with the state kept at its last stop; changes made in between may be missing), `backoff` (retrying; `tap_failed` if reading along is impossible, e.g. without root), `conflict` (the GUI guard stepped back, see [safety.md](safety.md)), `stopped` |
 | `connection.mode` | `tap` (reading along with the device's screen), `relay` (full control: the device's screen runs through the console) or `connect` |
-| `connection.fullControl` | Full control is switched on; `connection.relay` (`screen`, `screenSince`, `screenFrames`) describes it while it runs, `relayCode`/`relayError` why the last attempt ended (`relay_busy`, `relay_race`, `relay_no_mixer`, `relay_no_screen`, `relay_failed`) |
+| `connection.fullControl` | Full control is wanted (on the device, unless the console's connection setting is *Read along only*); `connection.relay` (`screen`, `screenSince`, `screenFrames`) describes it while it runs, `relayCode`/`relayError` why the last attempt ended (`relay_busy`, `relay_race`, `relay_no_mixer`, `relay_no_screen`, `relay_failed`) |
 | `passive` | `true` while reading along: the tree cannot be written (`meta.control.writable` is empty), the front panel can |
 | `meters` | `true` while the console reads the meters and hardware fader positions from the mixer's shared memory (on the device; elsewhere meters arrive as tree changes) |
 | `control` | The current control level: `off`, `basic` or `expert` |
@@ -140,7 +139,7 @@ time.
 | `GET api/changes` | `{"changes": [...], "dropped": n}`: the last 500 property changes the desk reported, oldest first, each with `time`, `node`, `index` (in its family, -1 for a single node), `path`, `name`, `old` and `new` (secrets redacted). Meters, fader positions, mix levels, progress and the recording time are left out. `POST api/changes/clear` empties it (not for plugins). The diagnostics bundle carries it as `changes.json`, without string values |
 | `GET api/audit` | `{"writes": [...]}`: the last 300 writes and changes to the console itself (node `console`: control level, device buttons, PIN without its value, reconnect, panel), with time, node type, path, property, value, client address and, for refused ones, the error code |
 | `GET api/diagnostics` | A zip with the console's connection statistics, status, clients, audit log, summary, layout and a sanitized copy of the tree; the host adds it to its diagnostics bundle |
-| `GET api/hw` | The device buttons (`panel`: `enabled`, `forced`, `error`) and the meter memory (`meters`: `available`, `live`) |
+| `GET api/hw` | The device buttons (`panel`: `enabled` where their serial line exists, `error`) and the meter memory (`meters`: `available`, `live`) |
 
 ## Writing
 
@@ -167,7 +166,7 @@ Every write:
 | `api/link` | `{"epoch", "source", "output", "link"}` | Links or unlinks a routing cell with the sequence the device expects |
 | `api/record` | `{"epoch", "value"}` | Recorder: 0 stop, 1 pause, 2 record |
 | `api/control` | `{"level": "off" \| "basic" \| "expert"}` | Changes the control level (refused with `read_only` or `untested_model` where control is not possible) |
-| `api/settings` | `{"readOnly": true}`, `{"panel": true}`, `{"fullControl": true}` | Switches write protection on or off (`read_only_forced` when started with `--read-only`); switches full control on or off (on the device only, `full_control_unavailable` elsewhere; switching on needs the expert level, see [protocol.md](protocol.md#full-control)); switches the device buttons (front-panel emulation) on or off. Saved across restarts. |
+| `api/settings` | `{"readOnly": true}` | Switches write protection on or off (`read_only_forced` when started with `--read-only`). Saved across restarts. Full control and the device buttons are no settings since 0.8.0 ([protocol.md](protocol.md#full-control)); `panel` and `fullControl` are ignored. |
 | `api/pin` | `{"current", "new"}` | Sets, changes (`current` required) or removes (`new: ""`) the PIN |
 | `api/pin/reset` | `{}` | No PIN needed: starts a minute in which four presses of channel 1's Listen (or Mute) button at the device within four seconds remove the PIN and set the level to `off`; progress in `api/status` → `pinReset` (`active`, `presses`, `need`, `seconds`, `done`). `no_pin` if none is set |
 | `api/reconnect` | `{}` | Reconnects to the desk, also after the GUI guard stepped back. At most every 10 s. |
@@ -253,7 +252,6 @@ if errors.As(err, &apiErr) && apiErr.Code == "permission_desk_write" {
 | `expert_required` | 403 | Needs the expert level |
 | `csrf` | 403 | The `X-Rcplug` header is missing |
 | `read_only_forced` | 409 | Write protection cannot be switched off: the console was started with `--read-only` |
-| `full_control_unavailable` | 409 | Full control works only on the device |
 | `no_pin` | 409 | A PIN reset without a PIN set |
 | `stale_epoch` | 409 | The tree changed since you read the path. Reload and retry. |
 | `pin_locked` | 429 | Too many wrong PINs; wait a minute |

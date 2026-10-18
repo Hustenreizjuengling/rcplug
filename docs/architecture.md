@@ -78,7 +78,7 @@ something need the header `X-Rcplug: 1`.
 | `GET /api/updates` | The last update check: `targets` (`rcplug` and `plugin:<name>`, each with `current`, `latest`, `available`, `notes`, `error`), the running install (`job`), the outcome of the last update of rcplug (`last`), the trusted key ids, whether the daily check is on (`autoCheck`) and how many updates it found (`available`); while an install runs, `job` has `phase`, `done`, `total` and `eta`. No network access |
 | `POST /api/updates/check` | Ask GitHub for the latest releases (a second check within 20 s returns the first) |
 | `POST /api/updates/auto?on=true\|false` | Switch the daily update check on or off |
-| `GET /api/audio`, `GET /api/audio/stream?ports=`, `POST /api/audio/enable?on=` | The shared audio taps: status and ports, a stream for a plugin (its token), the switch; see [plugin-api.md](plugin-api.md#audio) |
+| `GET /api/audio`, `GET /api/audio/stream?ports=` | The shared audio taps: status and ports, a stream for a plugin with the permission `audio` (its token); see [plugin-api.md](plugin-api.md#audio) |
 | `POST /api/uninstall` | Remove rcplug from the device (`{"confirm": "uninstall"}`), see [safety.md](safety.md#installing-and-removing) |
 | `GET /api/processes` | The device's processes with CPU, memory and threads, marked as rcplug's (and which plugin) or RØDE's; see [plugin-api.md](plugin-api.md#host-api) |
 | `GET /api/events`, `GET /api/events/stream`, `POST /api/events` | The event bus: the kept events, a live stream (server-sent events), publishing (plugins only, with their token); see [plugin-api.md](plugin-api.md#events) |
@@ -113,7 +113,7 @@ something need the header `X-Rcplug: 1`.
 | `internal/rcproto` | Pure protocol code: `juce::var` values, ValueTree nodes, change messages, TCP framing, discovery of the node families (layout), model detection, sanitizing |
 | `internal/desk` | The connection to the desk: session handling with full sync and reconnects, the GUI guard, the mirror (a local copy of the tree with epoch and sequence numbers), batched change fan-out to subscribers, JSON encoding with redaction |
 | `internal/console` | HTTP API, write policy (levels, deny list, value ranges), PIN, settings, audit log, summary, embedded web UI |
-| `internal/hw` | The mixer's meter memory (read-only) and the experimental front-panel emulation |
+| `internal/hw` | The mixer's meter memory (read-only) and the front-panel emulation |
 | `internal/rcsim` | Simulator of the control port for development and tests |
 
 ![The console's explorer](img/console-explorer.png)

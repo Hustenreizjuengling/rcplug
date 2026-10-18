@@ -21,13 +21,13 @@ this repository. Start with the [plugin guide](docs/plugin-guide.md).
 > simulator that replays a real Duo state capture (firmware 1.7.4), with the arm64
 > binaries under QEMU, and installed into the stock firmware images 1.7.6 and 1.7.3.
 > **First test on a real Duo (firmware 1.7.6):** flashing, SSH, the installer, in-app
-> updates, the dashboard and the plugins work. The mixer serves one client at a time
-> and the device's own screen holds it, so the console reads that connection along and
-> shows the whole desk with live meters; it changes mute, listen and the physical
-> faders through the device's buttons, and the experimental *full control* changes
-> every setting
-> ([docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo)).
-> A fresh install is read-only.
+> updates, the dashboard and the plugins work. The mixer serves one client at a time,
+> so the console takes that connection and passes everything on to the device's own
+> screen (*full control*): it shows the whole desk with live meters and changes every
+> setting, while the screen works as before
+> ([docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo)). Where that
+> is not possible it reads along and changes what has a button on the device.
+> A fresh install is read-only until you choose a control level.
 >
 > rcplug is not affiliated with or endorsed by RØDE. Use it at your own risk; read the
 > disclaimer below.
@@ -49,7 +49,7 @@ data or your productions. Do not use it during a show that must not fail.
 
 | Device | Status |
 |---|---|
-| RØDECaster Duo, firmware 1.7.x | Runs on a real Duo (1.7.6): host, dashboard, in-app updates and plugins; the console reads along with the device's screen, shows the whole desk with live meters and changes it through the device's buttons; full control (experimental) is still to be confirmed on hardware. |
+| RØDECaster Duo, firmware 1.7.x | Runs on a real Duo (1.7.6): host, dashboard, in-app updates and plugins; the console controls the whole desk with live meters, with the device's screen running through it (full control). |
 | RØDECaster Pro II | Recognised and shown **read-only**. Control needs a verified profile; see [docs/adding-a-model.md](docs/adding-a-model.md). |
 | Other / unknown | Shown read-only. |
 

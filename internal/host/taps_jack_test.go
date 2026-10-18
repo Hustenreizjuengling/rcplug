@@ -13,7 +13,7 @@ func TestJackBridge(t *testing.T) {
 	if os.Getenv("RCPLUG_TEST_JACK") == "" {
 		t.Skip("set RCPLUG_TEST_JACK=1 with a running JACK server")
 	}
-	taps := NewTaps(NewJackBridge(), func() bool { return true })
+	taps := NewTaps(NewJackBridge())
 	ctx := context.Background()
 	ports, err := taps.bridge.Ports(ctx)
 	if err != nil || len(ports) < 2 {

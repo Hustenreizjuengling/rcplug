@@ -125,7 +125,7 @@ const T = {
     catAdd: 'Add', catRemoveSrc: 'Remove', catRemoveSrcQ: 'Remove the catalog {repo}? Plugins installed from it stay.',
     perms: 'Permissions:', 'perm_desk:write': 'changes the desk', perm_audio: 'hears the desk', perm_network: 'network', perm_device: 'device',
     'permHint_desk:write': 'May change the mixer, the recorder and the pads through the console, without the PIN and whatever control level the console has; write protection stops it.',
-    permHint_audio: 'May listen to the desk\'s inputs and outputs through the shared audio taps (when they are switched on under System).',
+    permHint_audio: 'May listen to the desk\'s inputs and outputs through the shared audio taps.',
     permHint_network: 'Talks to other machines on the network or the internet.',
     permHint_device: 'Uses the device\'s hardware or files outside its own directory.',
     unknown: 'unknown plugin.json fields: {f}', notFound: 'Plugin not found.', isState: 'The plugin is {state}', autoRestart: 'It is restarted automatically…',
@@ -154,9 +154,8 @@ const T = {
     procFoot: '{n} processes (without kernel threads). Their own RAM together: {own} MB; the kernel counts {programs} MB for programs. The first CPU values appear after a few seconds.',
     memParts: 'programs {p} · shared memory {s} · kernel {k} · file cache {c} · free {f} MB',
     memPartsHint: 'Programs: the processes\' own memory. Shared memory: shared memory segments and tmpfs (/tmp). Kernel: memory the kernel keeps for itself. File cache: copies of files, freed when programs need the memory, so it does not count as used.',
-    tapTitle: 'Audio taps', tapExperimental: 'experimental', tapSwitch: 'switched on',
-    tapDesc: 'One bridge from the desk\'s audio graph (JACK) to the plugins that need sound, such as Sonar: plugins ask for inputs or outputs and get a stream. It adds one client to RØDE\'s audio graph, so it is off until you switch it on; it only runs while a plugin listens.',
-    tapConfirm: 'Switch on the audio taps? Plugins can then hear the desk\'s inputs and outputs. The bridge adds one client to RØDE\'s audio graph while a plugin listens. Watch for dropouts on the first use.',
+    tapTitle: 'Audio taps',
+    tapDesc: 'One bridge from the desk\'s audio graph (JACK) to the plugins that need sound, such as Sonar: plugins with the permission “hears the desk” ask for inputs or outputs and get a stream. It runs only while a plugin listens and costs about 1 % of the device\'s CPU.',
     tapRunning: 'Running: {n} channel(s) in use', tapIdle: 'Ready; the bridge starts when a plugin asks for audio.', tapProblems: '{n} dropout(s) reported',
     tapNoJack: 'JACK is not reachable here: {err}', tapPorts: '{n} ports can be tapped.',
     evTitle: 'Events', evDesc: 'What the desk, the host and the plugins report on the event bus, live (the last 30).', evNone: 'No events yet.',
@@ -194,7 +193,7 @@ const T = {
     catAdd: 'Hinzufügen', catRemoveSrc: 'Entfernen', catRemoveSrcQ: 'Den Katalog {repo} entfernen? Daraus installierte Plugins bleiben.',
     perms: 'Berechtigungen:', 'perm_desk:write': 'ändert das Pult', perm_audio: 'hört das Pult', perm_network: 'Netzwerk', perm_device: 'Gerät',
     'permHint_desk:write': 'Darf über die Konsole Mixer, Recorder und Pads ändern, ohne PIN und unabhängig von der Steuerungsstufe der Konsole; der Schreibschutz hält es auf.',
-    permHint_audio: 'Darf die Ein- und Ausgänge des Pults über die gemeinsamen Audio-Abgriffe hören (wenn sie unter System eingeschaltet sind).',
+    permHint_audio: 'Darf die Ein- und Ausgänge des Pults über die gemeinsamen Audio-Abgriffe hören.',
     permHint_network: 'Spricht mit anderen Rechnern im Netzwerk oder im Internet.',
     permHint_device: 'Nutzt die Hardware des Geräts oder Dateien außerhalb seines eigenen Verzeichnisses.',
     unknown: 'unbekannte plugin.json-Felder: {f}', notFound: 'Plugin nicht gefunden.', isState: 'Das Plugin ist gerade {state}', autoRestart: 'Es wird automatisch neu gestartet…',
@@ -223,9 +222,8 @@ const T = {
     procFoot: '{n} Prozesse (ohne Kernel-Threads). Ihr eigener Arbeitsspeicher zusammen: {own} MB; der Kernel zählt {programs} MB für Programme. Die ersten CPU-Werte erscheinen nach ein paar Sekunden.',
     memParts: 'Programme {p} · gemeinsamer Speicher {s} · Kernel {k} · Datei-Cache {c} · frei {f} MB',
     memPartsHint: 'Programme: der eigene Speicher der Prozesse. Gemeinsamer Speicher: Shared-Memory-Segmente und tmpfs (/tmp). Kernel: Speicher, den der Kernel für sich hält. Datei-Cache: Kopien von Dateien, die freigegeben werden, sobald Programme den Speicher brauchen; er zählt deshalb nicht als belegt.',
-    tapTitle: 'Audio-Abgriffe', tapExperimental: 'experimentell', tapSwitch: 'eingeschaltet',
-    tapDesc: 'Eine Brücke vom Audio-Graph des Pults (JACK) zu den Plugins, die Ton brauchen, etwa Sonar: Plugins fragen nach Ein- oder Ausgängen und bekommen einen Datenstrom. Sie fügt RØDEs Audio-Graph einen Client hinzu, ist deshalb aus, bis du sie einschaltest, und läuft nur, solange ein Plugin zuhört.',
-    tapConfirm: 'Audio-Abgriffe einschalten? Plugins können dann Ein- und Ausgänge des Pults hören. Solange ein Plugin zuhört, hängt die Brücke einen Client an RØDEs Audio-Graph. Beim ersten Einsatz bitte auf Aussetzer achten.',
+    tapTitle: 'Audio-Abgriffe',
+    tapDesc: 'Eine Brücke vom Audio-Graph des Pults (JACK) zu den Plugins, die Ton brauchen, etwa Sonar: Plugins mit der Berechtigung „hört das Pult“ fragen nach Ein- oder Ausgängen und bekommen einen Datenstrom. Sie läuft nur, solange ein Plugin zuhört, und kostet etwa 1 % der CPU des Geräts.',
     tapRunning: 'Läuft: {n} Kanal/Kanäle belegt', tapIdle: 'Bereit; die Brücke startet, sobald ein Plugin Ton anfordert.', tapProblems: '{n} Aussetzer gemeldet',
     tapNoJack: 'JACK ist hier nicht erreichbar: {err}', tapPorts: '{n} Ports können abgegriffen werden.',
     evTitle: 'Ereignisse', evDesc: 'Was Pult, Host und Plugins auf dem Ereignis-Bus melden, live (die letzten 30).', evNone: 'Noch keine Ereignisse.',
@@ -685,10 +683,8 @@ async function renderTaps() {
   try { d = await jget('api/audio'); } catch (e) { card.hidden = true; return; }
   card.hidden = false;
   const st = d.status || {};
-  let h = `<div class="row"><h2 style="margin:0">${esc(t('tapTitle'))}</h2><span class="tag">${esc(t('tapExperimental'))}</span><span class="spacer"></span>
-    <label class="row" style="gap:6px;font-size:13px"><input type="checkbox" id="tapOn"${st.enabled ? ' checked' : ''}> ${esc(t('tapSwitch'))}</label></div>
-    <p class="desc">${esc(t('tapDesc'))}</p>`;
-  if (st.enabled) {
+  let h = `<h2>${esc(t('tapTitle'))}</h2><p class="desc">${esc(t('tapDesc'))}</p>`;
+  {
     h += `<p><b>${esc(st.running ? t('tapRunning', { n: (st.channels || []).length }) : t('tapIdle'))}</b>${st.problems ? ` · <span class="error">${esc(t('tapProblems', { n: st.problems }))}</span>` : ''}</p>`;
     if (st.error) h += `<p class="error">${esc(st.error)}</p>`;
     for (const s of st.streams || []) h += `<div class="ev"><b>${esc(s.plugin)}</b> <code>${esc((s.ports || []).join(', '))}</code></div>`;
@@ -696,11 +692,6 @@ async function renderTaps() {
     else h += `<p class="note">${esc(t('tapPorts', { n: (d.ports || []).length }))}</p>`;
   }
   card.innerHTML = h;
-  $('#tapOn').onchange = async (e) => {
-    if (e.target.checked && !confirm(t('tapConfirm'))) { e.target.checked = false; return; }
-    try { await jpost('api/audio/enable?on=' + e.target.checked); } catch (x) { alert(t('failed', { err: x.message })); }
-    renderTaps();
-  };
 }
 
 // ---- the event bus, live on the System page

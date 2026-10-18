@@ -27,11 +27,14 @@ type Options struct {
 	Client *desk.Client
 	// DataDir keeps settings.json and the PIN file ("" = in memory only).
 	DataDir string
-	// Panel emulates front-panel input (hw.Panel). It is used when
-	// PanelEnabled is set (--panel) or the user switched it on
-	// (Settings.Panel).
-	Panel        FrontPanel
-	PanelEnabled bool
+	// Panel emulates front-panel input (hw.Panel), used wherever its tty
+	// exists: reading along it is how the console changes the desk, and
+	// physical faders are always set there.
+	Panel FrontPanel
+	// FullControl: on the device, take the mixer's place and serve the
+	// device's screen through the console, so every setting can be written
+	// (desk/relay.go); if that is not possible, read along.
+	FullControl bool
 	// Meters reads the levels and hardware fader positions the mixer keeps
 	// in shared memory (hw.Meters), which never travel over the control
 	// port; nil = not available.
@@ -107,8 +110,8 @@ func New(o Options) *Console {
 	if _, err := ParseLevel(c.settings.Control); err != nil {
 		c.settings.Control = "off"
 	}
-	if c.settings.FullControl {
-		c.client.SetFullControl(true)
+	if o.FullControl {
+		c.client.SetFullControl(true) // does nothing where the console does not read along
 	}
 	c.mirror.Watch(c.watchPinReset)
 	c.mirror.Watch(c.watchPresence)
@@ -202,8 +205,8 @@ func (c *Console) readOnly() bool {
 	return c.settings.ReadOnly
 }
 
-// panelOn reports whether the front-panel emulation is switched on, by
-// --panel or by the user.
+// panelOn reports whether the device's buttons can be pressed (the panel's
+// tty exists).
 func (c *Console) panelOn() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -211,7 +214,7 @@ func (c *Console) panelOn() bool {
 }
 
 func (c *Console) panelOnLocked() bool {
-	return c.opts.Panel != nil && (c.opts.PanelEnabled || c.settings.Panel)
+	return c.opts.Panel != nil && c.opts.Panel.Available() == nil
 }
 
 // statusDoc is GET api/status and the SSE hello event.

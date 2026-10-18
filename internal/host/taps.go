@@ -19,10 +19,10 @@ import (
 // that wants to hear an input or an output (Sonar, a loudness meter) needs a
 // client in it. Instead of one per plugin, the host runs one bridge for all
 // of them, "rcplug-taps" with a few channels, and hands each plugin the ports
-// it asks for as a stream. One switch for all of it (off by default, as it
-// adds a client to RØDE's graph), one place to see what runs and whether
-// audio drops out. Only plugins get audio (their token); the network does
-// not.
+// it asks for as a stream, one place to see what runs and whether audio drops
+// out. Only plugins with the permission "audio" get audio (their token; the
+// dashboard shows the permission before a plugin is installed); the network
+// does not. The bridge only runs while one listens.
 //
 // The bridge is only as wide as the ports in use need (2, 4 or 8 channels):
 // on a Duo its resampling of 8 channels took half a core. The reading loop
@@ -69,8 +69,7 @@ type tapBridge interface {
 
 // Taps hands out JACK ports to plugins through one bridge.
 type Taps struct {
-	bridge  tapBridge
-	enabled func() bool
+	bridge tapBridge
 
 	mu       sync.Mutex
 	running  bool
@@ -110,21 +109,17 @@ func (s *tapSub) fits(width int) bool {
 	return true
 }
 
-// NewTaps makes the taps; enabled reports the user's opt-in.
-func NewTaps(bridge tapBridge, enabled func() bool) *Taps {
-	return &Taps{bridge: bridge, enabled: enabled, subs: map[*tapSub]struct{}{}}
+// NewTaps makes the taps.
+func NewTaps(bridge tapBridge) *Taps {
+	return &Taps{bridge: bridge, subs: map[*tapSub]struct{}{}}
 }
 
 var (
-	errTapsOff  = sdk.NewError(http.StatusForbidden, "audio_taps_off", "shared audio taps are switched off (dashboard → System → Audio taps)")
 	errTapsFull = sdk.NewError(http.StatusServiceUnavailable, "audio_taps_full", "every channel of the audio bridge is in use")
 )
 
 // Open starts streaming ports to a plugin, starting the bridge if needed.
 func (t *Taps) Open(ctx context.Context, plugin string, ports []string) (*tapSub, error) {
-	if !t.enabled() {
-		return nil, errTapsOff
-	}
 	if len(ports) == 0 || len(ports) > tapMaxChannels {
 		return nil, sdk.NewError(http.StatusBadRequest, "bad_ports", fmt.Sprintf("ask for 1 to %d ports", tapMaxChannels))
 	}
@@ -360,7 +355,7 @@ func (t *Taps) pump(r io.Reader, width int) {
 
 // TapStatus describes the taps for the dashboard.
 type TapStatus struct {
-	Enabled  bool         `json:"enabled"`
+	Enabled  bool         `json:"enabled"` // always true since 0.8.0 (the permission "audio" decides)
 	Running  bool         `json:"running"`
 	Width    int          `json:"width,omitempty"` // the bridge's channels
 	Since    string       `json:"since,omitempty"`
@@ -388,7 +383,7 @@ type TapStream struct {
 func (t *Taps) Status() TapStatus {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	st := TapStatus{Enabled: t.enabled(), Running: t.running, Channels: []TapChannel{}, Streams: []TapStream{}, Error: t.errMsg}
+	st := TapStatus{Enabled: true, Running: t.running, Channels: []TapChannel{}, Streams: []TapStream{}, Error: t.errMsg}
 	if t.running {
 		st.Width = t.width
 		st.Since = t.since.Format(time.RFC3339)
@@ -421,20 +416,6 @@ func (s *Server) handleTaps(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, doc)
-}
-
-func (s *Server) handleTapsEnable(w http.ResponseWriter, r *http.Request) {
-	on, err := strconv.ParseBool(r.URL.Query().Get("on"))
-	if err != nil {
-		sdk.WriteError(w, sdk.NewError(http.StatusBadRequest, "bad_request", "on must be true or false"))
-		return
-	}
-	s.m.SetAudioTaps(on)
-	if !on {
-		s.Taps.Disable()
-	}
-	s.m.hostEvent("host.audio.taps", map[string]bool{"enabled": on})
-	writeJSON(w, s.Taps.Status())
 }
 
 // handleTapStream: GET api/audio/stream?ports=a,b from a plugin (its token)
@@ -491,20 +472,6 @@ func (s *Server) handleTapStream(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-}
-
-// --- the persisted switch
-
-// AudioTaps reports whether the user switched the shared audio taps on.
-func (m *Manager) AudioTaps() bool { return m.loadState().AudioTaps }
-
-// SetAudioTaps records the user's choice for the shared audio taps.
-func (m *Manager) SetAudioTaps(on bool) {
-	m.saveMu.Lock()
-	defer m.saveMu.Unlock()
-	ps := m.loadState()
-	ps.AudioTaps = on
-	_ = sdk.SaveJSON(m.stateFile(), ps)
 }
 
 func contains(list []string, s string) bool {

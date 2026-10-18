@@ -219,8 +219,6 @@ type writeReq struct {
 	Output   int         `json:"output"`
 	Link     bool        `json:"link"`
 	Level    string      `json:"level"`
-	Panel    *bool       `json:"panel"`
-	FullCtl  *bool       `json:"fullControl"`
 	ReadOnly *bool       `json:"readOnly"`
 	Current  string      `json:"current"`
 	New      string      `json:"new"`
@@ -680,28 +678,14 @@ func (c *Console) notifyControl() {
 	c.mirror.Notify("control", data)
 }
 
-// handleSettings switches write protection, the front-panel emulation and
-// full control.
+// handleSettings switches write protection. (Full control and the device's
+// buttons are no switches since 0.8.0: the console uses them wherever it can.)
 func (c *Console) handleSettings(w http.ResponseWriter, r *http.Request) {
 	req, ok := decode(w, r)
 	if !ok {
 		return
 	}
 
-	if req.Panel != nil {
-		if *req.Panel && c.opts.Panel == nil {
-			err := sdk.NewError(http.StatusConflict, "panel_unavailable", "front-panel emulation is not available here")
-			c.auditAction(r, "panel", "true", err)
-			sdk.WriteError(w, err)
-			return
-		}
-		c.mu.Lock()
-		c.settings.Panel = *req.Panel
-		c.saveSettingsLocked()
-		c.mu.Unlock()
-		c.opts.Logf("console: front panel %v by %s", *req.Panel, remoteOf(r))
-		c.auditAction(r, "panel", strconv.FormatBool(*req.Panel), nil)
-	}
 	if req.ReadOnly != nil {
 		if !*req.ReadOnly && c.client.ReadOnly() {
 			err := sdk.NewError(http.StatusConflict, "read_only_forced", "the console was started with --read-only")
@@ -715,28 +699,6 @@ func (c *Console) handleSettings(w http.ResponseWriter, r *http.Request) {
 		c.mu.Unlock()
 		c.opts.Logf("console: read-only %v by %s", *req.ReadOnly, remoteOf(r))
 		c.auditAction(r, "read-only", strconv.FormatBool(*req.ReadOnly), nil)
-	}
-	if req.FullCtl != nil {
-		on := *req.FullCtl
-		var err error
-		switch lv, _ := c.Level(); {
-		case on && !c.client.ReadsAlong():
-			err = sdk.NewError(http.StatusConflict, "full_control_unavailable", "full control is only possible on the device, where the console reads along with its screen")
-		case on && lv != LevelExpert:
-			err = sdk.NewError(http.StatusForbidden, "expert_required", "full control requires the expert control level")
-		}
-		if err != nil {
-			c.auditAction(r, "full control", "true", err)
-			sdk.WriteError(w, err)
-			return
-		}
-		c.mu.Lock()
-		c.settings.FullControl = on
-		c.saveSettingsLocked()
-		c.mu.Unlock()
-		c.client.SetFullControl(on)
-		c.opts.Logf("console: full control %v by %s", on, remoteOf(r))
-		c.auditAction(r, "full control", strconv.FormatBool(on), nil)
 	}
 
 	c.notifyControl()
@@ -827,7 +789,7 @@ var restartScreen = desk.RestartScreen
 
 // handleHW reports the front-panel emulation and the meter memory.
 func (c *Console) handleHW(w http.ResponseWriter, r *http.Request) {
-	p := map[string]interface{}{"enabled": c.panelOn(), "forced": c.opts.PanelEnabled}
+	p := map[string]interface{}{"enabled": c.panelOn()}
 	if c.opts.Panel != nil {
 		if err := c.opts.Panel.Available(); err != nil {
 			p["error"] = err.Error()

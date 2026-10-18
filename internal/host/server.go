@@ -138,7 +138,6 @@ func (s *Server) Handler() http.Handler {
 	}
 	if s.Taps != nil {
 		mux.HandleFunc("GET /api/audio", s.handleTaps)
-		mux.Handle("POST /api/audio/enable", sdk.CSRF(http.HandlerFunc(s.handleTapsEnable)))
 		mux.HandleFunc("GET /api/audio/stream", s.handleTapStream)
 	}
 	mux.HandleFunc("/plugins/{name}", s.handleProxy)

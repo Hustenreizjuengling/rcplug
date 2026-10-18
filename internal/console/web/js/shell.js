@@ -77,7 +77,7 @@ function banners() {
     out.push(h('div', { class: 'banner info' }, t('banner.tapResumed'), ' ',
       h('button', { class: 'btn small', type: 'button', onclick: resyncNow }, t('banner.tapResync'))));
   } else if (conn && conn.mode === 'tap' && conn.state === 'live' && current.id !== 'system') {
-    out.push(h('div', { class: 'banner info' }, t('banner.tapLive'), ' ', h('a', { href: '#system' }, t('banner.busyLink'))));
+    out.push(h('div', { class: 'banner info' }, conn.fullControl ? t('banner.tapFallback') : t('banner.tapLive'), ' ', h('a', { href: '#system' }, t('banner.busyLink'))));
   }
   // Busy: the device's screen holds the mixer, but its buttons still work.
   if (conn && conn.code === 'desk_busy' && current.id !== 'system') out.push(h('div', { class: 'banner info' }, t('banner.busyHint'), ' ', h('a', { href: '#system' }, t('banner.busyLink'))));

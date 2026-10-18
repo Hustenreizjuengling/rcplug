@@ -425,36 +425,16 @@ func TestLinkPressAndTrigger(t *testing.T) {
 	}
 }
 
-// The front panel is switched on in the UI (no --panel needed) and stays on
-// across a restart; the picture's rotation is a setting as well.
-func TestPanelIsASetting(t *testing.T) {
+// The device's buttons are used wherever their tty exists; there is no switch.
+func TestPanelWhereItsTTYExists(t *testing.T) {
 	r := newRig(t, rcsim.Options{}, func(o *Options) { o.Panel = &hw.Panel{TTY: "/dev/null"} })
-	if res := r.post(t, "/api/control", map[string]string{"level": "expert"}); res.code != 200 {
-		t.Fatalf("expert: %d %s", res.code, res.raw)
-	}
-	if res := r.post(t, "/api/settings", map[string]bool{"panel": true}); res.code != 200 {
-		t.Fatalf("switch panel on: %d %s", res.code, res.raw)
-	}
 	hwDoc := r.do(t, http.MethodGet, "/api/hw", nil).body["panel"].(map[string]interface{})
-	if hwDoc["enabled"] != true || hwDoc["forced"] != false {
+	if hwDoc["enabled"] != true {
 		t.Fatalf("hw panel: %v", hwDoc)
 	}
-	var saved Settings
-	if err := sdk.LoadJSON(filepath.Join(r.dir, "settings.json"), &saved); err != nil {
-		t.Fatal(err)
-	}
-	if !saved.Panel {
-		t.Fatalf("saved %+v", saved)
-	}
-	again := New(Options{Client: r.client, DataDir: r.dir, Logf: quiet, Panel: &hw.Panel{TTY: "/dev/null"}})
-	if !again.panelOn() {
-		t.Fatal("the panel switch did not survive a restart")
-	}
-	if res := r.post(t, "/api/settings", map[string]interface{}{"panel": false}); res.code != 200 {
-		t.Fatalf("switch off: %d %s", res.code, res.raw)
-	}
-	if r.console.panelOn() {
-		t.Fatal("panel still on after switching it off")
+	none := New(Options{Client: r.client, DataDir: t.TempDir(), Logf: quiet, Panel: &hw.Panel{TTY: "/dev/no-such-tty"}})
+	if none.panelOn() {
+		t.Fatal("panel on without its tty")
 	}
 }
 
@@ -533,12 +513,6 @@ func TestReadingAlongWritesThroughTheFrontPanel(t *testing.T) {
 	})
 	set := func(path []int, name string, v interface{}) resp {
 		return r.post(t, "/api/set", map[string]interface{}{"epoch": epoch, "path": path, "name": name, "value": v})
-	}
-	if res := set(ch0, "channelOutputMute", !muted); res.code != 403 || res.body["code"] != "panel_off" {
-		t.Fatalf("device buttons off: %d %s", res.code, res.raw)
-	}
-	if res := r.post(t, "/api/settings", map[string]bool{"panel": true}); res.code != 200 {
-		t.Fatalf("panel on: %d %s", res.code, res.raw)
 	}
 	tree := r.do(t, http.MethodGet, "/api/tree", nil)
 	meta := tree.body["meta"].(map[string]interface{})
@@ -899,7 +873,7 @@ func TestFullControlThroughTheAPI(t *testing.T) {
 	// Reading along (it cannot here, without root) as on the device.
 	client := desk.NewClient(desk.Config{Addr: sim.Addr(), Mode: "tap", Logf: quiet}, desk.NewMirror())
 	dir := t.TempDir()
-	c := New(Options{Client: client, DataDir: dir, Logf: quiet})
+	c := New(Options{Client: client, DataDir: dir, Logf: quiet, FullControl: true})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { client.Run(ctx); close(done) }()
@@ -908,14 +882,9 @@ func TestFullControlThroughTheAPI(t *testing.T) {
 	t.Cleanup(func() { cancel(); <-done; hs.Close() })
 	r := &rig{sim: sim, client: client, console: c, http: hs, dir: dir}
 
-	if res := r.post(t, "/api/settings", map[string]bool{"fullControl": true}); res.code != 403 || res.body["code"] != "expert_required" {
-		t.Fatalf("full control below expert: %d %s", res.code, res.raw)
-	}
-	r.control(t, "expert")
-	if res := r.post(t, "/api/settings", map[string]bool{"fullControl": true}); res.code != 200 {
-		t.Fatalf("full control: %d %s", res.code, res.raw)
-	}
+	// Full control starts by itself; writing needs only the Control level.
 	eventually(t, func() bool { st := client.Status(); return st.Mode == "relay" && st.State == desk.StateLive })
+	r.control(t, "basic")
 	if st := r.do(t, "GET", "/api/status", nil); st.body["passive"] != false {
 		t.Fatalf("passive in full control: %v", st.body["passive"])
 	}
@@ -926,23 +895,22 @@ func TestFullControlThroughTheAPI(t *testing.T) {
 		t.Fatalf("write in full control: %d %s", res.code, res.raw)
 	}
 	eventually(t, func() bool { v, _ := sim.Snapshot().At(ch).Get("channelOutputMute"); return v.Truth() == !cur.Truth() })
-	var saved Settings
-	raw, _ := os.ReadFile(filepath.Join(dir, "settings.json"))
-	if json.Unmarshal(raw, &saved); !saved.FullControl {
-		t.Fatalf("full control not kept: %s", raw)
-	}
-
+	// The old switch is gone: asking for it changes nothing.
 	if res := r.post(t, "/api/settings", map[string]bool{"fullControl": false}); res.code != 200 {
-		t.Fatalf("switch off: %d %s", res.code, res.raw)
+		t.Fatalf("old switch: %d %s", res.code, res.raw)
 	}
-	eventually(t, func() bool { return client.Status().Mode == "tap" && sim.Listening() })
+	time.Sleep(200 * time.Millisecond)
+	if st := client.Status(); st.Mode != "relay" {
+		t.Fatalf("full control ended by the old switch: %+v", st)
+	}
 }
 
+// Connected (not on the device), full control is never tried.
 func TestFullControlOnlyOnTheDevice(t *testing.T) {
-	r := newRig(t, rcsim.Options{})
-	r.control(t, "expert")
-	if res := r.post(t, "/api/settings", map[string]bool{"fullControl": true}); res.code != 409 || res.body["code"] != "full_control_unavailable" {
-		t.Fatalf("full control while connected: %d %s", res.code, res.raw)
+	r := newRig(t, rcsim.Options{}, func(o *Options) { o.FullControl = true })
+	time.Sleep(200 * time.Millisecond)
+	if st := r.client.Status(); st.Mode != "connect" || st.FullControl {
+		t.Fatalf("connected: %+v", st)
 	}
 }
 

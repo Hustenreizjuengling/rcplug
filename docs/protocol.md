@@ -77,10 +77,15 @@ loopback interface (`make test-root`).
 Reading along can only watch, so changes go through the front panel, which only
 reaches what has a button: mute and listen of the four physical channels, their
 faders (at the expert level), and since 0.7.3 the six SMART pads of the bank the
-device shows. *Full control* (experimental, off by default, switched on
-at the expert level on the console's *System* page) uses the one-client behaviour
-instead: the console takes the mixer's place itself and then serves the device's
-screen on the mixer's port, which the mixer does not listen on while it has a client.
+device shows. *Full control* uses the one-client behaviour instead: the console takes
+the mixer's place itself and then serves the device's screen on the mixer's port, which
+the mixer does not listen on while it has a client. Since 0.8.0 this is how the console
+works on a RØDECaster (`--desk-mode auto`); reading along is what it falls back to
+when the place cannot be taken, and what it does with `--desk-mode tap` (the
+console's setting *Connection to the mixer: Read along only*). Confirmed on a real
+Duo with firmware 1.7.6: the takeover took four seconds (with the session-open
+handshake), the screen worked normally through the console, and mute, listen, pads,
+routing and channel processing changed from the browser showed on the device.
 
 1. **Taking the place.** If the mixer listens (at boot, before the screen app has
    connected), the console connects at once. If the screen holds the place, the
@@ -96,16 +101,18 @@ screen on the mixer's port, which the mixer does not listen on while it has a cl
    written, within the console's control levels. Frames for the screen are queued, and
    a screen that does not keep up is disconnected (it reconnects and gets the state
    again); the mixer connection is never held up.
-3. **Giving the place back.** When full control is switched off, the console stops
-   or crashes, or the screen has not connected for 30 seconds, the console's listener
+3. **Giving the place back.** When the console stops or crashes, or the screen has
+   not connected for 30 seconds, the console's listener
    closes first and the mixer connection after it, so the mixer can listen again.
    Then the console restarts the screen app (except after a crash), so it connects to
    the mixer afresh, whatever it would do about a lost connection. A crash cannot reverse that order: a duplicate of the
    mixer connection is kept above every other file descriptor, and a process's
    descriptors are closed in ascending order when it ends.
 
-The setting is kept; at the next start the console waits for the mixer and takes the
-place before the screen app connects. Implemented in
+At its next start the console waits for the mixer and takes the place before the
+screen app connects. If taking the place fails, the console reads along and tries
+again only when the mixer's place becomes free, so it never restarts the screen app in
+a loop. Implemented in
 [`internal/desk/relay.go`](../internal/desk/relay.go), tested against the simulator in
 its one-client mode with a screen that reconnects like the device's (`rcsim
 --one-client`).

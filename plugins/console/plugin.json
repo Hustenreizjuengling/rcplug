@@ -3,7 +3,7 @@
   "name": "console",
   "title": "Console",
   "description": "The whole mixer in the browser: channels, levels, routing, inputs, effects, pads, recorder and system – mirrored live and optionally remote-controllable.",
-  "version": "0.7.5",
+  "version": "0.8.0",
   "exec": ["./console", "--addr", "127.0.0.1:{{port}}"],
   "httpProxy": "127.0.0.1:{{port}}",
   "autostart": true,
@@ -25,10 +25,10 @@
         },
         "deskMode": {
           "title": "Verbindung zum Mixer",
-          "description": "Automatisch liest auf einem RØDECaster beim Gerätebildschirm mit. Verbinden macht die Konsole zum Client des Mixer-Ports, den der Gerätebildschirm dann nicht nutzen kann: nur zur Fehlersuche.",
+          "description": "Automatisch: Auf einem RØDECaster übernimmt die Konsole die Verbindung zum Mixer und reicht alles an den Gerätebildschirm weiter (volle Steuerung), so lässt sich jede Einstellung im Browser ändern; geht das nicht, liest sie mit. Nur mitlesen: Die Konsole ändert nur, was am Gerät eine Taste hat (der Weg zurück, falls die volle Steuerung nach einem Firmware-Update Probleme macht). Verbinden: nur zur Fehlersuche.",
           "choices": {
-            "auto": "Automatisch",
-            "tap": "Mitlesen",
+            "auto": "Automatisch (volle Steuerung)",
+            "tap": "Nur mitlesen",
             "connect": "Verbinden (Fehlersuche)"
           }
         },
@@ -62,16 +62,16 @@
       "id": "deskMode",
       "type": "choice",
       "title": "Connection to the mixer",
-      "description": "Automatic reads along with the device's screen on a RØDECaster. Connect makes the console a client of the mixer's port, which the device's screen then cannot use: only for troubleshooting.",
+      "description": "Automatic: on a RØDECaster the console takes the mixer's connection and passes everything on to the device's screen (full control), so every setting can be changed in the browser; if that is not possible it reads along. Read along only: the console changes only what has a button on the device (the way back if full control misbehaves after a firmware update). Connect: only for troubleshooting.",
       "default": "auto",
       "choices": [
         {
           "value": "auto",
-          "title": "Automatic"
+          "title": "Automatic (full control)"
         },
         {
           "value": "tap",
-          "title": "Read along"
+          "title": "Read along only"
         },
         {
           "value": "connect",

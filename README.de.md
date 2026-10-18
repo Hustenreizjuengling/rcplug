@@ -24,12 +24,12 @@ dazu ein [Kochbuch](docs/cookbook.md) und die [Schnittstellen-Referenz](docs/plu
 > arm64-Programmen unter QEMU und installiert in die Original-Firmware 1.7.6 und 1.7.3.
 > **Erster Test an einem echten Duo (Firmware 1.7.6):** Flashen, SSH, Installer,
 > In-App-Updates, Dashboard und Plugins funktionieren. Das Mischpult bedient nur einen
-> Client gleichzeitig, und den belegt der Bildschirm des Geräts; die Konsole liest diese
-> Verbindung mit und zeigt das ganze Pult mit Live-Pegeln. Mute, Listen und die
-> physischen Fader ändert sie über die Tasten des Geräts, die experimentelle *volle
-> Steuerung* jede Einstellung
-> ([docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo), Englisch).
-> Nach der Installation ist sie nur lesend.
+> Client gleichzeitig; die Konsole übernimmt diese Verbindung und reicht alles an den
+> Bildschirm des Geräts weiter (*volle Steuerung*): Sie zeigt das ganze Pult mit
+> Live-Pegeln und ändert jede Einstellung, während der Bildschirm wie gewohnt arbeitet
+> ([docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo), Englisch). Wo
+> das nicht geht, liest sie mit und ändert, was am Gerät eine Taste hat.
+> Nach der Installation ist sie nur lesend, bis du eine Steuerungsstufe wählst.
 >
 > rcplug steht in keiner Verbindung zu RØDE. Nutzung auf eigene Gefahr; bitte den
 > Haftungsausschluss unten lesen.
@@ -53,7 +53,7 @@ einsetzen, die nicht ausfallen darf.
 
 | Gerät | Stand |
 |---|---|
-| RØDECaster Duo, Firmware 1.7.x | Läuft auf einem echten Duo (1.7.6): Host, Dashboard, In-App-Updates und Plugins; die Konsole liest beim Bildschirm des Geräts mit, zeigt das ganze Pult mit Live-Pegeln und ändert es über die Tasten des Geräts; die volle Steuerung (experimentell) ist am Gerät noch zu bestätigen. |
+| RØDECaster Duo, Firmware 1.7.x | Läuft auf einem echten Duo (1.7.6): Host, Dashboard, In-App-Updates und Plugins; die Konsole steuert das ganze Pult mit Live-Pegeln, der Bildschirm des Geräts läuft dabei über sie (volle Steuerung). |
 | RØDECaster Pro II | Wird erkannt und **nur lesend** angezeigt. Steuerung braucht ein geprüftes Profil, siehe [docs/adding-a-model.md](docs/adding-a-model.md). |
 | Andere / unbekannt | Nur lesend. |
 

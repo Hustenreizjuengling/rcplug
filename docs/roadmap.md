@@ -4,7 +4,7 @@ Where rcplug is going, and plugins that would be worth building. Nothing here is
 promise; priorities follow what users need and what the first tests on hardware
 show. Ideas and comments are welcome as issues.
 
-**Today (0.7.2):**
+**Today (0.8.0):**
 
 - **Host:** dashboard and plugin supervisor, signed in-app updates with rollback,
   diagnostics, plugin settings in the dashboard, update notices, an optional dashboard
@@ -12,11 +12,14 @@ show. Ideas and comments are welcome as issues.
   catalog to install and remove plugins, the device's processes with their CPU and RAM,
   and removing rcplug from the dashboard.
   - Updates download gently and show a progress bar.
-- **Console:** the whole desk in the browser, reading along on the real Duo.
+- **Console:** the whole desk in the browser, with every setting changeable: on the
+  device it takes the mixer's connection and the device's screen runs through it (full
+  control, confirmed on a real Duo); where that is not possible it reads along.
   - Live meters from the mixer's memory.
-  - Mute, listen and the physical faders through the device's buttons.
-  - Write protection and a PIN that can be reset at the device.
-  - Experimental *full control* for every setting.
+  - The physical faders, and while reading along mute, listen and the SMART pads,
+    through the device's buttons.
+  - Control levels, write protection and a PIN that can be reset at the device.
+  - A change log of the device, to work out what its settings' numbers mean.
 - **Sonar** as a plugin.
 - **Toolkit** for SSH access, flashing (Windows, Linux), installing, stopping and
   uninstalling, and diagnostics.
@@ -40,13 +43,13 @@ show. Ideas and comments are welcome as issues.
 
 ## Now: the rest of the first run on hardware
 
-1. **Full control** ([protocol.md](protocol.md#full-control), 0.6.4, experimental):
-   - Does the device's screen work normally through the console?
-   - Does a setting without a button, changed in the browser, show on the device?
-   - Does the screen find the mixer again when it is switched off?
-2. **A restart of the device:**
-   - The console starts before the device's screen and reads along on its own.
-   - With full control on, it takes the mixer's place at boot.
+1. **Full control** ([protocol.md](protocol.md#full-control)): *confirmed on a real Duo*
+   – the screen works normally through the console, and settings changed in the
+   browser show on the device. Since 0.8.0 it is how the console works there. Still to
+   see: the screen finding the mixer again when the console stops (an update of the
+   console does that).
+2. **A restart of the device:** the console takes the mixer's place at boot, before
+   the device's screen connects.
 3. **Open values** ([device-notes.md](device-notes.md#assumptions-to-confirm-on-hardware)):
    - the real gain ranges;
    - the meaning of a few integer settings (the console's change log, 0.7.3, shows
@@ -88,12 +91,14 @@ missing:
 2. **SMART pads** configured from the browser (name, colour, play mode, loop, effect
    and mixer pads), not only played.
 3. **Functions the screen app carries out** (switching shows, Bluetooth connections,
-   recording destination, system settings): they need *full control*
-   ([protocol.md](protocol.md#full-control)), which is still to be confirmed on a
-   real Duo, and each one tested there before it is offered.
+   recording destination, system settings): full control
+   ([protocol.md](protocol.md#full-control)) reaches them; each one is tested on a real
+   Duo before it is offered.
+4. **An overview** that makes the whole desk easy to find: the console shows nearly
+   everything already, spread over its pages.
 
-Reading along, the console changes what has a button on the device (mute, listen,
-physical faders); everything else needs full control.
+Since 0.8.0 there are no switches for experimental features: what the goal needs is
+on, what it does not need is gone.
 
 ## Waiting for hardware
 
@@ -157,6 +162,9 @@ How to build any of them: [plugin-guide.md](plugin-guide.md), [cookbook.md](cook
   put at risk for a feature ([safety.md](safety.md)).
 - Read-only by default; anything that changes the desk or touches the audio graph is
   opt-in and says so.
+- No switches for experiments: what the goal (the whole device from the browser)
+  needs is on, after it was tried on a real device; what it does not need is not
+  built.
 - Nothing in the firmware is changed except the one-time SSH key.
 - A firmware update removes rcplug completely and is the way back to the stock device
   in an emergency. rcplug does not try to survive it; reinstalling afterwards stays a

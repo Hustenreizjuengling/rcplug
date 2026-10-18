@@ -48,10 +48,10 @@ saved as `config/console.json`, then restart the console.
 | `--read-only` | off | Refuse every write, whatever the control level |
 | `--allow-untested-model` | off | Offer control on models without a verified profile |
 | `--guard` | on | The GUI guard, see [safety.md](safety.md) |
-| `--desk-mode` | `auto` | How the console gets the state: `tap` reads along with the device's screen (needs root; no writes, control through the front panel), `connect` is a client of the mixer's port, `auto` reads along on a RØDECaster (where `/usr/bin/rc_audio_mixer` exists and the mixer is local) and connects anywhere else (the simulator, an SSH tunnel) |
+| `--desk-mode` | `auto` | How the console reaches the desk: `auto` on a RØDECaster (where `/usr/bin/rc_audio_mixer` exists and the mixer is local) takes the mixer's connection and serves the device's screen through itself (*full control*, [protocol.md](protocol.md#full-control)), reading along when that is not possible, and connects anywhere else (the simulator, an SSH tunnel); `tap` only reads along with the device's screen (needs root; control through the front panel); `connect` is a client of the mixer's port. In the dashboard: Plugins → Console → Settings → *Connection to the mixer* |
 | `--boot-grace` | `75s` | Wait until the system has been up this long before connecting (only with the guard on and a desk on this machine, where the device's own screen may still be connecting) |
 | `--handshake` | `auto` | Session-open message: `auto` (only if no full sync arrives within 3 s), `always`, `never` |
-| `--panel` | off | Switches the experimental front-panel emulation on for good. Without it, users switch it on and off on the console's *System* page. The control levels apply as to every write: mute and listen from *Control* on, the physical faders at *Expert*. |
+| `--panel` | | Ignored since 0.8.0: the front-panel emulation is used wherever its serial line exists. The control levels apply as to every write: mute and listen from *Control* on, the physical faders at *Expert*. |
 | `--tty` | `/dev/ttyAML3` | Serial line of the front panel |
 | `--meters` | `auto` | Reads the level meters and the hardware faders' positions from the mixer's shared memory (read-only), where the Duo keeps them instead of sending them; `off` switches that off. |
 | `--sim` | off | Start a built-in simulated Duo and connect to it |

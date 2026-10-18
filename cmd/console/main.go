@@ -38,9 +38,9 @@ func main() {
 		bootGrace = flag.Duration("boot-grace", 75*time.Second, "wait until the system is up this long before connecting")
 		readOnly  = flag.Bool("read-only", false, "hard-disable all writes (overrides the UI setting)")
 		handshake = flag.String("handshake", "auto", "session-open handshake: auto (only if the desk stays silent) | always | never")
-		deskMode  = flag.String("desk-mode", "auto", "how to get the desk state: auto (read along with the device's screen on a RØDECaster, whose mixer serves one client; connect elsewhere) | tap | connect")
+		deskMode  = flag.String("desk-mode", "auto", "how to reach the desk: auto (on a RØDECaster full control: the console takes the mixer's one connection and serves the device's screen, reading along if that is not possible; elsewhere connect) | tap (read along only) | connect")
 		untested  = flag.Bool("allow-untested-model", false, "offer control on models without a verified profile (e.g. Pro II)")
-		panel     = flag.Bool("panel", false, "EXPERIMENTAL: allow emulating front-panel buttons via TIOCSTI (expert level only)")
+		panel     = flag.Bool("panel", false, "ignored since 0.8.0: the device's buttons are used wherever their tty exists")
 		meters    = flag.String("meters", "auto", "level meters and hardware fader positions from the mixer's shared memory (read-only): auto | off")
 		tty       = flag.String("tty", "/dev/ttyAML3", "front-panel serial tty")
 		sim       = flag.Bool("sim", false, "start a built-in simulated desk and connect to it (demo without hardware)")
@@ -102,7 +102,7 @@ func main() {
 	}, desk.NewMirror())
 	opts := console.Options{
 		Client: client, DataDir: dataDir, AllowUntested: *untested, LegacyPIN: *legacyPIN, Version: version,
-		Panel: &hw.Panel{TTY: *tty}, PanelEnabled: *panel, Logf: log.Printf, Hosted: sdk.Name() != "",
+		Panel: &hw.Panel{TTY: *tty}, FullControl: *deskMode == "auto", Logf: log.Printf, Hosted: sdk.Name() != "",
 	}
 
 	if *meters != "off" {
@@ -116,7 +116,8 @@ func main() {
 	go func() { client.Run(ctx); close(clientDone) }()
 	go c.Run(ctx)
 
-	log.Printf("console %s on %s, desk %s (guard=%v read-only=%v panel=%v)", version, *addr, *deskAddr, *guard, *readOnly, *panel)
+	_ = *panel
+	log.Printf("console %s on %s, desk %s (guard=%v read-only=%v mode=%s)", version, *addr, *deskAddr, *guard, *readOnly, *deskMode)
 	h := c.Handler()
 	if sdk.Name() == "" {
 		h = localHostsOnly(h) // run alone, without rcplugd's checks in front

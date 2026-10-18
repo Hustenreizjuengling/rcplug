@@ -39,8 +39,7 @@ func (c *Console) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 	add("changes.json", c.changesForDiagnostics())
 	c.mu.Lock()
 	settings := map[string]interface{}{"control": c.settings.Control, "pinSet": c.pin.set(),
-		"readOnly": c.client.ReadOnly() || c.settings.ReadOnly, "allowUntested": c.opts.AllowUntested, "panel": c.panelOnLocked(),
-		"fullControl": c.settings.FullControl}
+		"readOnly": c.client.ReadOnly() || c.settings.ReadOnly, "allowUntested": c.opts.AllowUntested, "panel": c.panelOnLocked()}
 	c.mu.Unlock()
 	raw, _ := json.MarshalIndent(settings, "", "  ")
 	add("settings.json", raw)

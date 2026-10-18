@@ -109,17 +109,9 @@ func TestTapsShareOneBridge(t *testing.T) {
 	tapIdleStop = 100 * time.Millisecond
 	t.Cleanup(func() { tapIdleStop = old })
 	fb := newFakeBridge()
-	on := false
-	var mu sync.Mutex
-	taps := NewTaps(fb, func() bool { mu.Lock(); defer mu.Unlock(); return on })
+	taps := NewTaps(fb)
 	ctx := context.Background()
 
-	if _, err := taps.Open(ctx, "sonar", []string{"system:capture_1"}); err != errTapsOff {
-		t.Fatalf("switched off: %v", err)
-	}
-	mu.Lock()
-	on = true
-	mu.Unlock()
 	if _, err := taps.Open(ctx, "sonar", []string{"nope:out"}); err == nil {
 		t.Fatal("an unknown port was tapped")
 	}
@@ -193,7 +185,7 @@ func TestTapStreamOverHTTP(t *testing.T) {
 	srv := NewServer(m, nil, "test")
 	srv.Events = m.Events
 	fb := newFakeBridge()
-	srv.Taps = NewTaps(fb, m.AudioTaps)
+	srv.Taps = NewTaps(fb)
 	hs := httptest.NewServer(srv.Handler())
 	t.Cleanup(hs.Close)
 
@@ -212,17 +204,6 @@ func TestTapStreamOverHTTP(t *testing.T) {
 		t.Fatalf("without a token: %d", r.StatusCode)
 	}
 	token := m.Events.Token("sonar")
-	if r := get(token); r.StatusCode != 403 {
-		t.Fatalf("switched off: %d", r.StatusCode)
-	}
-	req, _ := http.NewRequest("POST", hs.URL+"/api/audio/enable?on=true", nil)
-	req.Header.Set("X-Rcplug", "1")
-	if r, err := http.DefaultClient.Do(req); err != nil || r.StatusCode != 200 {
-		t.Fatalf("enable: %v", err)
-	}
-	if !m.AudioTaps() {
-		t.Fatal("the switch was not kept")
-	}
 	if r := get(m.Events.Token("quiet")); r.StatusCode != 403 {
 		t.Fatalf("a plugin without the audio permission: %d", r.StatusCode)
 	}
@@ -250,7 +231,7 @@ func TestTapStreamOverHTTP(t *testing.T) {
 // run meanwhile go on receiving audio (before, the bridge's buffer overran).
 func TestTapsReadOnWhileConnecting(t *testing.T) {
 	fb := newFakeBridge()
-	taps := NewTaps(fb, func() bool { return true })
+	taps := NewTaps(fb)
 	a, err := taps.Open(context.Background(), "sonar", []string{"system:capture_1"})
 	if err != nil {
 		t.Fatal(err)
