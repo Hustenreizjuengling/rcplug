@@ -104,8 +104,8 @@ func findSegment(table string, key int) (id, size int, ok bool) {
 		if len(fields) < 4 {
 			continue
 		}
-		k, err := strconv.ParseInt(fields[0], 10, 64)
-		if err != nil || int32(k) != int32(key) {
+		k, err := strconv.ParseInt(fields[0], 10, 32) // key_t, printed signed
+		if err != nil || k != int64(int32(key)) {
 			continue
 		}
 		id, err1 := strconv.Atoi(fields[1])
