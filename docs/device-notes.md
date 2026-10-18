@@ -123,9 +123,10 @@ from Windows to a patched 1.7.6):
    together with what you saw. They contain what the console found for most of the
    assumptions above.
 
-If anything looks wrong, `ssh root@<ip> /etc/init.d/rcplug stop` stops rcplug and all
-plugins at once (until the next boot), and `rcplug-wizard.sh --host <ip> --uninstall`
-removes it completely.
+If anything looks wrong, the toolkit's setup window stops rcplug and all plugins at once
+(*Diagnostics and more* → *Stop rcplug*, until it is started again or the device
+restarts; on the command line `rcplug-setup stop`), and *Uninstall rcplug* removes it
+completely. Neither needs the dashboard.
 
 ## Pro II
 
