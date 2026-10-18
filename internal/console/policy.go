@@ -208,13 +208,15 @@ var basicRules = func() map[string]map[string]rule {
 	bools(m, "masterCompellorOn", "masterDelayOn")
 	units(m, "masterCompellorThreshold", "masterCompellorAttack", "masterCompellorRelease", "masterCompellorGain")
 	r["MASTERCHANNEL"] = m
-	r["DUCKER"] = map[string]rule{"duckerDepth": unit()}
+	r["MIXMINUSES"] = map[string]rule{"outputMixMinus": integer(0, 2)} // main mix, mix-minus, custom
+	r["DUCKER"] = map[string]rule{"duckerDepth": dbl(-60, 0)}          // dB (-9 on a Duo, 1.7.6)
 	r["EMERGENCYMUTE"] = map[string]rule{"emergencyMuteActive": boolean()}
 	r["RECORDER"] = map[string]rule{"requestRecordState": integer(0, 2), "requestDropMarker": integer(0, 1<<53)}
 	r["GUI"] = map[string]rule{
-		"selectedBank":     special('i', checkBank),
-		"screenBrightness": integer(0, 100), "activeButtonsBrightness": integer(0, 100),
-		"inactiveButtonsBrightness": integer(0, 100), "autoBrightness": integer(0, 1),
+		"selectedBank": special('i', checkBank),
+		// 0..255 (a Duo with firmware 1.7.6 has 250, 255 and 8)
+		"screenBrightness": integer(0, 255), "activeButtonsBrightness": integer(0, 255),
+		"inactiveButtonsBrightness": integer(0, 255), "autoBrightness": special('b', checkSwitch),
 		"screenDimAfterSeconds": boolean(),
 	}
 	fx := map[string]rule{"reverbModel": dbl(0, 10), "pitchShiftSemitones": dbl(-12, 12)}
@@ -223,9 +225,17 @@ var basicRules = func() map[string]map[string]rule {
 		"echoLowCut", "echoHighCut", "distortionIntensity", "robotLevel", "robotMix")
 	r["EFFECTS_PARAMETERS"] = fx
 	r["PADBUTTON"] = map[string]rule{"padButtonPressed": boolean()}
-	r["PAD"] = map[string]rule{"padGain": unit()}
+	r["PAD"] = map[string]rule{"padGain": dbl(-60, 0)} // dB (-12 and 0 on a Duo, 1.7.6)
 	return r
 }()
+
+// checkSwitch accepts on/off as a bool (firmware 1.7.6) or as 0/1 (1.7.4).
+func checkSwitch(_ *rcproto.Node, _ *rcproto.Layout, _ []int, v *rcproto.Value) error {
+	if v.IsBool() || v.IsNumber() && (v.Num() == 0 || v.Num() == 1) && v.Kind != rcproto.KindDouble {
+		return nil
+	}
+	return fmt.Errorf("expected on or off")
+}
 
 // triggerProps rest as bools in the full sync but are driven with the binary
 // two-bool trigger pulse on the wire (validated on hardware by the

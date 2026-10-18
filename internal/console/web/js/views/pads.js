@@ -43,7 +43,7 @@ function padEl(scope, bank, slot, p, rerender) {
 
 function padDrawer(p) {
   openDrawer(t('pads.title', { name: val(p, 'padName') || '#' + val(p, 'padIdx') }), (scope) =>
-    h('div', null, slider(scope, p, 'padGain', { label: t('pads.gain') }), propsTable(scope, p, Object.keys(nodeAt(p).p))));
+    h('div', null, slider(scope, p, 'padGain', { label: t('pads.gain'), min: -60, max: 0, step: 0.5, fmt: (v) => Number(v).toFixed(1) + ' dB' }), propsTable(scope, p, Object.keys(nodeAt(p).p))));
 }
 
 export const pads = {

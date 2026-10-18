@@ -79,6 +79,7 @@ type Console struct {
 	reset         pinReset
 	presence      presenceState
 	desk          *deskEvents
+	changes       *changeLog
 }
 
 // New creates the console and loads persisted settings.
@@ -86,7 +87,8 @@ func New(o Options) *Console {
 	if o.Logf == nil {
 		o.Logf = func(string, ...interface{}) {}
 	}
-	c := &Console{opts: o, client: o.Client, mirror: o.Client.Mirror(), pin: newPinStore(o.DataDir), desk: newDeskEvents(o.Publish)}
+	c := &Console{opts: o, client: o.Client, mirror: o.Client.Mirror(), pin: newPinStore(o.DataDir), desk: newDeskEvents(o.Publish),
+		changes: newChangeLog()}
 	if o.DataDir != "" {
 		if err := sdk.LoadJSON(c.settingsPath(), &c.settings); err != nil {
 			o.Logf("console: settings: %v", err)
@@ -111,6 +113,7 @@ func New(o Options) *Console {
 	c.mirror.Watch(c.watchPinReset)
 	c.mirror.Watch(c.watchPresence)
 	c.mirror.Watch(c.watchDesk)
+	c.mirror.WatchChanges(c.watchChanges)
 	c.client.OnStatus(func(st desk.Status) {
 		data, _ := json.Marshal(st)
 		c.mirror.Notify("status", data)
@@ -155,6 +158,7 @@ func (c *Console) Level() (Level, string) {
 func (c *Console) Run(ctx context.Context) {
 	go c.runMeters(ctx)
 	go c.runDeskEvents(ctx)
+	go c.runChangeLog(ctx)
 	t := time.NewTicker(60 * time.Millisecond)
 	defer t.Stop()
 	for {

@@ -2,7 +2,7 @@
 import { h } from '../dom.js';
 import { t } from '../i18n.js';
 import { store, famPath, run } from '../store.js';
-import { valueText } from '../controls.js';
+import { selectCtl } from '../controls.js';
 import { sourceLabel, outputLabel, outputs, assignedSources, faders } from '../device.js';
 import { mixCell } from './parts.js';
 
@@ -36,7 +36,7 @@ export const routing = {
     const mmGrid = h('div', { class: 'grid cols-4' });
     for (let i = 0; i < (mm ? mm.count : 0); i++) {
       const p = famPath('MIXMINUSES', i);
-      mmGrid.append(h('div', { class: 'card' }, h('div', { class: 'small muted' }, outputLabel(i)), h('div', { class: 'mono' }, 'outputMixMinus = ', valueText(scope, p, 'outputMixMinus'))));
+      mmGrid.append(h('div', { class: 'card' }, selectCtl(scope, p, 'outputMixMinus', [0, 1, 2].map((v) => [v, t('mm.' + v)]), { label: outputLabel(i) })));
     }
     return [
       h('div', { class: 'row' }, h('p', { class: 'muted', style: 'margin:0' }, t('routing.intro')), h('span', { class: 'spacer' }), filter),

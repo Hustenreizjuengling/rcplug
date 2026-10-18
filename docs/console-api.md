@@ -137,6 +137,7 @@ time.
 | Request | Content |
 |---|---|
 | `GET api/clients` | `{"port", "clients": [...]}`: connections to the desk's control port with the process behind each (`pid`, `comm`), e.g. the device's GUI and the console |
+| `GET api/changes` | `{"changes": [...], "dropped": n}`: the last 500 property changes the desk reported, oldest first, each with `time`, `node`, `index` (in its family, -1 for a single node), `path`, `name`, `old` and `new` (secrets redacted). Meters, fader positions, mix levels, progress and the recording time are left out. `POST api/changes/clear` empties it (not for plugins). The diagnostics bundle carries it as `changes.json`, without string values |
 | `GET api/audit` | `{"writes": [...]}`: the last 300 writes and changes to the console itself (node `console`: control level, device buttons, PIN without its value, reconnect, panel), with time, node type, path, property, value, client address and, for refused ones, the error code |
 | `GET api/diagnostics` | A zip with the console's connection statistics, status, clients, audit log, summary, layout and a sanitized copy of the tree; the host adds it to its diagnostics bundle |
 | `GET api/hw` | The device buttons (`panel`: `enabled`, `forced`, `error`) and the meter memory (`meters`: `available`, `live`) |

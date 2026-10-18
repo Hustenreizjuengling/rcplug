@@ -39,7 +39,7 @@ export const outputsView = {
         slider(scope, m, 'masterCompellorRelease', { label: t('p.release') }), slider(scope, m, 'masterCompellorGain', { label: t('p.gain') }),
         slider(scope, m, 'masterDelaySeconds', { label: t('out.delay'), min: 0, max: 2, step: 0.01, fmt: (v) => v.toFixed(2) + ' s' })));
     }
-    if (d) cards.push(card(t('out.ducking'), slider(scope, d, 'duckerDepth', { label: t('out.depth') })));
+    if (d) cards.push(card(t('out.ducking'), slider(scope, d, 'duckerDepth', { label: t('out.depth'), min: -60, max: 0, step: 1, fmt: (v) => Math.round(v) + ' dB' })));
     if (em) cards.push(card(t('mon.emergency'), toggle(scope, em, 'emergencyMuteActive', t('out.allMuted'), 'mute', { confirm: t('mon.emergencyConfirm') })));
     return [h('div', { class: 'grid cols-3' }, cards)];
   },

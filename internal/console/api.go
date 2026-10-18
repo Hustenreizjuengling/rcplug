@@ -26,6 +26,8 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/events", c.handleEvents)
 	mux.HandleFunc("GET /api/clients", c.handleClients)
 	mux.HandleFunc("GET /api/audit", c.handleAudit)
+	mux.HandleFunc("GET /api/changes", c.handleChanges)
+	mux.HandleFunc("POST /api/changes/clear", c.forPeople(c.handleChangesClear))
 	mux.HandleFunc("GET /api/diagnostics", c.handleDiagnostics)
 	mux.HandleFunc("GET /api/hw", c.handleHW)
 	mux.HandleFunc("POST /api/set", c.withPIN(c.handleSet))

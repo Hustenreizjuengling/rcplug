@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -246,6 +247,13 @@ func TestWritePolicy(t *testing.T) {
 		{"phantom 2", map[string]interface{}{"path": in, "name": "inputPower", "value": 2}, "out_of_range"},
 		{"mic type (expert only)", map[string]interface{}{"path": in, "name": "inputMicrophoneType", "value": 1}, "denied"},
 		{"delay too long", map[string]interface{}{"path": l.Path("MASTERCHANNEL", 0), "name": "masterDelaySeconds", "value": 9}, "out_of_range"},
+		// Ranges as a Duo with firmware 1.7.6 has them.
+		{"ducking in dB", map[string]interface{}{"path": l.Path("DUCKER", 0), "name": "duckerDepth", "value": -9}, ""},
+		{"ducking above 0 dB", map[string]interface{}{"path": l.Path("DUCKER", 0), "name": "duckerDepth", "value": 3}, "out_of_range"},
+		{"brightness 250", map[string]interface{}{"path": l.Path("GUI", 0), "name": "screenBrightness", "value": 250}, ""},
+		{"brightness 300", map[string]interface{}{"path": l.Path("GUI", 0), "name": "screenBrightness", "value": 300}, "out_of_range"},
+		{"auto brightness", map[string]interface{}{"path": l.Path("GUI", 0), "name": "autoBrightness", "value": 1}, ""},
+		{"auto brightness 2", map[string]interface{}{"path": l.Path("GUI", 0), "name": "autoBrightness", "value": 2}, "out_of_range"},
 	}
 	for _, c := range cases {
 		if _, ok := c.body["epoch"]; !ok {
@@ -1171,5 +1179,53 @@ func TestPluginsNeedDeskWrite(t *testing.T) {
 	}
 	if res := r.post(t, "/api/set", body, asPlugin("desk:write")...); res.code != 403 || res.body["code"] != "read_only" {
 		t.Fatalf("plugin under write protection: %d %s", res.code, res.raw)
+	}
+}
+
+func TestChangeLog(t *testing.T) {
+	r := newRig(t, rcsim.Options{}, func(*Options) {})
+	l, _ := r.snap()
+	inject := func(path []int, name string, v rcproto.Value) {
+		if err := r.sim.Inject(&rcproto.Change{Type: rcproto.PropertyChanged, Path: path, Name: name, Value: v}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	in := l.Path("INPUTSOURCE", 1)
+	old, _ := r.sim.Snapshot().At(in).Get("inputMicrophoneType")
+	inject(in, "inputMicrophoneType", rcproto.Int(old.I+3))
+	inject(l.Path("FADER", 0), "faderLevel", rcproto.Int(77))    // continuous: left out
+	inject(l.Path("NETWORK", 0), "wifiPSK", rcproto.String("x")) // a secret
+	var got []ChangeEntry
+	for deadline := time.Now().Add(3 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		res := r.do(t, http.MethodGet, "/api/changes", nil)
+		got = nil
+		json.Unmarshal(res.raw, &struct{ Changes *[]ChangeEntry }{&got})
+		if len(got) >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("changes: %s", res.raw)
+		}
+	}
+	e := got[0]
+	if e.Node != "INPUTSOURCE" || e.Index != 1 || e.Name != "inputMicrophoneType" || string(e.Old) != strconv.FormatInt(old.I, 10) || string(e.New) != strconv.FormatInt(old.I+3, 10) {
+		t.Fatalf("entry %+v", e)
+	}
+	if s := got[1]; s.Name != "wifiPSK" || strings.Contains(string(s.New), `"x"`) {
+		t.Fatalf("secret %+v", s)
+	}
+	for _, e := range got {
+		if e.Name == "faderLevel" {
+			t.Fatal("a fader position was logged")
+		}
+	}
+	if !strings.Contains(string(r.console.changesForDiagnostics()), `"inputMicrophoneType"`) {
+		t.Fatal("not in the diagnostics")
+	}
+	if res := r.post(t, "/api/changes/clear", map[string]string{}); res.code != 200 {
+		t.Fatalf("clear: %d", res.code)
+	}
+	if res := r.do(t, http.MethodGet, "/api/changes", nil); strings.Contains(string(res.raw), "inputMicrophoneType") {
+		t.Fatal("not cleared")
 	}
 }

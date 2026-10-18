@@ -53,7 +53,9 @@ type Mirror struct {
 	subs map[*Subscriber]struct{}
 
 	watchers map[int]func(path []int, name string, v rcproto.Value)
-	nextW    int
+	// changeWatchers get the value before the change too (WatchChanges).
+	changeWatchers map[int]func(path []int, name string, old, v rcproto.Value)
+	nextW          int
 
 	changes  uint64
 	lastRate float64
@@ -121,6 +123,14 @@ func (m *Mirror) applyLocked(c *rcproto.Change) error {
 	if c.Type != rcproto.FullSync && m.root == nil {
 		return ErrNotSynced
 	}
+	old := rcproto.Void()
+	if len(m.changeWatchers) > 0 && m.root != nil && !c.Structural() {
+		if n := m.root.At(c.Path); n != nil {
+			if v, ok := n.Get(c.Name); ok {
+				old = v
+			}
+		}
+	}
 	root, err := rcproto.Apply(m.root, c)
 	if err != nil {
 		return err
@@ -141,6 +151,9 @@ func (m *Mirror) applyLocked(c *rcproto.Change) error {
 	}
 	for _, fn := range m.watchers {
 		fn(c.Path, c.Name, v)
+	}
+	for _, fn := range m.changeWatchers {
+		fn(c.Path, c.Name, old, v)
 	}
 	if i, ok := m.pending[key]; ok {
 		m.batch[i].v = v
@@ -227,6 +240,24 @@ func (m *Mirror) Watch(fn func(path []int, name string, v rcproto.Value)) func()
 	return func() {
 		m.mu.Lock()
 		delete(m.watchers, id)
+		m.mu.Unlock()
+	}
+}
+
+// WatchChanges is Watch with the value before the change (Void for a new
+// property). The same rules apply: fn runs under the mirror lock.
+func (m *Mirror) WatchChanges(fn func(path []int, name string, old, v rcproto.Value)) func() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.changeWatchers == nil {
+		m.changeWatchers = map[int]func([]int, string, rcproto.Value, rcproto.Value){}
+	}
+	id := m.nextW
+	m.nextW++
+	m.changeWatchers[id] = fn
+	return func() {
+		m.mu.Lock()
+		delete(m.changeWatchers, id)
 		m.mu.Unlock()
 	}
 }

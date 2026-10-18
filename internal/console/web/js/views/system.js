@@ -6,7 +6,7 @@
 import { h } from '../dom.js';
 import { t } from '../i18n.js';
 import { single, run, runPath } from '../store.js';
-import { slider, kv, card, valueText } from '../controls.js';
+import { slider, toggle, kv, card, valueText } from '../controls.js';
 import { request, reconnect, setPin, report, forgetPin, pinReset, setSettings } from '../api.js';
 import { confirmDialog } from '../dialogs.js';
 import { controlLevel } from '../policy.js';
@@ -213,9 +213,10 @@ export const system = {
       cards.push(card(t('sys.shows'), kv(scope, [[t('sys.currentShow'), single('CURRENTSHOW'), 'currentShowName']]),
         h('div', { class: 'tablewrap' }, h('table', { class: 'props' }, h('thead', null, h('tr', null, h('th', null, t('sys.show')), h('th', null, t('sys.icon')), h('th', null, 'Snapshot'))), tb))));
     }
-    if (gui) cards.push(card(t('sys.display'), slider(scope, gui, 'screenBrightness', { label: t('gui.screen'), min: 0, max: 100 }),
-      slider(scope, gui, 'activeButtonsBrightness', { label: t('gui.buttonsActive'), min: 0, max: 100 }), slider(scope, gui, 'inactiveButtonsBrightness', { label: t('gui.buttonsInactive'), min: 0, max: 100 }),
-      kv(scope, [[t('gui.lang'), gui, 'lang'], [t('gui.auto'), gui, 'autoBrightness'], [t('gui.dim'), gui, 'screenDimAfterSeconds'], ['Metering', gui, 'metering'], [t('gui.meters'), gui, 'broadcastMeters']])));
+    if (gui) cards.push(card(t('sys.display'), slider(scope, gui, 'screenBrightness', { label: t('gui.screen'), min: 0, max: 255, step: 1 }),
+      slider(scope, gui, 'activeButtonsBrightness', { label: t('gui.buttonsActive'), min: 0, max: 255, step: 1 }), slider(scope, gui, 'inactiveButtonsBrightness', { label: t('gui.buttonsInactive'), min: 0, max: 255, step: 1 }),
+      h('div', { class: 'row' }, toggle(scope, gui, 'autoBrightness', t('gui.auto'))),
+      kv(scope, [[t('gui.lang'), gui, 'lang'], [t('gui.dim'), gui, 'screenDimAfterSeconds'], ['Metering', gui, 'metering'], [t('gui.meters'), gui, 'broadcastMeters']])));
     return [h('div', { class: 'grid cols-3' }, cards)];
   },
 };

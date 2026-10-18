@@ -25,9 +25,9 @@ function quickCard(scope) {
   const d = single('DUCKER'), gui = single('GUI'), o = single('OUTPUT');
   return card(t('mixer.quick'),
     o ? slider(scope, o, 'outputBTLevel', { label: 'Bluetooth' }) : null,
-    d ? slider(scope, d, 'duckerDepth', { label: t('out.ducking') }) : null,
-    gui ? slider(scope, gui, 'screenBrightness', { label: t('gui.screen'), min: 0, max: 100 }) : null,
-    gui ? slider(scope, gui, 'activeButtonsBrightness', { label: t('gui.buttons'), min: 0, max: 100 }) : null);
+    d ? slider(scope, d, 'duckerDepth', { label: t('out.ducking'), min: -60, max: 0, step: 1, fmt: (v) => Math.round(v) + ' dB' }) : null,
+    gui ? slider(scope, gui, 'screenBrightness', { label: t('gui.screen'), min: 0, max: 255, step: 1 }) : null,
+    gui ? slider(scope, gui, 'activeButtonsBrightness', { label: t('gui.buttons'), min: 0, max: 255, step: 1 }) : null);
 }
 
 // sourceLevel: the device reports a physical fader's movement only as the

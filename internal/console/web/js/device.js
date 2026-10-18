@@ -84,5 +84,7 @@ export const FX = [
 ];
 
 export const recordStateText = (v) => (v >= 0 && v <= 3 ? t('rec.state' + v) : t('rec.stateN', { n: v }));
-export const inputTypeText = (v) => t('input.type' + v) !== 'input.type' + v ? t('input.type' + v) : String(v);
+// Only the values seen on a real Duo are named; the others show as numbers
+// until the console's change log shows what they are.
+export const inputTypeText = (v) => t('input.type' + v) !== 'input.type' + v ? t('input.type' + v) : t('input.typeN', { n: v });
 export const padTypeText = (v) => t('pad.type' + v) !== 'pad.type' + v ? t('pad.type' + v) : t('pad.typeN', { n: v });

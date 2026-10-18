@@ -125,13 +125,13 @@ func MakeRealistic(root *rcproto.Node) {
 			set(n, "meterStereo", true)
 		}
 	})
-	set(single("DUCKER"), "duckerDepth", 0.45)
+	set(single("DUCKER"), "duckerDepth", -9.0) // dB, as on a Duo with firmware 1.7.6
 	gui := single("GUI")
 	set(gui, "lang", "de")
 	set(gui, "broadcastMeters", true)
-	set(gui, "activeButtonsBrightness", 90)
-	set(gui, "inactiveButtonsBrightness", 30)
-	set(gui, "screenBrightness", 85)
+	set(gui, "activeButtonsBrightness", 255) // 0..255, as on a Duo with firmware 1.7.6
+	set(gui, "inactiveButtonsBrightness", 8)
+	set(gui, "screenBrightness", 250)
 	set(gui, "screenDimAfterSeconds", true)
 	colours := []string{"FF19C37D", "FF2F81F7", "FFF0A030", "FFD03CA0"}
 	each("HEADPHONE", func(i int, n *rcproto.Node) { set(n, "headphoneColour", colours[i%len(colours)]) })
@@ -310,8 +310,8 @@ func MakeRealistic(root *rcproto.Node) {
 			set(n, "inputMicrophoneGain", 42)
 			set(n, "inputInstrumentGain", 10)
 			set(n, "inputDigitalGain", 0)
-			set(n, "inputType", 1)
-			set(n, "inputMicrophoneType", 2)
+			set(n, "inputType", 0) // a microphone, as on a Duo with firmware 1.7.6
+			set(n, "inputMicrophoneType", 4)
 			set(n, "inputPower", map[bool]int{true: 1, false: 0}[i == 1])
 		}
 	})
@@ -347,7 +347,7 @@ func MakeRealistic(root *rcproto.Node) {
 		set(n, "padName", pads[i%len(pads)])
 		set(n, "padColourIndex", i%12)
 		set(n, "padType", 1)
-		set(n, "padGain", 0.8)
+		set(n, "padGain", -12.0) // dB
 		set(n, "padPlayMode", i%3)
 	})
 	each("RADIO/RADIOTX", func(i int, n *rcproto.Node) {

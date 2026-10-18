@@ -10,6 +10,20 @@ may break compatibility).
 - Reading along, the console plays the **SMART pads** of the bank the device shows:
   a click on a pad presses it on the front panel (with the device buttons switched
   on). Other banks need the bank selected on the device first; the console says so.
+- **Changes on the device** (console → *Log*): the last 500 changes the device
+  reported, with the value before and after (meters, fader positions and progress left
+  out). Change a setting on the device's screen to see which property it is and what
+  its numbers mean; the diagnostics bundle carries the list too (`changes.json`).
+  `GET api/changes`.
+- **Mix-minus** per output (*Routing*) as a choice: main mix, mix-minus or custom
+  (*Control* level).
+
+### Fixed
+- Value ranges checked against a real Duo (firmware 1.7.6): ducking depth and pad
+  volume are in dB (−60 to 0), the screen and button brightness go up to 255, and
+  automatic brightness is a switch. Before, the *Control* level refused real values.
+- Input type 0 is a microphone (it was shown as "—"); types not seen on a real device
+  show as numbers instead of guessed names.
 
 ## 0.7.2 - 2026-10-18
 
