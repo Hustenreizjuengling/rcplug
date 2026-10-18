@@ -99,7 +99,7 @@ func TestDashboardPassword(t *testing.T) {
 	if rec := r.do("GET", "/api/plugins", "", lan, ""); rec.Code != 401 || !strings.Contains(rec.Body.String(), "login_required") {
 		t.Fatalf("API without login: %d %s", rec.Code, rec.Body)
 	}
-	if rec := r.do("GET", "/plugins/console/", "", lan, "", "Accept", "text/html"); rec.Code != 303 || !strings.HasPrefix(rec.Header().Get("Location"), "/login?next=") {
+	if rec := r.do("GET", "/plugins/console/", "", lan, "", "Accept", "text/html"); rec.Code != 303 || rec.Header().Get("Location") != "/login" {
 		t.Fatalf("page without login: %d %s", rec.Code, rec.Header().Get("Location"))
 	}
 	for _, p := range []string{"/login", "/api/access"} {

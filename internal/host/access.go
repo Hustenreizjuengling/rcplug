@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -324,16 +323,18 @@ func (a *Access) Gate(next http.Handler) http.Handler {
 			return
 		}
 		if r.Method == http.MethodGet && strings.Contains(r.Header.Get("Accept"), "text/html") {
-			http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 		sdk.WriteError(w, errLogin)
 	})
 }
 
-func setSession(w http.ResponseWriter, value string, maxAge int) {
+// setSession sets the session cookie; Secure only over HTTPS (in front of
+// the host), as the device itself speaks plain HTTP.
+func setSession(w http.ResponseWriter, r *http.Request, value string, maxAge int) {
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: value, Path: "/", MaxAge: maxAge,
-		HttpOnly: true, SameSite: http.SameSiteStrictMode})
+		HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"})
 }
 
 // StartReset opens a minute in which presses at the device remove the
@@ -424,12 +425,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		sdk.WriteError(w, err)
 		return
 	}
-	setSession(w, v, int(sessionLife.Seconds()))
+	setSession(w, r, v, int(sessionLife.Seconds()))
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	setSession(w, "", -1)
+	setSession(w, r, "", -1)
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
@@ -450,10 +451,10 @@ func (s *Server) handlePassword(w http.ResponseWriter, r *http.Request) {
 	if req.New != "" {
 		// The new key ended every session; this browser stays logged in.
 		if v, err := s.Access.Login(req.New); err == nil {
-			setSession(w, v, int(sessionLife.Seconds()))
+			setSession(w, r, v, int(sessionLife.Seconds()))
 		}
 	} else {
-		setSession(w, "", -1)
+		setSession(w, r, "", -1)
 	}
 	writeJSON(w, map[string]bool{"ok": true})
 }

@@ -61,11 +61,6 @@ $('pw').setAttribute('aria-label', t('placeholder'));
 $('go').textContent = t('go');
 $('forgot').textContent = t('forgot');
 
-// Only same-site paths after the login (no open redirect).
-function target() {
-  const n = new URLSearchParams(location.search).get('next') || '/';
-  return n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/\\') ? n : '/';
-}
 async function post(url, body) {
   const r = await fetch(url, { method: 'POST', headers: { 'X-Rcplug': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
   let d = {};
@@ -78,7 +73,7 @@ $('form').addEventListener('submit', async (e) => {
   $('err').textContent = '';
   const r = await post('/api/login', { password: $('pw').value }).catch((x) => ({ ok: false, d: { error: x.message } }));
   $('go').disabled = false;
-  if (r.ok || r.d.code === 'no_password') { location.replace(target()); return; }
+  if (r.ok || r.d.code === 'no_password') { location.replace('/'); return; }
   $('err').textContent = r.d.code === 'wrong_password' ? t('wrong') : r.d.code === 'login_locked' ? t('locked') : t('failed', { err: r.d.error || '?' });
   $('pw').select();
 });
@@ -92,7 +87,7 @@ $('forgot').addEventListener('click', async () => {
     const s = await fetch('/api/access', { cache: 'no-store' }).then((x) => x.json()).catch(() => null);
     if (!s) return;
     const rs = s.reset || {};
-    if (!s.protected) { clearInterval(id); box.textContent = t('resetDone'); setTimeout(() => location.replace(target()), 2500); return; }
+    if (!s.protected) { clearInterval(id); box.textContent = t('resetDone'); setTimeout(() => location.replace('/'), 2500); return; }
     if (rs.active) { box.textContent = t('resetWait', { s: rs.seconds }); return; }
     clearInterval(id);
     box.textContent = t('resetFailed', { err: rs.error || '?' });
