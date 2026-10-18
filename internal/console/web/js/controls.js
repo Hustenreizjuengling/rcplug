@@ -103,6 +103,9 @@ export function vfader(scope, path, name, opts = {}) {
     out.textContent = fmt(v);
   };
   scope.bind(path, name, (v) => { if (typeof v === 'number' && !dragging) show(v); });
+  // follow: another property that carries the position (a physical fader's
+  // level shows in its source's mix, see mixer.js).
+  if (opts.follow) scope.bind(opts.follow.path, opts.follow.name, (v) => { const x = opts.follow.map(v); if (x != null && !dragging) show(x); });
   if (can) {
     const send = throttled((v) => setProp(scope, path, name, v));
     const fromY = (e) => {

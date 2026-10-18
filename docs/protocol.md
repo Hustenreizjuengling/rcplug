@@ -29,6 +29,27 @@ What the server does, read from `rc_audio_mixer` in firmware 1.7.6 and 1.7.3
   the binary cannot emit the signals its interface declares, and the methods that
   would return the tree are commented out in it.
 
+## What a running Duo sends
+
+Read along on a Duo with firmware 1.7.6 (the screen's connection):
+
+- The full sync when the screen connects: about 200 KB, 905 nodes, 8734 properties.
+  The tree differs from the 1.7.4 capture the simulator plays: 390 `MIX` nodes in
+  several runs (the first run, 12 sources × 13 outputs, is what the layout uses),
+  30 `INPUTSOURCE`, new types such as `RCSYNCMIX` and `STREAMERXSTREAMMIX`.
+- `ping` (a 4-byte body) every few seconds, in both directions.
+- A **physical fader** moving: only `MIX.mixLevelWithAnchor` of the 13 mixes of the
+  channel's source, `"anchor|level"` with level = position / 127 (`0.708661` = 90 =
+  unity). The `FADER` node's `faderLevel` is *not* updated; it keeps the value of the
+  last full sync. The console shows physical faders from the mix level.
+- **Mute** pressed on the device: `mutePressed` true/false on a node under
+  `PHYSICALINTERFACE`, then `CHANNEL.channelOutputMute` and `mixMute` of the
+  source's mixes.
+- From the screen to the mixer: what the user does there, e.g. `screenTouched`.
+- **No meter values**: the `METER` nodes stay at 0 and no level changes pass this
+  connection; the screen gets its meters another way (not yet known).
+- A message's 8-byte header and its body usually arrive as two TCP segments.
+
 ## Reading along
 
 Because the mixer serves one client and the screen holds it, the console on the

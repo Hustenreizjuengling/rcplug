@@ -30,9 +30,10 @@ type Options struct {
 	DataDir string
 	// Screen is the display mirror (nil = not available).
 	Screen *hw.Screen
-	// Panel emulates front-panel input. It is used when PanelEnabled is set
-	// (--panel) or the user switched it on (Settings.Panel).
-	Panel        *hw.Panel
+	// Panel emulates front-panel input (hw.Panel). It is used when
+	// PanelEnabled is set (--panel) or the user switched it on
+	// (Settings.Panel).
+	Panel        FrontPanel
 	PanelEnabled bool
 	// AllowUntested offers control on models without a verified profile.
 	AllowUntested bool
@@ -166,6 +167,12 @@ func (c *Console) Handler() http.Handler {
 		files.ServeHTTP(w, r)
 	}))
 	return mux
+}
+
+// FrontPanel presses the device's buttons (hw.Panel; tests use a fake).
+type FrontPanel interface {
+	Do(id string, value int) error
+	Available() error
 }
 
 // panelOn reports whether the front-panel emulation is switched on, by

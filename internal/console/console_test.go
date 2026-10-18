@@ -509,6 +509,80 @@ func TestResyncRestartsTheScreenWhileReadingAlong(t *testing.T) {
 	}
 }
 
+type fakePanel struct{ pressed []string }
+
+func (f *fakePanel) Do(id string, value int) error { f.pressed = append(f.pressed, id); return nil }
+func (f *fakePanel) Available() error              { return nil }
+
+// Reading along, mute and listen of the physical channels are pressed on the
+// front panel (when the device buttons are switched on); everything else is
+// refused. The mirror is not changed: the device reports the result.
+func TestReadingAlongWritesThroughTheFrontPanel(t *testing.T) {
+	root, err := rcsim.DuoTree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mirror := desk.NewMirror()
+	if err := mirror.Ingest(&rcproto.Change{Type: rcproto.FullSync, Tree: root}); err != nil {
+		t.Fatal(err)
+	}
+	fp := &fakePanel{}
+	client := desk.NewClient(desk.Config{Addr: "127.0.0.1:2345", Mode: "tap", Logf: quiet}, mirror)
+	c := New(Options{Client: client, Logf: quiet, Panel: fp, DataDir: t.TempDir()})
+	hs := httptest.NewServer(sdk.CSRF(c.Handler()))
+	defer hs.Close()
+	r := &rig{http: hs, console: c}
+	if res := r.post(t, "/api/control", map[string]string{"level": "basic"}); res.code != 200 {
+		t.Fatalf("level: %d %s", res.code, res.raw)
+	}
+	var epoch uint64
+	var ch0, ch5 []int
+	var muted, cued bool
+	mirror.View(func(s desk.Snapshot) {
+		epoch, ch0, ch5 = s.Epoch, s.Layout.Path("CHANNEL", 0), s.Layout.Path("CHANNEL", 5)
+		v, _ := s.Root.At(ch0).Get("channelOutputMute")
+		w, _ := s.Root.At(ch0).Get("channelCueEnable")
+		muted, cued = v.Truth(), w.Truth()
+	})
+	set := func(path []int, name string, v interface{}) resp {
+		return r.post(t, "/api/set", map[string]interface{}{"epoch": epoch, "path": path, "name": name, "value": v})
+	}
+	if res := set(ch0, "channelOutputMute", !muted); res.code != 403 || res.body["code"] != "panel_off" {
+		t.Fatalf("device buttons off: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/settings", map[string]bool{"panel": true}); res.code != 200 {
+		t.Fatalf("panel on: %d %s", res.code, res.raw)
+	}
+	tree := r.do(t, http.MethodGet, "/api/tree", nil)
+	meta := tree.body["meta"].(map[string]interface{})
+	if w, _ := json.Marshal(meta["control"].(map[string]interface{})["writable"]); string(w) != `{"CHANNEL":["channelOutputMute","channelCueEnable"]}` && string(w) != `{"CHANNEL":["channelCueEnable","channelOutputMute"]}` {
+		t.Fatalf("writable while reading along: %s", w)
+	}
+	if res := set(ch0, "channelOutputMute", !muted); res.code != 200 {
+		t.Fatalf("mute: %d %s", res.code, res.raw)
+	}
+	if res := set(ch0, "channelOutputMute", muted); res.code != 200 { // already so in the mirror
+		t.Fatalf("mute as it is: %d %s", res.code, res.raw)
+	}
+	if res := set(ch0, "channelCueEnable", !cued); res.code != 200 {
+		t.Fatalf("listen: %d %s", res.code, res.raw)
+	}
+	if strings.Join(fp.pressed, ",") != "mute1,listen1" {
+		t.Fatalf("pressed %v", fp.pressed)
+	}
+	if res := set(ch5, "channelOutputMute", true); res.code != 403 || res.body["code"] != "passive" {
+		t.Fatalf("virtual channel: %d %s", res.code, res.raw)
+	}
+	if res := set(ch0, "channelPanOn", true); res.code != 403 || res.body["code"] != "passive" {
+		t.Fatalf("other property: %d %s", res.code, res.raw)
+	}
+	muted2 := false
+	mirror.View(func(s desk.Snapshot) { v, _ := s.Root.At(ch0).Get("channelOutputMute"); muted2 = v.Truth() })
+	if muted2 != muted {
+		t.Fatal("the mirror was changed without the device reporting it")
+	}
+}
+
 func TestUntestedModelIsReadOnly(t *testing.T) {
 	root, _ := rcsim.DuoTree()
 	rcsim.MakeRealistic(root)

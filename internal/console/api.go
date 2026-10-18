@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -84,9 +85,20 @@ func (c *Console) handleTree(w http.ResponseWriter, r *http.Request) {
 	}
 	caps := Capabilities(level, s.Root)
 	if c.client.Passive() {
-		// Reading along cannot write; the level still counts for the
-		// front panel.
-		caps["writable"] = map[string][]string{}
+		// Reading along cannot write to the mixer; with the device buttons
+		// switched on, mute and listen of the physical channels are pressed
+		// there (the level still counts, also for the Display page).
+		w := map[string][]string{}
+		if c.panelOn() {
+			if all, ok := caps["writable"].(map[string][]string); ok {
+				for _, p := range all["CHANNEL"] {
+					if _, ok := panelProps[p]; ok {
+						w["CHANNEL"] = append(w["CHANNEL"], p)
+					}
+				}
+			}
+		}
+		caps["writable"] = w
 	}
 	meta, _ := json.Marshal(map[string]interface{}{
 		"passive":      c.client.Passive(),
@@ -253,6 +265,8 @@ func (c *Console) write(remote string, epoch uint64, path []int, name string, va
 	var err error
 	if limit == "untested_model" {
 		err = errUntestedModel
+	} else if c.client.Passive() {
+		ch, nodeType, err = c.writeByPanel(level, epoch, path, name, value)
 	} else {
 		ch, err = c.client.Write(epoch, func(s desk.Snapshot) (*rcproto.Change, error) {
 			if n := s.Root.At(path); n != nil {
@@ -295,6 +309,68 @@ func (c *Console) write(remote string, epoch uint64, path []int, name string, va
 	c.appendAudit(e)
 	return ch, err
 }
+
+// panelProps are the properties that, while reading along, are changed by
+// pressing a channel's button on the front panel.
+var panelProps = map[string]string{"channelOutputMute": "mute", "channelCueEnable": "listen"}
+
+// writeByPanel handles a write while reading along: the console cannot write
+// to the mixer, but mute and listen of a channel with physical buttons are
+// pressed on the front panel. The device reports the result, which the
+// mirror then shows; nothing is applied here.
+func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name string, value interface{}) (*rcproto.Change, string, error) {
+	nodeType, button := "?", ""
+	var want, cur rcproto.Value
+	var err error
+	c.mirror.View(func(s desk.Snapshot) {
+		if s.Root == nil {
+			err = desk.ErrNotSynced
+			return
+		}
+		if s.Epoch != epoch {
+			err = desk.ErrStaleEpoch
+			return
+		}
+		n := s.Root.At(path)
+		if n == nil {
+			err = errBadRequest("no node at this path")
+			return
+		}
+		nodeType = n.Type
+		i := -1 // the strip with physical buttons this channel is
+		for j := 0; j < s.Layout.PhysicalFaders; j++ {
+			if slices.Equal(s.Layout.Path("CHANNEL", j), path) {
+				i = j
+			}
+		}
+		b, ok := panelProps[name]
+		if n.Type != "CHANNEL" || !ok || i < 0 {
+			err = desk.ErrPassive
+			return
+		}
+		if want, err = CheckWrite(level, s, path, name, value); err != nil {
+			return
+		}
+		cur, _ = n.Get(name)
+		button = fmt.Sprintf("%s%d", b, i+1)
+	})
+	if err != nil {
+		return nil, nodeType, err
+	}
+	if !c.panelOn() {
+		return nil, nodeType, errPanelOff
+	}
+	ch := &rcproto.Change{Type: rcproto.PropertyChanged, Path: append([]int(nil), path...), Name: name, Value: want}
+	if cur.Truth() == want.Truth() {
+		return ch, nodeType, nil // already so: pressing would toggle it back
+	}
+	if err := c.opts.Panel.Do(button, 0); err != nil {
+		return nil, nodeType, sdk.NewError(http.StatusServiceUnavailable, "panel_failed", "pressing "+button+" failed: "+err.Error())
+	}
+	return ch, nodeType, nil
+}
+
+var errPanelOff = sdk.NewError(http.StatusForbidden, "panel_off", "reading along, the console changes the desk through the device buttons: switch them on on the Display page")
 
 func (c *Console) appendAudit(e AuditEntry) {
 	c.mu.Lock()

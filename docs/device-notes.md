@@ -53,6 +53,14 @@ flashing from Windows (below). What is still open:
 5. **Sonar's JACK bridge.** CPU load and dropouts when `alsa_out` joins RØDE's audio
    graph, and which JACK port carries which input of the desk
    ([Sonar](https://github.com/Hustenreizjuengling/rcplug-plugins/blob/main/sonar/README.md)).
+6. **Meters.** The mixer does not send meter values over the screen's connection
+   ([protocol.md](protocol.md#what-a-running-duo-sends)); where the screen gets them
+   is not known yet, so the console shows no meters on the device.
+7. **USB audio during an rcplug update.** During each update so far the computer's
+   playback through the Duo went silent until another output was chosen and the Duo
+   again; the kernel log shows the Duo's USB device being set up anew around those
+   times (`dwc2 … new device is high-speed`, once after `ep_stop_xfr: timeout`).
+   Whether the update causes it, and how, is open.
 ## First test on a real Duo
 
 On 2026-10-18 rcplug ran on a real Duo for the first time (firmware 1.7.3, flashed
@@ -83,6 +91,12 @@ from Windows to a patched 1.7.6):
 - **The screen mirror works next to the GUI** (DRM, 2 frames per second). The GUI
   draws its 1280×720 landscape screen into a 720×1280 buffer whose top is on the
   right; since 0.5.2 the mirror turns it.
+- **Reading along works** (0.6.0): after *Read the state again* (the screen app
+  restarted, about three seconds) the console mirrored the whole desk; changes on the
+  device arrive as described in [protocol.md](protocol.md#what-a-running-duo-sends).
+  Since 0.6.1 physical faders follow (from the mix levels), and mute and listen of the
+  four physical channels can be switched from the console's pages (pressed on the
+  front panel).
 - **Diagnostics** now include the network and unix sockets with their processes and
   the names on the D-Bus system bus, which is what this needed.
 

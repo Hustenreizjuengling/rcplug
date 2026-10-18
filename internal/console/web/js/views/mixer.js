@@ -1,12 +1,12 @@
 // Mixer: recorder, monitor, device info, the channel strips and output meters.
 import { h } from '../dom.js';
 import { t } from '../i18n.js';
-import { store, single, famPath, val, runPath } from '../store.js';
+import { store, single, famPath, val, runPath, mixPath } from '../store.js';
 import { canWrite } from '../policy.js';
 import { toggle, slider, vfader, selectCtl, chip, kv, card } from '../controls.js';
 import { hMeter, vMeter } from '../meters.js';
 import { openDrawer } from '../dialogs.js';
-import { PROC, faders, faderLabel, faderDb, sourceLabel, sourceColour, sources, stripSource, unityFader, outputLabel } from '../device.js';
+import { PROC, faders, faderLabel, faderDb, sourceLabel, sourceColour, sources, stripSource, unityFader, outputLabel, mixLevel } from '../device.js';
 import { recorderCard, monitorCard, inputCard, routingRow } from './parts.js';
 import { actionButtons } from '../plugins.js';
 
@@ -28,6 +28,20 @@ function quickCard(scope) {
     d ? slider(scope, d, 'duckerDepth', { label: t('out.ducking') }) : null,
     gui ? slider(scope, gui, 'screenBrightness', { label: t('gui.screen'), min: 0, max: 100 }) : null,
     gui ? slider(scope, gui, 'activeButtonsBrightness', { label: t('gui.buttons'), min: 0, max: 100 }) : null);
+}
+
+// sourceLevel: the device reports a physical fader's movement only as the
+// level of its source's mixes ("anchor|level", level = position / max), not
+// as the FADER's faderLevel. The first linked mix carries it.
+function sourceLevel(src, max) {
+  if (src < 0) return null;
+  let path = null;
+  for (let o = 0; o < store.L.mixPerSource; o++) {
+    const p = mixPath(src, o);
+    if (p && val(p, 'mixLink') === true) { path = p; break; }
+  }
+  if (!path) return null;
+  return { path, name: 'mixLevelWithAnchor', map: (v) => { const m = mixLevel(v); return m ? Math.round(m.level * max) : null; } };
 }
 
 export function sourceOptions() {
@@ -53,7 +67,7 @@ function strip(scope, i) {
     if (val(mp, 'meterStereo') !== false) fz.append(vMeter(scope, mp, 'R'));
   }
   const fmax = Number(val(fd, 'faderMax')) || 127;
-  const fs = vfader(scope, fd, 'faderLevel', { min: Number(val(fd, 'faderMin')) || 0, max: fmax, unity: unityFader(), label: name, fmt: (v) => `${v} · ≈${faderDb(v)} dB` });
+  const fs = vfader(scope, fd, 'faderLevel', { min: Number(val(fd, 'faderMin')) || 0, max: fmax, unity: unityFader(), label: name, fmt: (v) => `${v} · ≈${faderDb(v)} dB`, follow: physical ? sourceLevel(src, fmax) : null });
   fz.append(fs.el);
   el.append(fz, h('div', { class: 'db', title: t('mixer.faderHint', { max: fmax }) }, fs.out));
   el.append(h('div', { class: 'btns' }, toggle(scope, ch, 'channelOutputMute', t('mute'), 'mute'), toggle(scope, ch, 'channelCueEnable', t('listen'), 'cue')));

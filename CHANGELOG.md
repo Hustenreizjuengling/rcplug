@@ -6,7 +6,16 @@ may break compatibility).
 
 ## 0.6.1 - Unreleased
 
+### Added
+- Reading along, mute and listen of the four physical channels can be switched on the
+  console's pages again: the console presses the channel's button on the front panel
+  (with the device buttons switched on, at a level that allows it) and the device
+  reports the result. Other changes stay on the *Display* page.
+
 ### Fixed
+- Physical faders did not move in the console on a real Duo: the device reports their
+  position only as the level of the source's mixes (`mixLevelWithAnchor`), not as
+  `faderLevel`. The mixer shows physical faders from there.
 - An invalid port in the console's `--mixer` address (above 65535, zero, negative) falls back
   to 2345 instead of being cut down to another port (found by code scanning).
 
