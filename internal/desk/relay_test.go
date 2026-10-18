@@ -394,3 +394,13 @@ func mirrorValue(c *Client, path []int, name string) (v rcproto.Value) {
 	})
 	return
 }
+
+func TestFullControlAsksASilentMixerForItsState(t *testing.T) {
+	fastRelay(t)
+	sim := oneClientSim(t, rcsim.Options{OneClient: true, WaitHandshake: true})
+	c, start, _ := relayClient(t, sim.Addr())
+	c.cfg.SyncTimeout = 2 * time.Second // handshake after 0.4 s
+	c.SetFullControl(true)
+	start()
+	waitFor(t, "relay live after the handshake", func() bool { st := c.Status(); return st.Mode == "relay" && st.State == StateLive })
+}

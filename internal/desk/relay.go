@@ -212,12 +212,25 @@ func (r *relay) watch(ctx context.Context) error {
 	ping := rcproto.Frame([]byte("ping"))
 	timeout := time.NewTimer(r.c.cfg.SyncTimeout)
 	defer timeout.Stop()
+	// Like the client: if the mixer stays silent, the session-open message
+	// asks for the state (TCP normally needs none).
+	hello := time.NewTimer(r.c.handshakeAfter())
+	defer hello.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case err := <-r.fail:
 			return err
+		case <-hello.C:
+			select {
+			case <-r.synced:
+			default:
+				if r.c.cfg.Handshake != "never" {
+					r.c.cfg.Logf("desk: full control: no full sync yet, sending the session-open handshake")
+					_ = r.toMixer(rcproto.Frame(rcproto.SessionOpen))
+				}
+			}
 		case <-timeout.C:
 			select {
 			case <-r.synced:
