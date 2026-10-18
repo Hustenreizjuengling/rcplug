@@ -13,6 +13,8 @@ may break compatibility).
   second while someone watches) and shows every channel's level, its gain reduction,
   the master and the channel open on the device's screen. Physical faders moved by
   hand show at their real position. `--meters auto|off`.
+- Diagnostics include the state of the sound devices' streams and of the USB device
+  controller, to find out what silences USB audio during an update.
 
 ### Changed
 - The mixer page shows the master and the channel open on the device's screen

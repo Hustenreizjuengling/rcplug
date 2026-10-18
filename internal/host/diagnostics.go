@@ -97,6 +97,9 @@ func WriteDiagnostics(ctx context.Context, w io.Writer, in DiagnosticsInput) err
 	if in := inputDevices(); in != "" {
 		add("system/input-devices.txt", []byte(in))
 	}
+	if t := soundState("/"); t != "" {
+		add("system/sound.txt", []byte(t))
+	}
 	if t := dbusTable(ctx); t != "" {
 		add("system/dbus.txt", []byte(t))
 	}

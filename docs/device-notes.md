@@ -60,7 +60,10 @@ flashing from Windows (below). What is still open:
    after each update (`dwc2 … new device is high-speed`), most likely when the
    computer selected it again, so the silence starts earlier. The device has about
    120 MB of memory to spare; since 0.6.2 the update log records each step with the
-   free memory, and the diagnostics include RØDE's own logs, to find the cause.
+   free memory, and the diagnostics include RØDE's own logs, to find the cause. Since
+   0.6.3 they also hold the state of the sound devices' streams and of the USB device
+   controller (`system/sound.txt`): a stream left in `XRUN` or stopped after an update
+   would show where the sound ends.
 6. **Operating the screen** (0.6.2, experimental). RØDE's screen app reads its
    touchscreen from `/dev/input/event0`/`event1` (evdev, no libinput); which one is the
    touchscreen, its axis ranges and orientation are in the diagnostics
