@@ -59,13 +59,13 @@ func (b *toneBridge) Ports(ctx context.Context) ([]string, error) {
 	return []string{"system:capture_1", "system:capture_2"}, nil
 }
 
-func (b *toneBridge) Start(ctx context.Context) (io.ReadCloser, error) {
+func (b *toneBridge) Start(ctx context.Context, channels int) (io.ReadCloser, error) {
 	pr, pw := io.Pipe()
 	b.pw = pw
 	go func() {
-		frame := make([]byte, 8*2*960)
+		frame := make([]byte, channels*2*960)
 		for i := 0; i < len(frame); i += 2 {
-			binary.LittleEndian.PutUint16(frame[i:], uint16(i/2%8))
+			binary.LittleEndian.PutUint16(frame[i:], uint16(i/2%channels))
 		}
 		for {
 			if _, err := pw.Write(frame); err != nil {

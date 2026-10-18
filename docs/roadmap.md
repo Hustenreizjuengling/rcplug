@@ -44,8 +44,10 @@ show. Ideas and comments are welcome as issues.
    - With full control on, it takes the mixer's place at boot.
 3. **Open values** ([device-notes.md](device-notes.md#assumptions-to-confirm-on-hardware)):
    - the real gain ranges;
-   - the meaning of a few integer settings;
-   - the CPU load of Sonar's JACK bridge.
+   - the meaning of a few integer settings (the console's change log, 0.7.3, shows
+     them when a setting is changed on the device's screen);
+   - the CPU load of the audio taps since 0.7.4 (2 channels, cheapest resampling; with
+     8 channels it was 13 % of the device in 0.7.2).
 
 ## Done: the core (0.6.8 – 0.6.11)
 

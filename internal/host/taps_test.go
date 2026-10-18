@@ -22,6 +22,8 @@ type fakeBridge struct {
 	starts    int
 	stops     int
 	running   bool
+	widths    []int
+	slow      time.Duration // Connect takes this long (jack_connect on a busy device)
 	pw        *io.PipeWriter
 }
 
@@ -31,20 +33,22 @@ func newFakeBridge() *fakeBridge {
 
 func (f *fakeBridge) Ports(ctx context.Context) ([]string, error) { return f.ports, nil }
 
-func (f *fakeBridge) Start(ctx context.Context) (io.ReadCloser, error) {
+func (f *fakeBridge) Start(ctx context.Context, channels int) (io.ReadCloser, error) {
 	pr, pw := io.Pipe()
 	f.mu.Lock()
 	f.starts++
+	f.widths = append(f.widths, channels)
 	f.running = true
 	f.pw = pw
 	f.mu.Unlock()
 	go func() {
 		frame := 0
-		buf := make([]byte, tapChunk*tapFrame)
+		size := channels * 2
+		buf := make([]byte, tapChunk*size)
 		for {
 			for i := 0; i < tapChunk; i++ {
-				for c := 0; c < tapChannels; c++ {
-					binary.LittleEndian.PutUint16(buf[i*tapFrame+c*2:], uint16(int16(c*1000+frame%1000)))
+				for c := 0; c < channels; c++ {
+					binary.LittleEndian.PutUint16(buf[i*size+c*2:], uint16(int16(c*1000+frame%1000)))
 				}
 				frame++
 			}
@@ -58,6 +62,10 @@ func (f *fakeBridge) Start(ctx context.Context) (io.ReadCloser, error) {
 }
 
 func (f *fakeBridge) Connect(port string, ch int) error {
+	f.mu.Lock()
+	slow := f.slow
+	f.mu.Unlock()
+	time.Sleep(slow)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.connected[ch] = port
@@ -123,9 +131,17 @@ func TestTapsShareOneBridge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Two ports fit the first bridge of two channels; the third makes it
+	// restart with four, and the first stream goes on.
 	starts, _, conn := fb.state()
-	if starts != 1 || len(conn) != 3 {
-		t.Fatalf("one bridge with three channels expected: starts %d, connected %v", starts, conn)
+	fb.mu.Lock()
+	widths := append([]int(nil), fb.widths...)
+	fb.mu.Unlock()
+	if starts != 2 || len(conn) != 3 || len(widths) != 2 || widths[0] != 2 || widths[1] != 4 {
+		t.Fatalf("a bridge of 2, then 4 channels expected: starts %d, widths %v, connected %v", starts, widths, conn)
+	}
+	for len(a.out) > 0 { // chunks from before the restart
+		<-a.out
 	}
 	// Each stream gets its ports, in its order: sonar channels 1,2; meter 2,3.
 	check := func(s *tapSub, want []int) {
@@ -149,7 +165,7 @@ func TestTapsShareOneBridge(t *testing.T) {
 	check(a, []int{0, 1})
 	check(b, []int{1, 2})
 	st := taps.Status()
-	if !st.Running || len(st.Streams) != 2 || len(st.Channels) != 3 || st.Channels[1].Streams != 2 {
+	if !st.Running || st.Width != 4 || len(st.Streams) != 2 || len(st.Channels) != 3 || st.Channels[1].Streams != 2 {
 		t.Fatalf("status %+v", st)
 	}
 
@@ -158,7 +174,7 @@ func TestTapsShareOneBridge(t *testing.T) {
 		t.Fatalf("after one stream: %v", conn)
 	}
 	taps.Close(b)
-	waitFor(t, "the idle bridge stops", 3*time.Second, func() bool { _, stops, _ := fb.state(); return stops == 1 })
+	waitFor(t, "the idle bridge stops", 3*time.Second, func() bool { _, stops, _ := fb.state(); return stops == 2 }) // one was the restart
 	if st := taps.Status(); st.Running || len(st.Channels) != 0 {
 		t.Fatalf("after stop %+v", st)
 	}
@@ -228,4 +244,38 @@ func TestTapStreamOverHTTP(t *testing.T) {
 	if !strings.Contains(string(body), `"plugin":"sonar"`) || !strings.Contains(string(body), `"running":true`) {
 		t.Fatalf("status %s", body)
 	}
+}
+
+// Opening a stream runs JACK's tools under the taps' lock; the streams that
+// run meanwhile go on receiving audio (before, the bridge's buffer overran).
+func TestTapsReadOnWhileConnecting(t *testing.T) {
+	fb := newFakeBridge()
+	taps := NewTaps(fb, func() bool { return true })
+	a, err := taps.Open(context.Background(), "sonar", []string{"system:capture_1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fb.mu.Lock()
+	fb.slow = 400 * time.Millisecond
+	fb.mu.Unlock()
+	done := make(chan error, 1)
+	go func() {
+		_, err := taps.Open(context.Background(), "meter", []string{"JUCEJack:out_1"})
+		done <- err
+	}()
+	time.Sleep(50 * time.Millisecond) // the second Open is in jack_connect now
+	got := 0
+	deadline := time.After(300 * time.Millisecond)
+	for got < 5 {
+		select {
+		case <-a.out:
+			got++
+		case <-deadline:
+			t.Fatalf("only %d chunks while another stream was connecting", got)
+		}
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	taps.Disable()
 }

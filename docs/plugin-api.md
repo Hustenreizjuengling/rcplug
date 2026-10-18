@@ -542,9 +542,12 @@ be right after its own restart) reads it from the console as well (`api/summary`
 On the Duo the whole desk is a JACK graph: every input and output is a JACK port
 (`system:capture_*` for the inputs, `JUCEJack:out_*` for the mixer's outputs, …). A
 plugin that wants to hear some of them asks the host, which runs **one** bridge for all
-plugins: the JACK client `rcplug-taps` with 8 channels into an ALSA loopback, read
-with `arecord`. The bridge starts when the first plugin asks and stops ten seconds after
-the last one hangs up; a port that two plugins want takes one channel.
+plugins: the JACK client `rcplug-taps` into an ALSA loopback, read with `arecord`. It
+is only as wide as the ports in use need (2, 4 or 8 channels; it restarts wider when a
+stream needs more, and the running streams go on after a short gap) and resamples as
+cheaply as it can: on a Duo, 8 channels at the default quality took about half a core
+(13 % of the device). The bridge starts when the first plugin asks and stops ten
+seconds after the last one hangs up; a port that two plugins want takes one channel.
 
 ```go
 on, ports, err := sdk.AudioPorts(ctx) // switched on? which ports?

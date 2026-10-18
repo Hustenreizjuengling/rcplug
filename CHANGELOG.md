@@ -6,6 +6,16 @@ may break compatibility).
 
 ## 0.7.4 - Unreleased
 
+### Fixed
+- **Audio taps, measured on a real Duo:** the bridge resampled 8 channels at the default
+  quality, which took about half a core (13 % of the device) while Sonar listened, and
+  `arecord` overran for half a second whenever a stream started or stopped, because the
+  reading loop waited while JACK's tools ran. The bridge is now only as wide as the
+  ports in use need (2, 4 or 8 channels; it restarts wider when needed and the running
+  streams go on), resamples as cheaply as it can (`alsa_out -q 0`: on a test machine a
+  third of before), reads without ever waiting for those tools, and `arecord` keeps
+  half a second of buffer. `GET /api/audio` shows the bridge's `width`.
+
 ## 0.7.3 - 2026-10-18
 
 ### Added

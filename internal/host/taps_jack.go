@@ -21,7 +21,9 @@ import (
 //
 //  1. snd-aloop as card RcplugLoop (index 7), an ALSA loopback, unless one is
 //     there already, and a substream nobody uses on either end;
-//  2. alsa_out as JACK client "rcplug-taps" with tapChannels inputs, playing
+//  2. alsa_out as JACK client "rcplug-taps" with as many inputs as the taps
+//     need (2, 4 or 8) and the cheapest resampling (it only follows the
+//     loopback's clock), playing
 //     into the loopback;
 //  3. arecord on the loopback's other end, the frames the host hands out;
 //  4. jack_connect / jack_disconnect for each tapped port.
@@ -124,7 +126,7 @@ func freeSubstream(card string) (int, error) {
 }
 
 // Start runs alsa_out and arecord.
-func (b *jackBridge) Start(ctx context.Context) (io.ReadCloser, error) {
+func (b *jackBridge) Start(ctx context.Context, channels int) (io.ReadCloser, error) {
 	for _, tool := range []string{"jack_lsp", "jack_connect", "jack_disconnect", "alsa_out", "arecord", "modprobe"} {
 		if _, err := exec.LookPath(tool); err != nil {
 			return nil, fmt.Errorf("the audio taps need %s, which is not installed here", tool)
@@ -142,7 +144,7 @@ func (b *jackBridge) Start(ctx context.Context) (io.ReadCloser, error) {
 	defer b.mu.Unlock()
 	b.problems = 0
 	play := exec.CommandContext(ctx, "alsa_out", "-j", tapClient, "-d", fmt.Sprintf("hw:%s,0,%d", card, sub),
-		"-c", strconv.Itoa(tapChannels), "-r", strconv.Itoa(tapRate))
+		"-c", strconv.Itoa(channels), "-r", strconv.Itoa(tapRate), "-q", "0")
 	setProcessGroup(play)
 	playErr, _ := play.StderrPipe()
 	play.Stdout = nil
@@ -156,7 +158,7 @@ func (b *jackBridge) Start(ctx context.Context) (io.ReadCloser, error) {
 		return nil, err
 	}
 	rec := exec.CommandContext(ctx, "arecord", "-q", "-D", fmt.Sprintf("plughw:%s,1,%d", card, sub),
-		"-f", "S16_LE", "-c", strconv.Itoa(tapChannels), "-r", strconv.Itoa(tapRate), "-t", "raw", "--buffer-time=200000")
+		"-f", "S16_LE", "-c", strconv.Itoa(channels), "-r", strconv.Itoa(tapRate), "-t", "raw", "--buffer-time=500000")
 	setProcessGroup(rec)
 	out, err := rec.StdoutPipe()
 	if err != nil {
@@ -173,7 +175,7 @@ func (b *jackBridge) Start(ctx context.Context) (io.ReadCloser, error) {
 	go b.watch("arecord", recErr)
 	b.play, b.rec = play, rec
 	b.pids = []int{play.Process.Pid, rec.Process.Pid}
-	log.Printf("audio taps: %s with %d channels → hw:%s,0,%d → arecord", tapClient, tapChannels, card, sub)
+	log.Printf("audio taps: %s with %d channels → hw:%s,0,%d → arecord", tapClient, channels, card, sub)
 	return out, nil
 }
 

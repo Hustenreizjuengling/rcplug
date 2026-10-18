@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug/sdk"
@@ -22,14 +23,29 @@ import (
 // adds a client to RØDE's graph), one place to see what runs and whether
 // audio drops out. Only plugins get audio (their token); the network does
 // not.
+//
+// The bridge is only as wide as the ports in use need (2, 4 or 8 channels):
+// on a Duo its resampling of 8 channels took half a core. The reading loop
+// never waits for the lock that opening and closing streams hold while they
+// run JACK's tools, so the bridge is read on time.
 
 const (
-	tapChannels  = 8
-	tapRate      = 48000
-	tapFrame     = tapChannels * 2 // S16_LE
-	tapChunk     = 960             // frames per read: 20 ms
-	tapSubBuffer = 50              // chunks (one second) queued per stream
+	tapMaxChannels = 8
+	tapRate        = 48000
+	tapChunk       = 960 // frames per read: 20 ms
+	tapSubBuffer   = 50  // chunks (one second) queued per stream
 )
+
+// tapWidth is the bridge's width for n channels in use.
+func tapWidth(n int) int {
+	switch {
+	case n <= 2:
+		return 2
+	case n <= 4:
+		return 4
+	}
+	return tapMaxChannels
+}
 
 // tapIdleStop: how long the bridge runs on without a stream (tests shorten it).
 var tapIdleStop = 10 * time.Second
@@ -38,9 +54,9 @@ var tapIdleStop = 10 * time.Second
 type tapBridge interface {
 	// Ports lists JACK's output ports (what can be tapped).
 	Ports(ctx context.Context) ([]string, error)
-	// Start runs the bridge; the reader delivers frames of tapChannels
-	// interleaved S16_LE samples at tapRate.
-	Start(ctx context.Context) (io.ReadCloser, error)
+	// Start runs the bridge with channels inputs; the reader delivers frames
+	// of that many interleaved S16_LE samples at tapRate.
+	Start(ctx context.Context, channels int) (io.ReadCloser, error)
 	// Connect and Disconnect wire a port to one of the bridge's channels
 	// (1-based).
 	Connect(port string, channel int) error
@@ -58,14 +74,18 @@ type Taps struct {
 
 	mu       sync.Mutex
 	running  bool
+	width    int // the running bridge's channels
 	reader   io.ReadCloser
 	stopRead context.CancelFunc
-	ports    [tapChannels]string // port per channel, "" = free
-	refs     [tapChannels]int
+	ports    [tapMaxChannels]string // port per channel, "" = free
+	refs     [tapMaxChannels]int
 	subs     map[*tapSub]struct{}
 	idle     *time.Timer
 	since    time.Time
 	errMsg   string
+
+	// list is subs for the reading loop, replaced (never changed) under mu.
+	list atomic.Pointer[[]*tapSub]
 }
 
 type tapSub struct {
@@ -79,6 +99,16 @@ type tapSub struct {
 }
 
 func (s *tapSub) close() { s.once.Do(func() { close(s.done) }) }
+
+// fits reports whether the stream's channels are within a bridge of width.
+func (s *tapSub) fits(width int) bool {
+	for _, ch := range s.channels {
+		if ch >= width {
+			return false
+		}
+	}
+	return true
+}
 
 // NewTaps makes the taps; enabled reports the user's opt-in.
 func NewTaps(bridge tapBridge, enabled func() bool) *Taps {
@@ -95,8 +125,8 @@ func (t *Taps) Open(ctx context.Context, plugin string, ports []string) (*tapSub
 	if !t.enabled() {
 		return nil, errTapsOff
 	}
-	if len(ports) == 0 || len(ports) > tapChannels {
-		return nil, sdk.NewError(http.StatusBadRequest, "bad_ports", fmt.Sprintf("ask for 1 to %d ports", tapChannels))
+	if len(ports) == 0 || len(ports) > tapMaxChannels {
+		return nil, sdk.NewError(http.StatusBadRequest, "bad_ports", fmt.Sprintf("ask for 1 to %d ports", tapMaxChannels))
 	}
 	known, err := t.bridge.Ports(ctx)
 	if err != nil {
@@ -113,8 +143,28 @@ func (t *Taps) Open(ctx context.Context, plugin string, ports []string) (*tapSub
 		t.idle.Stop()
 		t.idle = nil
 	}
-	if !t.running {
-		if err := t.startLocked(); err != nil {
+	// Channels in use afterwards: those now plus the ports not tapped yet.
+	need := 0
+	for i := range t.ports {
+		if t.ports[i] != "" {
+			need++
+		}
+	}
+	for i, p := range ports {
+		if !contains(t.ports[:], p) && !contains(ports[:i], p) {
+			need++
+		}
+	}
+	if need > tapMaxChannels {
+		return nil, errTapsFull
+	}
+	switch {
+	case !t.running:
+		if err := t.startLocked(tapWidth(need)); err != nil {
+			return nil, err
+		}
+	case need > t.width:
+		if err := t.growLocked(tapWidth(need)); err != nil {
 			return nil, err
 		}
 	}
@@ -129,7 +179,7 @@ func (t *Taps) Open(ctx context.Context, plugin string, ports []string) (*tapSub
 			}
 		}
 		if ch < 0 {
-			for i, q := range t.ports {
+			for i, q := range t.ports[:t.width] {
 				if q == "" {
 					ch = i
 					break
@@ -150,19 +200,50 @@ func (t *Taps) Open(ctx context.Context, plugin string, ports []string) (*tapSub
 	}
 	sub.channels = added
 	t.subs[sub] = struct{}{}
+	t.publishLocked()
 	return sub, nil
 }
 
-func (t *Taps) startLocked() error {
+// publishLocked hands the reading loop the current streams.
+func (t *Taps) publishLocked() {
+	list := make([]*tapSub, 0, len(t.subs))
+	for s := range t.subs {
+		list = append(list, s)
+	}
+	t.list.Store(&list)
+}
+
+func (t *Taps) startLocked(width int) error {
 	ctx, cancel := context.WithCancel(context.Background())
-	r, err := t.bridge.Start(ctx)
+	r, err := t.bridge.Start(ctx, width)
 	if err != nil {
 		cancel()
 		t.errMsg = err.Error()
 		return sdk.NewError(http.StatusServiceUnavailable, "audio_bridge", err.Error())
 	}
-	t.running, t.reader, t.stopRead, t.since, t.errMsg = true, r, cancel, time.Now(), ""
-	go t.pump(r)
+	t.running, t.width, t.reader, t.stopRead, t.since, t.errMsg = true, width, r, cancel, time.Now(), ""
+	go t.pump(r, width)
+	return nil
+}
+
+// growLocked restarts the bridge wider and wires the tapped ports again; the
+// streams go on after a short gap.
+func (t *Taps) growLocked(width int) error {
+	t.stopRead()
+	_ = t.reader.Close()
+	t.bridge.Stop()
+	t.running = false
+	if err := t.startLocked(width); err != nil {
+		t.stopLocked()
+		return err
+	}
+	for i, p := range t.ports {
+		if p != "" {
+			if err := t.bridge.Connect(p, i+1); err != nil {
+				t.errMsg = err.Error()
+			}
+		}
+	}
 	return nil
 }
 
@@ -188,6 +269,7 @@ func (t *Taps) Close(sub *tapSub) {
 		return
 	}
 	delete(t.subs, sub)
+	t.publishLocked()
 	t.releaseLocked(sub.channels)
 	if len(t.subs) == 0 && t.running && t.idle == nil {
 		t.idle = time.AfterFunc(tapIdleStop, t.stopIfIdle)
@@ -218,6 +300,7 @@ func (t *Taps) stopLocked() {
 		s.close()
 	}
 	t.subs = map[*tapSub]struct{}{}
+	t.publishLocked()
 }
 
 // Disable stops everything (the user switched the taps off).
@@ -228,19 +311,28 @@ func (t *Taps) Disable() {
 }
 
 // pump reads the bridge and hands each stream its channels; a stream that
-// does not keep up is ended rather than ever holding up the bridge.
-func (t *Taps) pump(r io.Reader) {
-	buf := make([]byte, tapChunk*tapFrame)
+// does not keep up is ended rather than ever holding up the bridge. It never
+// takes t.mu while the bridge runs: opening a stream holds it while JACK's
+// tools run, and the bridge's buffer would overrun meanwhile.
+func (t *Taps) pump(r io.Reader, width int) {
+	frame := width * 2 // S16_LE
+	buf := make([]byte, tapChunk*frame)
 	for {
 		n, err := io.ReadFull(r, buf)
-		if n >= tapFrame {
-			frames := n / tapFrame
-			t.mu.Lock()
-			for s := range t.subs {
+		if n >= frame {
+			frames := n / frame
+			var subs []*tapSub
+			if l := t.list.Load(); l != nil {
+				subs = *l
+			}
+			for _, s := range subs {
+				if !s.fits(width) {
+					continue // wired after a restart this loop does not read
+				}
 				out := make([]byte, frames*len(s.channels)*2)
 				o := 0
 				for f := 0; f < frames; f++ {
-					base := f * tapFrame
+					base := f * frame
 					for _, ch := range s.channels {
 						copy(out[o:o+2], buf[base+ch*2:base+ch*2+2])
 						o += 2
@@ -248,11 +340,11 @@ func (t *Taps) pump(r io.Reader) {
 				}
 				select {
 				case s.out <- out:
+				case <-s.done:
 				default:
 					s.close()
 				}
 			}
-			t.mu.Unlock()
 		}
 		if err != nil {
 			t.mu.Lock()
@@ -270,6 +362,7 @@ func (t *Taps) pump(r io.Reader) {
 type TapStatus struct {
 	Enabled  bool         `json:"enabled"`
 	Running  bool         `json:"running"`
+	Width    int          `json:"width,omitempty"` // the bridge's channels
 	Since    string       `json:"since,omitempty"`
 	Channels []TapChannel `json:"channels"`
 	Streams  []TapStream  `json:"streams"`
@@ -297,6 +390,7 @@ func (t *Taps) Status() TapStatus {
 	defer t.mu.Unlock()
 	st := TapStatus{Enabled: t.enabled(), Running: t.running, Channels: []TapChannel{}, Streams: []TapStream{}, Error: t.errMsg}
 	if t.running {
+		st.Width = t.width
 		st.Since = t.since.Format(time.RFC3339)
 		st.Problems = t.bridge.Problems()
 	}
