@@ -63,6 +63,14 @@ var (
 // again within about three seconds); tests replace it.
 var restartScreen = RestartScreen
 
+// booting reports whether the device started less than relayBoot ago, when
+// its screen app is still coming up; tests replace it (a CI machine may
+// have just started too).
+var booting = func() bool {
+	up := uptimeSeconds()
+	return up >= 0 && up < relayBoot.Seconds()
+}
+
 var (
 	errRelayBusy    = sessionErr("relay_busy", "the device's screen holds the mixer's only place; restart it to take over")
 	errRelayRace    = sessionErr("relay_race", "the device's screen connected to the mixer again first")
@@ -222,7 +230,7 @@ func (r *relay) watch(ctx context.Context) error {
 	timeout := time.NewTimer(r.c.cfg.SyncTimeout)
 	defer timeout.Stop()
 	nudge, noScreen := relayNudge, relayNoScreen
-	if up := uptimeSeconds(); up >= 0 && up < relayBoot.Seconds() {
+	if booting() {
 		nudge, noScreen = relayBootNudge, relayBootAlone
 	}
 	var nudged time.Time // the alone period a restart of the screen was for

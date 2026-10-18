@@ -220,7 +220,9 @@ func fdOf(t *testing.T, sc interface {
 func fastRelay(t *testing.T) {
 	old := []time.Duration{relayPing, relayNoScreen, relayTakeover}
 	relayPing, relayNoScreen, relayTakeover = 50*time.Millisecond, 5*time.Second, 3*time.Second
-	t.Cleanup(func() { relayPing, relayNoScreen, relayTakeover = old[0], old[1], old[2] })
+	oldBooting := booting
+	booting = func() bool { return false } // whatever the test machine's uptime
+	t.Cleanup(func() { relayPing, relayNoScreen, relayTakeover = old[0], old[1], old[2]; booting = oldBooting })
 }
 
 func TestFullControlFromTheStart(t *testing.T) {
