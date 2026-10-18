@@ -1012,3 +1012,85 @@ func TestFullControlOnlyOnTheDevice(t *testing.T) {
 		t.Fatalf("full control while connected: %d %s", res.code, res.raw)
 	}
 }
+
+func TestReadOnlySwitch(t *testing.T) {
+	r := newRig(t, rcsim.Options{})
+	r.control(t, "basic")
+	if res := r.post(t, "/api/settings", map[string]bool{"readOnly": true}); res.code != 200 {
+		t.Fatalf("switch on: %d %s", res.code, res.raw)
+	}
+	st := r.do(t, "GET", "/api/status", nil).body
+	if st["readOnly"] != true || st["readOnlyFlag"] != false || st["controlLimit"] != "read_only" || st["control"] != "off" {
+		t.Fatalf("status: %v", st)
+	}
+	l, epoch := r.snap()
+	ch := l.Path("CHANNEL", 6)
+	if res := r.post(t, "/api/set", map[string]interface{}{"epoch": epoch, "path": ch, "name": "channelOutputMute", "value": true}); res.code != 403 || res.body["code"] != "read_only" {
+		t.Fatalf("write while read-only: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/settings", map[string]bool{"readOnly": false}); res.code != 200 {
+		t.Fatalf("switch off: %d %s", res.code, res.raw)
+	}
+	if st := r.do(t, "GET", "/api/status", nil).body; st["readOnly"] != false || st["control"] != "basic" {
+		t.Fatalf("after switching off: %v", st)
+	}
+}
+
+func TestPinResetAtTheDevice(t *testing.T) {
+	r := newRig(t, rcsim.Options{})
+	if res := r.post(t, "/api/pin/reset", nil); res.code != 409 || res.body["code"] != "no_pin" {
+		t.Fatalf("reset without a PIN: %d %s", res.code, res.raw)
+	}
+	r.control(t, "expert")
+	if res := r.post(t, "/api/pin", map[string]string{"new": "4711"}); res.code != 200 {
+		t.Fatalf("set PIN: %d %s", res.code, res.raw)
+	}
+	l, _ := r.snap()
+	btn := l.Path("SOLOMUTEBUTTON", 0)
+	press := func() {
+		for _, v := range []bool{true, false} {
+			if err := r.sim.Inject(&rcproto.Change{Type: rcproto.PropertyChanged, Path: btn, Name: "soloPressed", Value: rcproto.Bool(v)}); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	press() // before the request: does not count
+	if res := r.post(t, "/api/pin/reset", nil); res.code != 200 {
+		t.Fatalf("start reset: %d %s", res.code, res.raw)
+	}
+	press()
+	press()
+	press()
+	time.Sleep(100 * time.Millisecond)
+	st := r.do(t, "GET", "/api/status", nil).body
+	if st["pinRequired"] != true || st["pinReset"].(map[string]interface{})["presses"] != float64(3) {
+		t.Fatalf("after three presses: %v", st["pinReset"])
+	}
+	press()
+	eventually(t, func() bool { return r.do(t, "GET", "/api/status", nil).body["pinRequired"] == false })
+	if st := r.do(t, "GET", "/api/status", nil).body; st["control"] != "off" || st["pinReset"].(map[string]interface{})["done"] == nil {
+		t.Fatalf("after the reset: %v", st)
+	}
+	if _, err := os.Stat(filepath.Join(r.dir, "pin")); !os.IsNotExist(err) {
+		t.Fatalf("PIN file still there: %v", err)
+	}
+
+	// Presses spread out (normal use) do not reset it.
+	if res := r.post(t, "/api/pin", map[string]string{"new": "4711"}); res.code != 200 {
+		t.Fatalf("set PIN again: %d %s", res.code, res.raw)
+	}
+	old := pinResetBurst.Load()
+	pinResetBurst.Store(int64(50 * time.Millisecond))
+	defer pinResetBurst.Store(old)
+	if res := r.post(t, "/api/pin/reset", nil); res.code != 200 {
+		t.Fatalf("start reset: %d %s", res.code, res.raw)
+	}
+	for i := 0; i < 5; i++ {
+		press()
+		time.Sleep(60 * time.Millisecond)
+	}
+	if st := r.do(t, "GET", "/api/status", nil).body; st["pinRequired"] != true {
+		t.Fatal("spread-out presses reset the PIN")
+	}
+}

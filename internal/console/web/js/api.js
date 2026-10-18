@@ -110,6 +110,7 @@ export const link = (scope, source, output, on, okMsg) => post('api/link', { epo
 export const setControl = (level) => post('api/control', { level });
 export const setSettings = (settings) => post('api/settings', settings);
 export const setPin = (current, next) => post('api/pin', { current, new: next });
+export const pinReset = () => post('api/pin/reset', {});
 export const reconnect = (okMsg) => post('api/reconnect', {}, okMsg);
 export const resync = (okMsg) => post('api/resync', {}, okMsg);
 export const panel = (control, value) => post('api/panel', { control, value: value || 0 });

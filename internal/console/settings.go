@@ -34,6 +34,9 @@ type Settings struct {
 	// mixer's one place and serves the device's screen in turn, so every
 	// setting can be written (see desk/relay.go).
 	FullControl bool `json:"fullControl,omitempty"`
+	// ReadOnly refuses every write, like --read-only, but switchable in the
+	// UI (behind the PIN, if one is set).
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // rotations are the valid ScreenRotate values besides "" (auto).
@@ -148,6 +151,20 @@ func (p *pinStore) change(current, next string) error {
 		}
 	}
 	p.pin = next
+	return nil
+}
+
+// reset removes the PIN without knowing it: the caller has made sure that
+// someone is at the device (see pinreset.go).
+func (p *pinStore) reset() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.path != "" {
+		if err := os.Remove(p.path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	p.pin, p.failures, p.locked = "", nil, time.Time{}
 	return nil
 }
 

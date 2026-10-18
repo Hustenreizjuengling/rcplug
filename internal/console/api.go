@@ -43,7 +43,8 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/resync", c.withPIN(c.handleResync))
 	mux.HandleFunc("POST /api/panel", c.withPIN(c.handlePanel))
 	mux.HandleFunc("POST /api/touch", c.withPIN(c.handleTouch))
-	mux.HandleFunc("POST /api/pin", c.handlePIN) // verifies the current PIN itself
+	mux.HandleFunc("POST /api/pin", c.handlePIN)            // verifies the current PIN itself
+	mux.HandleFunc("POST /api/pin/reset", c.handlePinReset) // proven at the device, see pinreset.go
 	// Everything else under api/ is an error in the API's own format.
 	notFound := func(w http.ResponseWriter, r *http.Request) {
 		sdk.WriteError(w, sdk.NewError(http.StatusNotFound, "not_found", "no such API endpoint (or wrong method): "+r.Method+" "+r.URL.Path))
@@ -222,6 +223,7 @@ type writeReq struct {
 	Panel     *bool       `json:"panel"`
 	ScreenCtl *bool       `json:"screenControl"`
 	FullCtl   *bool       `json:"fullControl"`
+	ReadOnly  *bool       `json:"readOnly"`
 	Flip      *string     `json:"touchFlip"`
 	Current   string      `json:"current"`
 	New       string      `json:"new"`
@@ -271,6 +273,8 @@ func (c *Console) write(remote string, epoch uint64, path []int, name string, va
 	var err error
 	if limit == "untested_model" {
 		err = errUntestedModel
+	} else if limit == "read_only" {
+		err = desk.ErrReadOnly
 	} else if c.client.Passive() || (name == "faderLevel" && c.client.ReadsAlong() && c.panelOn() && c.physicalFader(path)) {
 		// Reading along, or a physical fader in full control: the front
 		// panel sets it as the hardware does (whether the mixer follows a
@@ -728,6 +732,20 @@ func (c *Console) handleSettings(w http.ResponseWriter, r *http.Request) {
 		c.mu.Unlock()
 		c.opts.Logf("console: front panel %v by %s", *req.Panel, remoteOf(r))
 		c.auditAction(r, "panel", strconv.FormatBool(*req.Panel), nil)
+	}
+	if req.ReadOnly != nil {
+		if !*req.ReadOnly && c.client.ReadOnly() {
+			err := sdk.NewError(http.StatusConflict, "read_only_forced", "the console was started with --read-only")
+			c.auditAction(r, "read-only", "false", err)
+			sdk.WriteError(w, err)
+			return
+		}
+		c.mu.Lock()
+		c.settings.ReadOnly = *req.ReadOnly
+		c.saveSettingsLocked()
+		c.mu.Unlock()
+		c.opts.Logf("console: read-only %v by %s", *req.ReadOnly, remoteOf(r))
+		c.auditAction(r, "read-only", strconv.FormatBool(*req.ReadOnly), nil)
 	}
 	if req.FullCtl != nil {
 		on := *req.FullCtl

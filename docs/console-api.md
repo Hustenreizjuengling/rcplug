@@ -21,7 +21,9 @@ Responses are JSON, except the screen images. Errors look like `{"error": "human
   "control": "off",
   "controlLimit": "",
   "readOnly": false,
+  "readOnlyFlag": false,
   "pinRequired": false,
+  "pinReset": {"active": false, "need": 4},
   "screen": false,
   "panel": false,
   "version": "0.4.0",
@@ -43,7 +45,9 @@ Responses are JSON, except the screen images. Errors look like `{"error": "human
 | `passive` | `true` while reading along: the tree cannot be written (`meta.control.writable` is empty), the front panel can |
 | `meters` | `true` while the console reads the meters and hardware fader positions from the mixer's shared memory (on the device; elsewhere meters arrive as tree changes) |
 | `control` | The current control level: `off`, `basic` or `expert` |
-| `controlLimit` | Why control is limited even if a level is set: `read_only` (started with `--read-only`), `untested_model` (no verified profile), or empty |
+| `controlLimit` | Why control is limited even if a level is set: `read_only` (write protection on, or started with `--read-only`), `untested_model` (no verified profile), or empty |
+| `readOnly` / `readOnlyFlag` | Write protection is on (switched on the *System* page or forced) / forced by `--read-only` |
+| `pinReset` | A PIN reset at the device in progress (see `api/pin/reset`) |
 | `epoch` | Changes whenever the tree's structure changes (it starts at a random value; the examples here use 1). Writes must carry it. |
 | `seq` | Increases with every change the console has applied |
 | `stale` | `true` while the console is disconnected and shows the last known state |
@@ -158,8 +162,9 @@ Every write:
 | `api/link` | `{"epoch", "source", "output", "link"}` | Links or unlinks a routing cell with the sequence the device expects |
 | `api/record` | `{"epoch", "value"}` | Recorder: 0 stop, 1 pause, 2 record |
 | `api/control` | `{"level": "off" \| "basic" \| "expert"}` | Changes the control level (refused with `read_only` or `untested_model` where control is not possible) |
-| `api/settings` | `{"screen": true}`, `{"screenRotate": "auto"}`, `{"panel": true}`, `{"screenControl": true}`, `{"touchFlip": ""}`, `{"fullControl": true}` | Switches full control on or off (on the device only, `full_control_unavailable` elsewhere; switching on needs the expert level, see [protocol.md](protocol.md#full-control)); switches the screen mirror on or off; turns its picture (`auto`: a portrait buffer such as the Duo's becomes landscape, or `0`, `90`, `180`, `270` degrees clockwise); switches the front-panel emulation on or off; switches operating the screen from the mirror on or off, and corrects the touchscreen's orientation (`""`, `x`, `y`, `xy`). Saved across restarts. |
+| `api/settings` | `{"readOnly": true}`, `{"screen": true}`, `{"screenRotate": "auto"}`, `{"panel": true}`, `{"screenControl": true}`, `{"touchFlip": ""}`, `{"fullControl": true}` | Switches write protection on or off (`read_only_forced` when started with `--read-only`); switches full control on or off (on the device only, `full_control_unavailable` elsewhere; switching on needs the expert level, see [protocol.md](protocol.md#full-control)); switches the screen mirror on or off; turns its picture (`auto`: a portrait buffer such as the Duo's becomes landscape, or `0`, `90`, `180`, `270` degrees clockwise); switches the front-panel emulation on or off; switches operating the screen from the mirror on or off, and corrects the touchscreen's orientation (`""`, `x`, `y`, `xy`). Saved across restarts. |
 | `api/pin` | `{"current", "new"}` | Sets, changes (`current` required) or removes (`new: ""`) the PIN |
+| `api/pin/reset` | `{}` | No PIN needed: starts a minute in which four presses of channel 1's Listen (or Mute) button at the device within four seconds remove the PIN and set the level to `off`; progress in `api/status` → `pinReset` (`active`, `presses`, `need`, `seconds`, `done`). `no_pin` if none is set |
 | `api/reconnect` | `{}` | Reconnects to the desk, also after the GUI guard stepped back. At most every 10 s. |
 | `api/resync` | `{}` | Reading along only: restarts the device's screen app, whose new connection brings a full sync. At most every 10 s. |
 | `api/panel` | `{"control", "value"}` | Experimental front-panel emulation; needs it switched on (`api/settings` or `--panel`) and the expert level |

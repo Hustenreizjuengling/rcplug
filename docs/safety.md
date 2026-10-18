@@ -64,8 +64,10 @@ The level is stored on the device, shared by all browsers and kept across restar
 fresh install starts at *Read only*. Switching to *Control* or *Expert* asks for
 confirmation (and the PIN, if one is set).
 
-`--read-only` (for example in `config/console.json`: `{"args": ["--read-only"]}`, then
-restart the console) turns off all writes regardless of the level. Models without a verified profile (currently
+*Write protection* on the console's *System* page (behind the PIN, if one is set)
+turns off all writes regardless of the level; `--read-only` (for example in
+`config/console.json`: `{"args": ["--read-only"]}`, then restart the console) does the
+same for good, and the page cannot switch it off. Models without a verified profile (currently
 everything except the Duo) are read-only unless the console is started with
 `--allow-untested-model`.
 
@@ -173,8 +175,14 @@ arguments. Review a bundle before you post it anyway.
   level and reconnecting. It is stored in the console's data directory with mode 0600,
   compared in constant time, and five wrong attempts within five minutes lock it for
   a minute (requests that carry no PIN at all do not count). PINs consist of printable
-  ASCII characters. Use more than four digits. A forgotten PIN is removed over SSH with
-  `rm <install dir>/data/console/pin` and a restart of the console.
+  ASCII characters. Use more than four digits. A forgotten PIN is removed at the
+  device, without a shell: *Forgot the PIN?* on the *System* page opens a minute in
+  which pressing channel 1's Listen button four times within four seconds removes the
+  PIN and sets the level to *Read only*. Over the network those buttons can only be
+  pressed with the PIN (front panel, touchscreen, writes), and four presses in so
+  short a time do not happen by chance; every reset is in the console's log.
+  (Without the console running, deleting `<install dir>/data/console/pin` and
+  restarting the console still works.)
 
 ### Limits
 

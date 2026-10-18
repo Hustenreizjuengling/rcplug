@@ -78,6 +78,7 @@ type Console struct {
 	clientsAt     time.Time
 	clientsDoc    interface{}
 	meters        meterState
+	reset         pinReset
 }
 
 // New creates the console and loads persisted settings.
@@ -113,6 +114,7 @@ func New(o Options) *Console {
 	if c.settings.FullControl {
 		c.client.SetFullControl(true)
 	}
+	c.mirror.Watch(c.watchPinReset)
 	c.client.OnStatus(func(st desk.Status) {
 		data, _ := json.Marshal(st)
 		c.mirror.Notify("status", data)
@@ -134,7 +136,7 @@ func (c *Console) saveSettingsLocked() {
 // Level returns the effective control level and, when it is limited, why
 // ("read_only" or "untested_model").
 func (c *Console) Level() (Level, string) {
-	if c.client.ReadOnly() {
+	if c.readOnly() {
 		return LevelOff, "read_only"
 	}
 	controllable := true
@@ -194,6 +196,16 @@ type TouchScreen interface {
 	Do(hw.Gesture) error
 }
 
+// readOnly: --read-only or the user's switch.
+func (c *Console) readOnly() bool {
+	if c.client.ReadOnly() {
+		return true
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.settings.ReadOnly
+}
+
 // panelOn reports whether the front-panel emulation is switched on, by
 // --panel or by the user.
 func (c *Console) panelOn() bool {
@@ -217,7 +229,9 @@ func (c *Console) statusDoc() map[string]interface{} {
 		"connection":   c.client.Status(),
 		"control":      level.String(),
 		"controlLimit": limit,
-		"readOnly":     c.client.ReadOnly(),
+		"readOnly":     c.readOnly(),
+		"readOnlyFlag": c.client.ReadOnly(),
+		"pinReset":     c.pinResetState(),
 		"pinRequired":  c.pin.set(),
 		"screen":       screen,
 		"panel":        panel,

@@ -52,6 +52,9 @@ type Mirror struct {
 
 	subs map[*Subscriber]struct{}
 
+	watchers map[int]func(path []int, name string, v rcproto.Value)
+	nextW    int
+
 	changes  uint64
 	lastRate float64
 	rateAt   time.Time
@@ -136,6 +139,9 @@ func (m *Mirror) applyLocked(c *rcproto.Change) error {
 	if c.Type == rcproto.PropertyRemoved {
 		v = rcproto.Void()
 	}
+	for _, fn := range m.watchers {
+		fn(c.Path, c.Name, v)
+	}
 	if i, ok := m.pending[key]; ok {
 		m.batch[i].v = v
 	} else {
@@ -203,6 +209,26 @@ func (m *Mirror) commit(epoch uint64, build func(s Snapshot) (*rcproto.Change, e
 		return nil, err
 	}
 	return ch, m.applyLocked(ch)
+}
+
+// Watch calls fn for every property change applied to the tree (from the
+// desk, the device's screen, the console's own writes and overlays). It runs
+// under the mirror lock: fn must be quick and must not call the mirror. The
+// returned function stops watching.
+func (m *Mirror) Watch(fn func(path []int, name string, v rcproto.Value)) func() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.watchers == nil {
+		m.watchers = map[int]func([]int, string, rcproto.Value){}
+	}
+	id := m.nextW
+	m.nextW++
+	m.watchers[id] = fn
+	return func() {
+		m.mu.Lock()
+		delete(m.watchers, id)
+		m.mu.Unlock()
+	}
 }
 
 // Overlay applies readings that do not come over the control port (the

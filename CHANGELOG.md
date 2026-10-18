@@ -14,6 +14,11 @@ may break compatibility).
   restarts the device's screen once. The console gives the place back when it is
   switched off, when the console stops or crashes, or when the screen does not
   connect, so the screen always finds the mixer again.
+- **Write protection** can be switched on and off on the console's *System* page
+  (behind the PIN); `--read-only` still forces it.
+- **Forgot the PIN?** removes the console's PIN at the device, without a shell: four
+  presses of channel 1's Listen button within four seconds, in the minute after the
+  request. The control level goes back to *Read only*.
 - The simulator can serve one client like the Duo's mixer (`rcsim --one-client`) and
   send pings (`--ping`).
 

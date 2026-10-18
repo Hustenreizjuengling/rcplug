@@ -5,7 +5,7 @@ import { h } from '../dom.js';
 import { t } from '../i18n.js';
 import { single, run, runPath } from '../store.js';
 import { slider, kv, card, valueText } from '../controls.js';
-import { request, reconnect, setPin, report, forgetPin } from '../api.js';
+import { request, reconnect, setPin, report, forgetPin, pinReset, setSettings } from '../api.js';
 import { confirmDialog } from '../dialogs.js';
 import { liveState } from '../live.js';
 
@@ -39,7 +39,40 @@ function connectionCard(scope) {
     h('button', { class: 'btn', type: 'button', onclick: loadClients }, t('conn.clients'))), clients);
 }
 
-function consoleCard() {
+// readOnlyRow switches the console's write protection (the --read-only flag
+// cannot be switched off here).
+function readOnlyRow(st, rerender) {
+  const set = async (on) => {
+    if (!on && !(await confirmDialog(t('ro.offConfirm'), t('ro.off')))) return;
+    if (await setSettings({ readOnly: on })) rerender();
+  };
+  const btn = st.readOnlyFlag ? null : st.readOnly
+    ? h('button', { class: 'btn', type: 'button', onclick: () => set(false) }, t('ro.off'))
+    : h('button', { class: 'btn', type: 'button', onclick: () => set(true) }, t('ro.on'));
+  return h('div', { class: 'row', style: 'margin:8px 0' },
+    h('span', null, t('ro.label'), ': ', h('b', null, st.readOnly ? (st.readOnlyFlag ? t('ro.forced') : t('ro.isOn')) : t('ro.isOff'))), btn);
+}
+
+// pinResetBox resets a forgotten PIN by presses at the device.
+function pinResetBox(scope, rerender) {
+  const box = h('div', { class: 'small', role: 'status' });
+  const start = async () => {
+    if (!(await confirmDialog(t('pin.resetConfirm'), t('pin.resetStart')))) return;
+    if (!(await pinReset())) return;
+    const tick = () => request('api/status').then((s) => {
+      const r = s.pinReset || {};
+      if (r.done && !s.pinRequired) { box.replaceChildren(h('b', null, t('pin.resetDone'))); setTimeout(rerender, 2500); return true; }
+      if (!r.active) { box.replaceChildren(t('pin.resetExpired')); return true; }
+      box.replaceChildren(h('b', null, t('pin.resetPress', { n: r.presses || 0, need: r.need, s: r.seconds })));
+      return false;
+    });
+    const id = scope.interval(async () => { if (await tick().catch(() => false)) clearInterval(id); }, 500);
+    tick();
+  };
+  return h('div', null, h('button', { class: 'btn small', type: 'button', onclick: start }, t('pin.forgot')), box);
+}
+
+function consoleCard(scope, rerender) {
   const st = liveState.status || {};
   const current = h('input', { type: 'password', autocomplete: 'current-password', 'aria-label': t('pin.current'), placeholder: t('pin.current') });
   const next = h('input', { type: 'password', autocomplete: 'new-password', 'aria-label': t('pin.new'), placeholder: t('pin.newHint') });
@@ -53,6 +86,8 @@ function consoleCard() {
       h('dt', null, t('console.pin')), h('dd', null, st.pinRequired ? t('console.pinSet') : t('console.pinNone'))),
     h('div', { class: 'pinrow' }, st.pinRequired ? current : null, next, h('button', { class: 'btn', type: 'button', onclick: save }, t('pin.save'))),
     h('p', { class: 'muted small' }, t('console.pinHint')),
+    st.pinRequired ? pinResetBox(scope, rerender) : null,
+    readOnlyRow(st, rerender),
     // Behind the host the dashboard offers the full diagnostics bundle.
     /\/plugins\/[^/]+\//.test(location.pathname) ? h('a', { class: 'btn', href: '../../api/diagnostics', download: '' }, t('console.diagnostics')) : null);
 }
@@ -60,9 +95,9 @@ function consoleCard() {
 export const system = {
   id: 'system',
   title: 'tab.system',
-  render(scope) {
+  render(scope, rerender) {
     const sys = single('SYSTEM'), b = single('BUILD'), a = single('AUDIO'), net = single('NETWORK'), gui = single('GUI');
-    const cards = [connectionCard(scope), consoleCard()];
+    const cards = [connectionCard(scope), consoleCard(scope, rerender)];
     if (sys) cards.push(card(t('sys.device'), kv(scope, [
       [t('sys.name'), sys, 'systemName'], [t('sys.serial'), sys, 'systemSerialNumber'], [t('sys.firmware'), sys, 'systemFirmwareVersion'],
       [t('sys.board'), sys, 'boardType', (v) => (v === 1 ? 'Duo (1)' : v === 0 ? 'Pro II (0)' : String(v))], [t('sys.engine'), sys, 'engineMode'],
