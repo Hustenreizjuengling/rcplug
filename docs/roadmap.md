@@ -17,11 +17,13 @@ and the plugins ([device-notes.md](device-notes.md#first-test-on-a-real-duo)).
    client and the device's screen holds it. Plan: (a) a mirror that reads the
    screen's connection alongside it on the loopback interface, without being a
    client, started before the screen at boot (read-only, cannot disturb the desk):
-   **implemented in 0.6.0**, to be confirmed on hardware;
+   **works since 0.6.0/0.6.1**;
    (b) control through the front-panel emulation (mute, listen, pads, pages, the
    wheel), whose effect the mirror then shows: **works since 0.5.1/0.5.2** on the
-   *Display* page, together with the screen mirror; (c) later and experimental, a
-   relay that holds the mixer's slot for the screen, for settings without a button.
+   *Display* page, together with the screen mirror; (c) experimental, a relay that
+   holds the mixer's slot and serves the screen, for settings without a button
+   ([full control](protocol.md#full-control)): **implemented in 0.6.4**, to be tested
+   on hardware.
 2. **The rest of the first run on hardware**: the meters from the mixer's memory
    (**implemented in 0.6.3**, to be confirmed on hardware), gain ranges,
    CPU load of the JACK bridge

@@ -72,6 +72,41 @@ missing, which the console says. Implemented in
 [`internal/desk/tap.go`](../internal/desk/tap.go), tested against the simulator on the
 loopback interface (`make test-root`).
 
+## Full control
+
+Reading along can only watch, so changes go through the front panel, which only
+reaches what has a button. *Full control* (experimental, off by default, switched on
+at the expert level on the console's *Display* page) uses the one-client behaviour
+instead: the console takes the mixer's place itself and then serves the device's
+screen on the mixer's port, which the mixer does not listen on while it has a client.
+
+1. **Taking the place.** If the mixer listens (at boot, before the screen app has
+   connected), the console connects at once. If the screen holds the place, the
+   console restarts the screen app (as *Read the state again* does) and connects in
+   the moment the mixer listens again, before the screen app is back (about three
+   seconds). Once connected it binds the mixer's address (`127.0.0.1:2345`) as soon
+   as the mixer has closed its listener; if the mixer keeps listening (another
+   firmware), it gives the place back at once.
+2. **Relaying.** The screen app connects to the console as it would to the mixer and
+   gets the mixer's state as a full sync, then every message passes through unchanged
+   in both directions, pings included. A change the console makes goes to the mixer
+   and to the screen, which shows it like any other change; so every setting can be
+   written, within the console's control levels. Frames for the screen are queued, and
+   a screen that does not keep up is disconnected (it reconnects and gets the state
+   again); the mixer connection is never held up.
+3. **Giving the place back.** When full control is switched off, the console stops
+   or crashes, or the screen has not connected for 30 seconds, the console's listener
+   closes first and the mixer connection after it, so the mixer can listen again and
+   the screen app finds it. A crash cannot reverse that order: a duplicate of the
+   mixer connection is kept above every other file descriptor, and a process's
+   descriptors are closed in ascending order when it ends.
+
+The setting is kept; at the next start the console waits for the mixer and takes the
+place before the screen app connects. Implemented in
+[`internal/desk/relay.go`](../internal/desk/relay.go), tested against the simulator in
+its one-client mode with a screen that reconnects like the device's (`rcsim
+--one-client`).
+
 ## Transport
 
 Both directions use the same frame:

@@ -22,7 +22,8 @@ firmware serves **one client at a time** (1.7.3 and 1.7.6, seen on a real Duo; s
 client that connects before the screen would lock it out. On a RØDECaster the console
 therefore **does not connect at all**: it reads along with the screen's connection
 (`--desk-mode auto`, see [protocol.md](protocol.md#reading-along)), which cannot
-disturb it, and changes the desk only through the front panel. *Read the state
+disturb it, and changes the desk only through the front panel – unless a user switches
+on the experimental *full control* (below). *Read the state
 again* restarts the screen app once (about three seconds; RØDE's own scripts restart
 it the same way, and the mixer keeps running); it is rate-limited and needs the PIN
 if one is set. To go on after its own restart, the console keeps the mirrored tree in
@@ -206,6 +207,16 @@ trust. Do not expose port 8080 to the internet.
   the mirror turns such a picture by 90° (the orientation can be changed on the
   *Display* page). It only reads, never draws. A user must switch it on (*Display* tab), since the
   screen can show private information.
+- **Full control** lets the console take the mixer's one connection and serve the
+  device's screen through itself, so every setting can be changed
+  ([protocol.md](protocol.md#full-control)). It is off until a user switches it on at
+  the *Expert* level (*Display* page, with a warning); switching it on restarts the
+  screen app once. The console always closes its own listener before it lets go of the
+  mixer, also when it crashes, so the mixer can listen again and the screen finds it;
+  a screen that does not keep up is disconnected rather than ever holding up the
+  mixer; without the screen for 30 seconds the console steps back. Audio does not pass
+  through this connection. Switching it off (or `--desk-mode connect`) returns to
+  reading along.
 - **Meters** come from the shared memory in which the mixer keeps them for its screen
   ([protocol.md](protocol.md#meters-and-fader-positions)). The console attaches it
   read-only, like the screen app, and only copies it; it is on by default because it

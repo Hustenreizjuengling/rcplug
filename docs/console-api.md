@@ -38,7 +38,8 @@ Responses are JSON, except the screen images. Errors look like `{"error": "human
 | Field | Meaning |
 |---|---|
 | `connection.state` | `waiting` (boot grace; or, reading along, waiting for a full sync: `code` `tap_waiting` or `tap_lost`), `connecting`, `syncing`, `live` (`code` `resumed`: going on with the state kept at its last stop; changes made in between may be missing), `backoff` (retrying; `tap_failed` if reading along is impossible, e.g. without root), `conflict` (the GUI guard stepped back, see [safety.md](safety.md)), `stopped` |
-| `connection.mode` | `tap` (reading along with the device's screen) or `connect` |
+| `connection.mode` | `tap` (reading along with the device's screen), `relay` (full control: the device's screen runs through the console) or `connect` |
+| `connection.fullControl` | Full control is switched on; `connection.relay` (`screen`, `screenSince`, `screenFrames`) describes it while it runs, `relayCode`/`relayError` why the last attempt ended (`relay_busy`, `relay_race`, `relay_no_mixer`, `relay_no_screen`, `relay_failed`) |
 | `passive` | `true` while reading along: the tree cannot be written (`meta.control.writable` is empty), the front panel can |
 | `meters` | `true` while the console reads the meters and hardware fader positions from the mixer's shared memory (on the device; elsewhere meters arrive as tree changes) |
 | `control` | The current control level: `off`, `basic` or `expert` |
@@ -157,7 +158,7 @@ Every write:
 | `api/link` | `{"epoch", "source", "output", "link"}` | Links or unlinks a routing cell with the sequence the device expects |
 | `api/record` | `{"epoch", "value"}` | Recorder: 0 stop, 1 pause, 2 record |
 | `api/control` | `{"level": "off" \| "basic" \| "expert"}` | Changes the control level (refused with `read_only` or `untested_model` where control is not possible) |
-| `api/settings` | `{"screen": true}`, `{"screenRotate": "auto"}`, `{"panel": true}`, `{"screenControl": true}`, `{"touchFlip": ""}` | Switches the screen mirror on or off; turns its picture (`auto`: a portrait buffer such as the Duo's becomes landscape, or `0`, `90`, `180`, `270` degrees clockwise); switches the front-panel emulation on or off; switches operating the screen from the mirror on or off, and corrects the touchscreen's orientation (`""`, `x`, `y`, `xy`). Saved across restarts. |
+| `api/settings` | `{"screen": true}`, `{"screenRotate": "auto"}`, `{"panel": true}`, `{"screenControl": true}`, `{"touchFlip": ""}`, `{"fullControl": true}` | Switches full control on or off (on the device only, `full_control_unavailable` elsewhere; switching on needs the expert level, see [protocol.md](protocol.md#full-control)); switches the screen mirror on or off; turns its picture (`auto`: a portrait buffer such as the Duo's becomes landscape, or `0`, `90`, `180`, `270` degrees clockwise); switches the front-panel emulation on or off; switches operating the screen from the mirror on or off, and corrects the touchscreen's orientation (`""`, `x`, `y`, `xy`). Saved across restarts. |
 | `api/pin` | `{"current", "new"}` | Sets, changes (`current` required) or removes (`new: ""`) the PIN |
 | `api/reconnect` | `{}` | Reconnects to the desk, also after the GUI guard stepped back. At most every 10 s. |
 | `api/resync` | `{}` | Reading along only: restarts the device's screen app, whose new connection brings a full sync. At most every 10 s. |

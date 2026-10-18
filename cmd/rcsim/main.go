@@ -24,6 +24,8 @@ func main() {
 	animate := flag.Bool("animate", true, "slowly move physical fader 1 now and then")
 	exclusive := flag.Bool("exclusive", false, "drop existing clients when a new one connects")
 	waitHS := flag.Bool("wait-handshake", false, "send the full sync only after a session-open handshake")
+	oneClient := flag.Bool("one-client", false, "serve one client like the Duo's mixer: stop listening while a client is connected")
+	ping := flag.Duration("ping", 0, "send a ping frame to clients at this interval, like the desk (0 = never)")
 	flag.Parse()
 
 	frame := rcsim.DuoFrame
@@ -33,7 +35,7 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	opts := rcsim.Options{MeterHz: *hz, Animate: *animate, Exclusive: *exclusive, WaitHandshake: *waitHS}
+	opts := rcsim.Options{MeterHz: *hz, Animate: *animate, Exclusive: *exclusive, WaitHandshake: *waitHS, OneClient: *oneClient, Ping: *ping}
 	s, err := rcsim.NewFromFrame(frame, opts)
 	if err != nil {
 		log.Fatal(err)

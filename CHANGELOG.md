@@ -6,6 +6,17 @@ may break compatibility).
 
 ## 0.6.4 - Unreleased
 
+### Added
+- **Full control** (experimental, off by default): on the *Display* page, at the expert
+  level, the console takes the mixer's one connection itself and serves the device's
+  screen through it. Every setting can then be changed from the browser, not only
+  those with a button, and the device's screen shows the change. Switching it on
+  restarts the device's screen once. The console gives the place back when it is
+  switched off, when the console stops or crashes, or when the screen does not
+  connect, so the screen always finds the mixer again.
+- The simulator can serve one client like the Duo's mixer (`rcsim --one-client`) and
+  send pings (`--ping`).
+
 ## 0.6.3 - 2026-10-18
 
 ### Added

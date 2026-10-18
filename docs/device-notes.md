@@ -69,6 +69,13 @@ flashing from Windows (below). What is still open:
    touchscreen, its axis ranges and orientation are in the diagnostics
    (`system/input-devices.txt`). Whether taps land where clicked is to be confirmed
    on the device.
+7. **Full control** (0.6.4, experimental). Built on what the analysis of the binaries
+   says (the mixer closes its listener while it has a client and opens it again when
+   the client leaves; the screen app connects to `127.0.0.1:2345`) and tested against
+   the simulator. To confirm on the device: that the screen app connects through the
+   console and works normally, that a setting changed in the console shows on the
+   screen, and that the screen finds the mixer again when full control is switched
+   off or the console stops.
 
 ## First test on a real Duo
 

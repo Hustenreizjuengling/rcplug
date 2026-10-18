@@ -75,9 +75,11 @@ Sonar and other plugins have their own settings, described next to their code in
 private), `--timeout` (`30s`), `--guard` (on). See [adding-a-model.md](adding-a-model.md).
 
 `rcsim`: `--addr` (`127.0.0.1:2345`), `--fixture <file>`, `--meter-hz` (`15`),
-`--animate` (on), `--exclusive` (drop older clients like a single-client desk),
-`--wait-handshake` (withhold the full sync until the client sends the session-open
-handshake; meter changes flow before it, as they may on a real desk).
+`--animate` (on), `--exclusive` (drop older clients), `--one-client` (serve one client
+like the Duo's mixer: stop listening while a client is connected, listen again when it
+leaves), `--ping <interval>` (send `ping` frames like the desk), `--wait-handshake`
+(withhold the full sync until the client sends the session-open handshake; meter
+changes flow before it).
 
 ## Installing and setup tools
 

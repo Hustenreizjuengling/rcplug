@@ -30,6 +30,10 @@ type Settings struct {
 	// touchscreen; TouchFlip corrects its orientation ("", "x", "y", "xy").
 	ScreenControl bool   `json:"screenControl,omitempty"`
 	TouchFlip     string `json:"touchFlip,omitempty"`
+	// FullControl (experimental, reading along only): the console takes the
+	// mixer's one place and serves the device's screen in turn, so every
+	// setting can be written (see desk/relay.go).
+	FullControl bool `json:"fullControl,omitempty"`
 }
 
 // rotations are the valid ScreenRotate values besides "" (auto).

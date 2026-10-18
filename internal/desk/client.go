@@ -89,10 +89,16 @@ type Status struct {
 	NextRetry   float64 `json:"nextRetrySeconds,omitempty"`
 	Wait        float64 `json:"waitSeconds,omitempty"` // boot grace remaining
 	Guard       string  `json:"guard"`                 // off | active | unavailable | remote | passive
-	Mode        string  `json:"mode"`                  // connect | tap
+	Mode        string  `json:"mode"`                  // connect | tap | relay
 	ReadOnly    bool    `json:"readOnly"`
-	Rate        float64 `json:"changesPerSecond"`
-	Stats       Stats   `json:"stats"`
+	// FullControl: relay mode is wanted (see relay.go); Relay describes the
+	// session while it runs, RelayCode/RelayError why the last attempt ended.
+	FullControl bool         `json:"fullControl,omitempty"`
+	Relay       *RelayStatus `json:"relay,omitempty"`
+	RelayCode   string       `json:"relayCode,omitempty"`
+	RelayError  string       `json:"relayError,omitempty"`
+	Rate        float64      `json:"changesPerSecond"`
+	Stats       Stats        `json:"stats"`
 }
 
 // sessionError is how a session ended (code for the UI, detail for humans).
@@ -130,6 +136,15 @@ type Client struct {
 	mode      string // connect | tap
 	stats     Stats
 	onStatus  func(Status)
+
+	// Full control (tap mode only).
+	wantRelay   bool
+	takeover    bool // an explicit request to take over is pending
+	relay       *relay
+	relayFrames uint64
+	relayCode   string
+	relayErr    string
+	switchMode  context.CancelFunc // ends reading along or the relay session for a mode change
 
 	wmu  sync.Mutex // serialises writes on the socket
 	kick chan struct{}
@@ -171,7 +186,15 @@ func NewClient(cfg Config, mirror *Mirror) *Client {
 
 // Passive reports whether the client reads along instead of connecting: it
 // mirrors the desk but cannot write to it.
-func (c *Client) Passive() bool { return c.mode == "tap" }
+func (c *Client) Passive() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.mode == "tap" && c.relay == nil
+}
+
+// ReadsAlong reports whether the client works with the device's screen
+// (reading along, or relaying in full control) rather than connecting.
+func (c *Client) ReadsAlong() bool { return c.mode == "tap" }
 
 // ReadOnly reports whether writes are hard-disabled.
 func (c *Client) ReadOnly() bool { return c.cfg.ReadOnly }
@@ -268,6 +291,12 @@ func (c *Client) Status() Status {
 		State: c.state, Addr: c.cfg.Addr, Code: c.code, Error: c.lastErr,
 		Since: c.since.Format(time.RFC3339), Guard: c.guardMode,
 		ReadOnly: c.cfg.ReadOnly, Rate: rate, Stats: c.stats, Mode: c.mode,
+		FullControl: c.wantRelay, RelayCode: c.relayCode, RelayError: c.relayErr,
+	}
+	if c.relay != nil {
+		st.Mode = "relay"
+		st.Relay = c.relay.status()
+		st.Relay.ScreenFrames = c.relayFrames
 	}
 	switch c.state {
 	case StateLive:
@@ -302,7 +331,7 @@ func (c *Client) Reconnect() {
 // Run maintains the connection until ctx is cancelled.
 func (c *Client) Run(ctx context.Context) {
 	if c.mode == "tap" {
-		c.runTap(ctx)
+		c.runDevice(ctx)
 		return
 	}
 	defer c.setState(StateStopped, "", "")
@@ -651,14 +680,20 @@ func (c *Client) Write(epoch uint64, build func(s Snapshot) (*rcproto.Change, er
 	if c.cfg.ReadOnly {
 		return nil, ErrReadOnly
 	}
-	if c.mode == "tap" {
-		return nil, ErrPassive
-	}
 	c.wmu.Lock()
 	defer c.wmu.Unlock()
 	c.mu.Lock()
-	conn, state := c.conn, c.state
+	conn, state, r := c.conn, c.state, c.relay
 	c.mu.Unlock()
+	if c.mode == "tap" && r == nil {
+		return nil, ErrPassive
+	}
+	if r != nil {
+		if state != StateLive {
+			return nil, ErrOffline
+		}
+		return c.mirror.commit(epoch, build, r.send)
+	}
 	if conn == nil || state != StateLive {
 		return nil, ErrOffline
 	}

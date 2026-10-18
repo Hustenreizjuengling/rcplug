@@ -1,6 +1,7 @@
 package rcsim
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -21,6 +22,13 @@ type Options struct {
 	// Exclusive emulates a single-client server: a new connection drops all
 	// existing ones. Used to exercise the client's GUI-protection guard.
 	Exclusive bool
+	// OneClient serves one client the way rc_audio_mixer 1.7.x does: the
+	// listener closes while a client is connected and opens again on the
+	// same address when it leaves (see RelistenFailures).
+	OneClient bool
+	// Ping sends a "ping" frame to every client at this interval, as the
+	// desk does (0 = never).
+	Ping time.Duration
 	// WaitHandshake withholds the full sync until the client sends the
 	// USB-style session-open body (to exercise the client's fallback).
 	WaitHandshake bool
@@ -42,10 +50,12 @@ type Server struct {
 	meters   []float64
 	recSince time.Time
 
-	ln        net.Listener
-	done      chan struct{}
-	closeOnce sync.Once
-	wg        sync.WaitGroup
+	ln               net.Listener // guarded by mu
+	addr             string
+	relistenFailures int
+	done             chan struct{}
+	closeOnce        sync.Once
+	wg               sync.WaitGroup
 }
 
 type client struct {
@@ -99,32 +109,96 @@ func (s *Server) Listen(addr string) error {
 	if err != nil {
 		return err
 	}
-	s.ln = ln
+	s.mu.Lock()
+	s.ln, s.addr = ln, ln.Addr().String()
+	s.mu.Unlock()
 	s.wg.Add(1)
-	go s.acceptLoop()
+	go s.acceptLoop(ln)
 	if s.opts.MeterHz > 0 || s.opts.Animate {
 		s.wg.Add(1)
 		go s.tickLoop()
 	}
+	if s.opts.Ping > 0 {
+		s.wg.Add(1)
+		go s.pingLoop()
+	}
 	return nil
 }
 
-// Addr returns the listening address.
+// Addr returns the listening address (also while a OneClient server has
+// its listener closed).
 func (s *Server) Addr() string {
-	if s.ln == nil {
-		return ""
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.addr
+}
+
+// Listening reports whether the server accepts connections right now.
+func (s *Server) Listening() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.ln != nil
+}
+
+// RelistenFailures counts the times a OneClient server could not listen
+// again after its client left, because something else had taken its
+// address. The real mixer would then never accept its screen again.
+func (s *Server) RelistenFailures() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.relistenFailures
+}
+
+// relistenLocked opens the listener again after a OneClient server's client
+// left.
+func (s *Server) relistenLocked() {
+	select {
+	case <-s.done:
+		return
+	default:
 	}
-	return s.ln.Addr().String()
+	if s.ln != nil {
+		return
+	}
+	ln, err := net.Listen("tcp", s.addr)
+	if err != nil {
+		s.relistenFailures++
+		s.opts.Logf("rcsim: cannot listen on %s again: %v", s.addr, err)
+		return
+	}
+	s.ln = ln
+	s.wg.Add(1)
+	go s.acceptLoop(ln)
+}
+
+func (s *Server) pingLoop() {
+	defer s.wg.Done()
+	t := time.NewTicker(s.opts.Ping)
+	defer t.Stop()
+	ping := rcproto.Frame([]byte("ping"))
+	for {
+		select {
+		case <-s.done:
+			return
+		case <-t.C:
+			s.mu.Lock()
+			for c := range s.clients {
+				s.sendLocked(c, ping)
+			}
+			s.mu.Unlock()
+		}
+	}
 }
 
 // Close stops the server and disconnects all clients.
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
 		close(s.done)
+		s.mu.Lock()
 		if s.ln != nil {
 			_ = s.ln.Close()
+			s.ln = nil
 		}
-		s.mu.Lock()
 		for c := range s.clients {
 			c.close()
 		}
@@ -169,15 +243,18 @@ func (s *Server) Inject(c *rcproto.Change) error {
 	return s.applyLocked(c, nil)
 }
 
-func (s *Server) acceptLoop() {
+func (s *Server) acceptLoop(ln net.Listener) {
 	defer s.wg.Done()
 	for {
-		conn, err := s.ln.Accept()
+		conn, err := ln.Accept()
 		if err != nil {
 			select {
 			case <-s.done:
 				return
 			default:
+			}
+			if s.opts.OneClient && errors.Is(err, net.ErrClosed) {
+				return
 			}
 			s.opts.Logf("rcsim: accept: %v", err)
 			time.Sleep(100 * time.Millisecond)
@@ -185,6 +262,13 @@ func (s *Server) acceptLoop() {
 		}
 		c := &client{conn: conn, out: make(chan []byte, 8192), closed: make(chan struct{})}
 		s.mu.Lock()
+		if s.opts.OneClient {
+			// Like the mixer's connectionMade: stop accepting.
+			_ = ln.Close()
+			if s.ln == ln {
+				s.ln = nil
+			}
+		}
 		if s.opts.Exclusive {
 			for old := range s.clients {
 				s.opts.Logf("rcsim: exclusive mode, dropping %s", old.conn.RemoteAddr())
@@ -201,6 +285,9 @@ func (s *Server) acceptLoop() {
 		s.wg.Add(2)
 		go s.writeLoop(c)
 		go s.readLoop(c)
+		if s.opts.OneClient {
+			return
+		}
 	}
 }
 
@@ -232,10 +319,13 @@ func (s *Server) writeLoop(c *client) {
 func (s *Server) readLoop(c *client) {
 	defer s.wg.Done()
 	defer func() {
+		c.close()
 		s.mu.Lock()
 		delete(s.clients, c)
+		if s.opts.OneClient && len(s.clients) == 0 {
+			s.relistenLocked() // like the mixer's connectionLost
+		}
 		s.mu.Unlock()
-		c.close()
 		s.opts.Logf("rcsim: client %s disconnected", c.conn.RemoteAddr())
 	}()
 	fr := rcproto.NewFrameReader(c.conn)
@@ -243,6 +333,9 @@ func (s *Server) readLoop(c *client) {
 		body, err := fr.Next()
 		if err != nil {
 			return
+		}
+		if string(body) == "ping" {
+			continue
 		}
 		if string(body) == string(rcproto.SessionOpen) {
 			s.opts.Logf("rcsim: session-open handshake from %s", c.conn.RemoteAddr())

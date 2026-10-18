@@ -110,6 +110,9 @@ func New(o Options) *Console {
 	if o.Screen != nil {
 		o.Screen.SetRotation(screenRotation(c.settings.ScreenRotate))
 	}
+	if c.settings.FullControl {
+		c.client.SetFullControl(true)
+	}
 	c.client.OnStatus(func(st desk.Status) {
 		data, _ := json.Marshal(st)
 		c.mirror.Notify("status", data)

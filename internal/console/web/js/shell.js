@@ -90,7 +90,7 @@ function banners() {
 
 export function connText(c) {
   switch (c.state) {
-    case 'live': return c.mode === 'tap' ? t('state.liveTap') : t('state.live');
+    case 'live': return c.mode === 'tap' ? t('state.liveTap') : c.mode === 'relay' ? t('state.liveRelay') : t('state.live');
     case 'waiting':
       if (c.code === 'tap_waiting') return t('state.tapWaiting');
       if (c.code === 'tap_lost') return t('state.tapLost');
@@ -108,7 +108,7 @@ export function renderHeader() {
   const live = liveState.open && conn && conn.state === 'live';
   pill.className = 'conn ' + (!liveState.open ? 'bad' : !conn ? '' : live ? 'live' : conn.state === 'conflict' ? 'bad' : 'warn');
   // The banner explains a conflict at length; the pill stays short.
-  $('.txt', pill).textContent = !liveState.open ? t('header.offline') : !conn ? '…' : live ? t(conn.mode === 'tap' ? 'header.liveTap' : 'header.live', { n: (conn.changesPerSecond || 0).toFixed(0) })
+  $('.txt', pill).textContent = !liveState.open ? t('header.offline') : !conn ? '…' : live ? t(conn.mode === 'tap' ? 'header.liveTap' : conn.mode === 'relay' ? 'header.liveRelay' : 'header.live', { n: (conn.changesPerSecond || 0).toFixed(0) })
     : conn.state === 'conflict' ? t('code.guard_conflict') : connText(conn);
   // Without a live connection the meters would freeze at their last levels.
   document.body.classList.toggle('notlive', !live);

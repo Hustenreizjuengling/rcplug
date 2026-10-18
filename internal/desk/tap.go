@@ -399,7 +399,6 @@ func (t *tapper) lose(c *tapConn, why string) {
 
 // runTap reads along with the device's screen until ctx ends.
 func (c *Client) runTap(ctx context.Context) {
-	defer c.setState(StateStopped, "", "")
 	for ctx.Err() == nil {
 		cp, err := openCapture(c.Port())
 		if err != nil {

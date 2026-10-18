@@ -221,6 +221,7 @@ type writeReq struct {
 	Rotate    *string     `json:"screenRotate"`
 	Panel     *bool       `json:"panel"`
 	ScreenCtl *bool       `json:"screenControl"`
+	FullCtl   *bool       `json:"fullControl"`
 	Flip      *string     `json:"touchFlip"`
 	Current   string      `json:"current"`
 	New       string      `json:"new"`
@@ -270,7 +271,11 @@ func (c *Console) write(remote string, epoch uint64, path []int, name string, va
 	var err error
 	if limit == "untested_model" {
 		err = errUntestedModel
-	} else if c.client.Passive() {
+	} else if c.client.Passive() || (name == "faderLevel" && c.client.ReadsAlong() && c.panelOn() && c.physicalFader(path)) {
+		// Reading along, or a physical fader in full control: the front
+		// panel sets it as the hardware does (whether the mixer follows a
+		// value written over the control port for a fader the panel
+		// reports is not known).
 		ch, nodeType, err = c.writeByPanel(level, epoch, path, name, value)
 	} else {
 		ch, err = c.client.Write(epoch, func(s desk.Snapshot) (*rcproto.Change, error) {
@@ -389,6 +394,17 @@ func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name strin
 		return nil, nodeType, sdk.NewError(http.StatusServiceUnavailable, "panel_failed", "pressing "+button+" failed: "+err.Error())
 	}
 	return ch, nodeType, nil
+}
+
+// physicalFader reports whether path is the FADER node of a physical fader.
+func (c *Console) physicalFader(path []int) (ok bool) {
+	c.mirror.View(func(s desk.Snapshot) {
+		if s.Layout != nil {
+			i := s.Layout.Runs["FADER"].IndexOf(path)
+			ok = i >= 0 && i < s.Layout.PhysicalFaders
+		}
+	})
+	return
 }
 
 // panelFader checks a physical fader position for the front panel: expert
@@ -712,6 +728,28 @@ func (c *Console) handleSettings(w http.ResponseWriter, r *http.Request) {
 		c.mu.Unlock()
 		c.opts.Logf("console: front panel %v by %s", *req.Panel, remoteOf(r))
 		c.auditAction(r, "panel", strconv.FormatBool(*req.Panel), nil)
+	}
+	if req.FullCtl != nil {
+		on := *req.FullCtl
+		var err error
+		switch lv, _ := c.Level(); {
+		case on && !c.client.ReadsAlong():
+			err = sdk.NewError(http.StatusConflict, "full_control_unavailable", "full control is only possible on the device, where the console reads along with its screen")
+		case on && lv != LevelExpert:
+			err = sdk.NewError(http.StatusForbidden, "expert_required", "full control requires the expert control level")
+		}
+		if err != nil {
+			c.auditAction(r, "full control", "true", err)
+			sdk.WriteError(w, err)
+			return
+		}
+		c.mu.Lock()
+		c.settings.FullControl = on
+		c.saveSettingsLocked()
+		c.mu.Unlock()
+		c.client.SetFullControl(on)
+		c.opts.Logf("console: full control %v by %s", on, remoteOf(r))
+		c.auditAction(r, "full control", strconv.FormatBool(on), nil)
 	}
 	if req.Screen != nil {
 		if *req.Screen && c.opts.Screen == nil {

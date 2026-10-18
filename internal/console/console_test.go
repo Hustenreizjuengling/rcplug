@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -947,5 +948,67 @@ func TestMetersNeedOneNodePerRecord(t *testing.T) {
 	pi.Children = append(pi.Children[:last], pi.Children[last+1:]...)
 	if _, ok := meterChanges(desk.Snapshot{Root: root, Layout: rcproto.DiscoverLayout(root)}, &r); ok {
 		t.Error("applied to a tree with another meter count")
+	}
+}
+
+func TestFullControlThroughTheAPI(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("reads /proc")
+	}
+	sim, err := rcsim.NewDuo(rcsim.Options{OneClient: true, Logf: quiet})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sim.Listen("127.0.0.1:0"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(sim.Close)
+	// Reading along (it cannot here, without root) as on the device.
+	client := desk.NewClient(desk.Config{Addr: sim.Addr(), Mode: "tap", Logf: quiet}, desk.NewMirror())
+	dir := t.TempDir()
+	c := New(Options{Client: client, DataDir: dir, Logf: quiet})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { client.Run(ctx); close(done) }()
+	go c.Run(ctx)
+	hs := httptest.NewServer(sdk.CSRF(c.Handler()))
+	t.Cleanup(func() { cancel(); <-done; hs.Close() })
+	r := &rig{sim: sim, client: client, console: c, http: hs, dir: dir}
+
+	if res := r.post(t, "/api/settings", map[string]bool{"fullControl": true}); res.code != 403 || res.body["code"] != "expert_required" {
+		t.Fatalf("full control below expert: %d %s", res.code, res.raw)
+	}
+	r.control(t, "expert")
+	if res := r.post(t, "/api/settings", map[string]bool{"fullControl": true}); res.code != 200 {
+		t.Fatalf("full control: %d %s", res.code, res.raw)
+	}
+	eventually(t, func() bool { st := client.Status(); return st.Mode == "relay" && st.State == desk.StateLive })
+	if st := r.do(t, "GET", "/api/status", nil); st.body["passive"] != false {
+		t.Fatalf("passive in full control: %v", st.body["passive"])
+	}
+	l, epoch := r.snap()
+	ch := l.Path("CHANNEL", 6)
+	cur, _ := sim.Snapshot().At(ch).Get("channelOutputMute")
+	if res := r.post(t, "/api/set", map[string]interface{}{"epoch": epoch, "path": ch, "name": "channelOutputMute", "value": !cur.Truth()}); res.code != 200 {
+		t.Fatalf("write in full control: %d %s", res.code, res.raw)
+	}
+	eventually(t, func() bool { v, _ := sim.Snapshot().At(ch).Get("channelOutputMute"); return v.Truth() == !cur.Truth() })
+	var saved Settings
+	raw, _ := os.ReadFile(filepath.Join(dir, "settings.json"))
+	if json.Unmarshal(raw, &saved); !saved.FullControl {
+		t.Fatalf("full control not kept: %s", raw)
+	}
+
+	if res := r.post(t, "/api/settings", map[string]bool{"fullControl": false}); res.code != 200 {
+		t.Fatalf("switch off: %d %s", res.code, res.raw)
+	}
+	eventually(t, func() bool { return client.Status().Mode == "tap" && sim.Listening() })
+}
+
+func TestFullControlOnlyOnTheDevice(t *testing.T) {
+	r := newRig(t, rcsim.Options{})
+	r.control(t, "expert")
+	if res := r.post(t, "/api/settings", map[string]bool{"fullControl": true}); res.code != 409 || res.body["code"] != "full_control_unavailable" {
+		t.Fatalf("full control while connected: %d %s", res.code, res.raw)
 	}
 }
