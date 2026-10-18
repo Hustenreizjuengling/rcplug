@@ -54,8 +54,9 @@ printf '{"exec": ["/bin/sh", "-c", "sleep 1000"]}\n' > "$D/plugins/mine/plugin.j
 echo "== reinstall 1.1.0 keeps them"
 install v1.1.0 || { cat "$W/install.log"; fail "reinstall"; }
 wait_version 1.1.0
-[ -f "$D/config/console.json" ] && [ -f "$D/data/console/marker" ] && [ -f "$D/plugins/mine/plugin.json" ] \
-  || fail "settings, data or a user plugin lost"
+for f in config/console.json data/console/marker plugins/mine/plugin.json; do
+  [ -f "$D/$f" ] || fail "$f was lost"
+done
 [ ! -e "$D/.previous" ] || fail ".previous left after a successful install"
 
 echo "== a reinstall that fails halfway goes back to 1.1.0"
