@@ -61,6 +61,13 @@
   .bar{height:6px;background:#0a0d12;border-radius:3px;overflow:hidden;border:1px solid var(--line);margin-top:4px}
   .bar i{display:block;height:100%;background:var(--accent)}
   .note{color:var(--muted);font-size:12px;margin-top:16px}
+  .tag.update{color:var(--blue);border-color:var(--blue)}
+  .upd{border-top:1px solid var(--line);padding:10px 0}
+  .upd:first-child{border-top:0}
+  .upd .ver{font-variant-numeric:tabular-nums}
+  details summary{cursor:pointer;color:var(--muted);font-size:12px}
+  details .logs{margin-top:6px}
+  .ok{color:var(--accent)}
   @media (max-width:700px){ .vitals{margin-left:0;width:100%} }
 </style>
 </head>
@@ -90,6 +97,16 @@ const T = {
     disclaimer: 'rcplug is unofficial software, not affiliated with or endorsed by RØDE Microphones. RØDE and RØDECaster are trademarks of their owner. Use at your own risk.',
     diagTitle: 'Diagnostics', diagText: 'If something does not work: download this bundle (logs, versions, device state; passwords and keys masked) and attach it to a bug report. Review it before posting it publicly.',
     diagButton: 'Download diagnostics',
+    updTitle: 'Updates', updDesc: 'rcplug and plugins update from signed releases on GitHub. Nothing is downloaded until you check, nothing is installed until you click. Settings and plugin data are kept.',
+    updOff: 'Updates are switched off on this device (RCPLUG_UPDATES=off).', updCheck: 'Check for updates', updChecking: 'checking…',
+    updNever: 'Not checked yet.', updChecked: 'Last checked: {at}', updCurrent: 'up to date', updAvail: 'update available',
+    updInstall: 'Install {v}', updNotes: 'Release notes', updRelease: 'release page ↗', updNoTargets: 'Nothing to check.',
+    updConfirmHost: 'Update rcplug to {v}?\n\nrcplug and all plugins restart (about half a minute). The RØDECaster itself and its audio keep running. If the new version does not start, the previous one comes back automatically.',
+    updConfirmPlugin: 'Update the plugin “{name}” to {v}?\n\nThe plugin restarts; its settings and data are kept.',
+    updRunning: 'Installing {name} {v}…', updRestarting: 'rcplug {v} is being installed and restarts now. This page reloads by itself when it is back.',
+    updDone: '{name} {v} installed.', updFailed: 'The update failed: {err}', updLog: 'Details',
+    updLastOk: 'Last rcplug update{v}: successful ({at}).', updLastFail: 'Last rcplug update{v} failed ({at}); the previous version was kept or restored.',
+    updKeys: 'Trusted signing keys: {ids}', updBadge: 'update {v}', updPlugin: 'Update',
     days: '{d} d {h} h', hours: '{h} h {m} min', mins: '{m} min', switchLang: 'Deutsch',
   },
   de: {
@@ -106,6 +123,16 @@ const T = {
     disclaimer: 'rcplug ist inoffizielle Software und steht in keiner Verbindung zu RØDE Microphones. RØDE und RØDECaster sind Marken ihres Inhabers. Nutzung auf eigene Gefahr.',
     diagTitle: 'Diagnose', diagText: 'Wenn etwas nicht funktioniert: dieses Paket herunterladen (Logs, Versionen, Gerätezustand; Passwörter und Schlüssel maskiert) und an einen Fehlerbericht hängen. Vor dem öffentlichen Teilen bitte durchsehen.',
     diagButton: 'Diagnose herunterladen',
+    updTitle: 'Updates', updDesc: 'rcplug und Plugins aktualisieren sich aus signierten Releases auf GitHub. Heruntergeladen wird erst nach „Nach Updates suchen“, installiert erst nach deinem Klick. Einstellungen und Plugin-Daten bleiben erhalten.',
+    updOff: 'Updates sind auf diesem Gerät abgeschaltet (RCPLUG_UPDATES=off).', updCheck: 'Nach Updates suchen', updChecking: 'suche…',
+    updNever: 'Noch nicht gesucht.', updChecked: 'Zuletzt gesucht: {at}', updCurrent: 'aktuell', updAvail: 'Update verfügbar',
+    updInstall: '{v} installieren', updNotes: 'Versionshinweise', updRelease: 'Release-Seite ↗', updNoTargets: 'Nichts zu prüfen.',
+    updConfirmHost: 'rcplug auf {v} aktualisieren?\n\nrcplug und alle Plugins starten neu (etwa eine halbe Minute). Der RØDECaster selbst und sein Audio laufen weiter. Startet die neue Version nicht, kommt automatisch die vorherige zurück.',
+    updConfirmPlugin: 'Das Plugin „{name}“ auf {v} aktualisieren?\n\nDas Plugin startet neu; seine Einstellungen und Daten bleiben erhalten.',
+    updRunning: '{name} {v} wird installiert…', updRestarting: 'rcplug {v} wird installiert und startet jetzt neu. Die Seite lädt sich von selbst neu, sobald es wieder da ist.',
+    updDone: '{name} {v} installiert.', updFailed: 'Das Update ist fehlgeschlagen: {err}', updLog: 'Details',
+    updLastOk: 'Letztes rcplug-Update{v}: erfolgreich ({at}).', updLastFail: 'Letztes rcplug-Update{v} fehlgeschlagen ({at}); die vorherige Version blieb bzw. wurde wiederhergestellt.',
+    updKeys: 'Vertrauenswürdige Signaturschlüssel: {ids}', updBadge: 'Update {v}', updPlugin: 'Aktualisieren',
     days: '{d} T {h} h', hours: '{h} h {m} min', mins: '{m} min', switchLang: 'English',
   },
 };
@@ -131,6 +158,7 @@ async function jpost(u) {
 }
 
 let plugins = [], invalid = [], sys = null, route = '', loaded = false, pageSig = '';
+let upd = null, updSig = '', updChecking = false, bootVersion = null;
 const openLogs = {};
 
 function fmtUptime(s) {
@@ -148,6 +176,9 @@ async function refresh() {
     if (sys.memTotalKB) v.push(`${t('ramFree')} <b>${esc(Math.round(sys.memAvailableKB / 1024))} MB</b>`);
     if (sys.systemUptimeSec !== undefined) v.push(`${t('up')} <b>${esc(fmtUptime(sys.systemUptimeSec))}</b>`);
     v.push(`rcplug <b>${esc(sys.version)}</b>`);
+    // After an update the new rcplug may serve a new dashboard.
+    if (bootVersion === null) bootVersion = sys.version;
+    else if (sys.version !== bootVersion) { location.reload(); return; }
     $('#vitals').innerHTML = v.join(' · ');
     $('#title').textContent = 'rcplug · ' + (sys.host || 'RØDECaster');
   } catch (e) {
@@ -155,6 +186,7 @@ async function refresh() {
     $('#vitals').textContent = t('offline');
   }
   try { const d = await jget('api/plugins'); plugins = d.plugins || []; invalid = d.invalid || []; loaded = true; } catch (e) { /* keep last */ }
+  if (route === 'system' || route === 'plugins' || !route) await loadUpdates();
   renderNav();
   if (!route) go();
   else if (route === 'plugins') renderPlugins();
@@ -204,6 +236,7 @@ function go() {
   if (route.startsWith('p/')) { const f = frameRoute(); renderFrame(f.name, f.sub); }
   else if (route === 'system') renderSystem();
   else renderPlugins();
+  if ((route === 'system' || route === 'plugins') && !upd) loadUpdates().then(() => (route === 'system' ? renderUpdates() : renderPlugins()));
 }
 window.addEventListener('hashchange', go);
 
@@ -243,7 +276,7 @@ async function act(name, action, btn) {
 // open logs and scroll positions survive the periodic refresh)
 function renderPlugins() {
   frameFor = null;
-  const sig = JSON.stringify([plugins, invalid, lang]);
+  const sig = JSON.stringify([plugins, invalid, lang, upd && upd.targets, upd && upd.job && upd.job.state]);
   if (sig === pageSig && $('#view .page')) { refreshLogs(); return; }
   pageSig = sig;
   let html = '<div class="page">';
@@ -252,14 +285,16 @@ function renderPlugins() {
   if (!plugins.length) html += `<div class="empty">${esc(t('none'))}<br>${esc(t('noneHint'))}</div>`;
   for (const p of plugins) {
     const st = p.state || 'stopped';
+    const u = pluginUpdate(p.name);
     html += `<div class="card" data-name="${esc(p.name)}">
-      <div class="row"><h2>${esc(p.icon || '')} ${esc(tr(p, 'title'))}</h2><span class="tag">v${esc(p.version || '?')}</span>${p.needsAudio ? `<span class="tag">${esc(t('audio'))}</span>` : ''}${p.primary ? `<span class="tag">${esc(t('startpage'))}</span>` : ''}
+      <div class="row"><h2>${esc(p.icon || '')} ${esc(tr(p, 'title'))}</h2><span class="tag">v${esc(p.version || '?')}</span>${u ? `<span class="tag update">${esc(t('updBadge', { v: u.latest }))}</span>` : ''}${p.needsAudio ? `<span class="tag">${esc(t('audio'))}</span>` : ''}${p.primary ? `<span class="tag">${esc(t('startpage'))}</span>` : ''}
         <span class="spacer"></span><span class="tag ${esc(st)}">${esc(t('st_' + st))}${p.pid ? ' · PID ' + esc(p.pid) : ''}</span></div>
       <p class="desc">${esc(tr(p, 'description'))}</p>
       ${p.unknownFields ? `<p class="error">${esc(t('unknown', { f: p.unknownFields.join(', ') }))}</p>` : ''}
       <div class="row">
         ${p.hasUI ? `<a class="btn" href="#/p/${encodeURIComponent(p.name)}">${esc(t('open'))}</a><a class="btn" href="plugins/${encodeURIComponent(p.name)}/" target="_blank" rel="noopener">${esc(t('newTab'))}</a>` : ''}
         ${p.enabled ? `<button class="danger" data-act="disable">${esc(t('stop'))}</button><button data-act="restart">${esc(t('restart'))}</button>` : `<button class="primary" data-act="enable">${esc(t('start'))}</button>`}
+        ${u ? `<button data-act="update"${jobActive() ? ' disabled' : ''}>${esc(t('updPlugin'))}</button>` : ''}
         <button class="linkbtn" data-act="logs" aria-expanded="${!!openLogs[p.name]}">${esc(t('log'))}</button>
         ${p.restarts ? `<span class="muted" style="font-size:12px">${esc(t('restarts', { n: p.restarts }))}</span>` : ''}
         ${p.lastErr && st !== 'running' ? `<span style="font-size:12px;color:var(--warn)">${esc(p.lastErr)}</span>` : ''}
@@ -283,6 +318,7 @@ function renderPlugins() {
         if (openLogs[name]) loadLogs(name, logsEl);
         return;
       }
+      if (b.dataset.act === 'update') { installUpdate('plugin:' + name, b); return; }
       act(name, b.dataset.act, b);
     }));
   });
@@ -303,23 +339,101 @@ async function loadLogs(name, el) {
   } catch (e) { el.textContent = t('noLog'); }
 }
 
-// ---- system page
+// ---- system page (the system card is redrawn on every refresh, the
+// updates card only when its content changed, so open details stay open)
 function renderSystem() {
   frameFor = null;
   if (!sys) { $('#view').innerHTML = `<div class="empty">${esc(t('offline'))}</div>`; return; }
+  if (!$('#sysCard')) {
+    $('#view').innerHTML = `<div class="page"><div class="card" id="sysCard"></div>
+      <div class="card" id="updCard" style="margin-top:14px"></div>
+      <div class="card" style="margin-top:14px"><h2>${esc(t('diagTitle'))}</h2><p class="desc">${esc(t('diagText'))}</p>
+        <a class="btn primary" href="api/diagnostics" download>${esc(t('diagButton'))}</a></div>
+      <p class="note">${esc(t('disclaimer'))}</p></div>`;
+    updSig = '';
+  }
   const mem = sys.memTotalKB ? `${esc(t('memUsed', { used: Math.round((sys.memTotalKB - sys.memAvailableKB) / 1024), total: Math.round(sys.memTotalKB / 1024) }))}<div class="bar"><i style="width:${((1 - sys.memAvailableKB / sys.memTotalKB) * 100).toFixed(0)}%"></i></div>` : '—';
   const disk = sys.diskTotalMB ? `${esc(t('diskFree', { free: sys.diskFreeMB, total: sys.diskTotalMB }))}<div class="bar"><i style="width:${((1 - sys.diskFreeMB / sys.diskTotalMB) * 100).toFixed(0)}%"></i></div>` : '—';
   const row = (k, v) => `<dt>${esc(t(k))}</dt><dd>${v}</dd>`;
-  $('#view').innerHTML = `<div class="page"><div class="card"><h2>${esc(t('sysTitle'))}</h2><p class="desc">${esc(t('sysDesc'))}</p><dl class="kv">
+  $('#sysCard').innerHTML = `<h2>${esc(t('sysTitle'))}</h2><p class="desc">${esc(t('sysDesc'))}</p><dl class="kv">
     ${row('hostname', esc(sys.host))}${row('arch', esc(sys.arch + '/' + sys.os))}
     ${row('temp', sys.cpuTempC !== undefined ? esc(sys.cpuTempC.toFixed(1)) + ' °C' : '—')}${row('loadAvg', sys.load ? esc(sys.load.join(' / ')) : '—')}
     ${row('memory', mem)}${row('disk', disk)}
     ${row('devUp', sys.systemUptimeSec !== undefined ? esc(fmtUptime(sys.systemUptimeSec)) : '—')}${row('hostUp', esc(fmtUptime(sys.uptimeSec)))}
     ${row('version', esc(sys.version))}${row('clock', esc(new Date(sys.time).toLocaleString(lang)))}
-  </dl></div>
-  <div class="card" style="margin-top:14px"><h2>${esc(t('diagTitle'))}</h2><p class="desc">${esc(t('diagText'))}</p>
-    <a class="btn primary" href="api/diagnostics" download>${esc(t('diagButton'))}</a></div>
-  <p class="note">${esc(t('disclaimer'))}</p></div>`;
+  </dl>`;
+  renderUpdates();
+}
+
+// ---- updates
+async function loadUpdates() { try { upd = await jget('api/updates'); } catch (e) { /* keep the last state */ } }
+const jobActive = () => !!(upd && upd.job && (upd.job.state === 'running' || upd.job.state === 'restarting'));
+const pluginUpdate = (name) => (upd && upd.targets || []).find((x) => x.target === 'plugin:' + name && x.available);
+const fmtTime = (s) => { const d = new Date(s); return isNaN(d) ? String(s) : d.toLocaleString(lang); };
+const logBlock = (lines, open) => (lines && lines.length ? `<details${open ? ' open' : ''}><summary>${esc(t('updLog'))}</summary><pre class="logs">${esc(lines.join('\n'))}</pre></details>` : '');
+
+function renderUpdates() {
+  const card = $('#updCard');
+  if (!card) return;
+  const sig = JSON.stringify([upd, updChecking, lang]);
+  if (sig === updSig) return;
+  updSig = sig;
+  let h = `<h2>${esc(t('updTitle'))}</h2><p class="desc">${esc(t('updDesc'))}</p>`;
+  if (!upd) { card.innerHTML = h + `<p class="muted">${esc(t('offline'))}</p>`; return; }
+  if (!upd.enabled) { card.innerHTML = h + `<p class="muted">${esc(t('updOff'))}</p>`; return; }
+  const busy = jobActive();
+  h += `<div class="row"><button class="primary" id="updCheck"${updChecking || busy ? ' disabled' : ''}>${esc(updChecking ? t('updChecking') : t('updCheck'))}</button>
+    <span class="muted" style="font-size:12px">${esc(upd.checkedAt ? t('updChecked', { at: fmtTime(upd.checkedAt) }) : t('updNever'))}</span></div>`;
+  if (upd.error) h += `<p class="error">${esc(upd.error)}</p>`;
+  const j = upd.job;
+  if (j) {
+    const name = j.target === 'rcplug' ? 'rcplug' : j.target.replace(/^plugin:/, '');
+    const msg = j.state === 'restarting' || (j.state === 'running' && j.target === 'rcplug') ? t('updRestarting', { v: j.version })
+      : j.state === 'running' ? t('updRunning', { name, v: j.version })
+      : j.state === 'done' ? t('updDone', { name, v: j.version }) : t('updFailed', { err: j.error || '?' });
+    h += `<div class="banner" style="margin:12px 0 0">${esc(msg)}${logBlock(j.log, j.state === 'error')}</div>`;
+  }
+  if (upd.last && !(j && j.target === 'rcplug' && j.state !== 'error')) {
+    const v = upd.last.from && upd.last.to ? ` (${upd.last.from} → ${upd.last.to})` : '';
+    h += `<p class="${upd.last.ok ? 'ok' : 'error'}" style="margin:12px 0 0">${esc(t(upd.last.ok ? 'updLastOk' : 'updLastFail', { v, at: fmtTime(upd.last.at) }))}</p>${logBlock(upd.last.log, false)}`;
+  }
+  if (upd.checkedAt) {
+    h += '<div style="margin-top:12px">';
+    if (!(upd.targets || []).length) h += `<p class="muted">${esc(t('updNoTargets'))}</p>`;
+    for (const x of upd.targets || []) {
+      const state = x.error ? `<span class="error">${esc(x.error)}</span>`
+        : x.available ? `<span class="tag update">${esc(t('updAvail'))}</span>` : `<span class="tag">${esc(t('updCurrent'))}</span>`;
+      h += `<div class="upd"><div class="row"><b>${esc(x.name)}</b><span class="ver muted">${esc(x.current || '?')}${x.latest && x.latest !== x.current ? ' → ' + esc(x.latest) : ''}</span>${state}
+        <span class="spacer"></span>${x.url ? `<a class="linkbtn" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(t('updRelease'))}</a>` : ''}
+        ${x.available ? `<button class="primary" data-target="${esc(x.target)}"${busy ? ' disabled' : ''}>${esc(t('updInstall', { v: x.latest }))}</button>` : ''}</div>
+        ${x.available && x.notes ? `<details><summary>${esc(t('updNotes'))}</summary><pre class="logs">${esc(x.notes)}</pre></details>` : ''}</div>`;
+    }
+    h += '</div>';
+  }
+  if (upd.keyIds && upd.keyIds.length) h += `<p class="note">${esc(t('updKeys', { ids: upd.keyIds.join(', ') }))}</p>`;
+  card.innerHTML = h;
+  $('#updCheck').onclick = checkUpdates;
+  card.querySelectorAll('[data-target]').forEach((b) => (b.onclick = () => installUpdate(b.dataset.target, b)));
+}
+
+async function checkUpdates() {
+  updChecking = true;
+  renderUpdates();
+  try { upd = await jpost('api/updates/check'); } catch (e) { if (upd) upd = { ...upd, error: t('failed', { err: e.message }) }; }
+  updChecking = false;
+  if (route === 'system') renderUpdates(); else renderPlugins();
+}
+
+async function installUpdate(target, btn) {
+  const x = (upd && upd.targets || []).find((y) => y.target === target);
+  if (!x) return;
+  const q = target === 'rcplug' ? t('updConfirmHost', { v: x.latest }) : t('updConfirmPlugin', { name: x.name, v: x.latest });
+  if (!confirm(q)) return;
+  if (btn) btn.disabled = true;
+  try { upd = await jpost('api/updates/install?target=' + encodeURIComponent(target)); }
+  catch (e) { alert(t('failed', { err: e.message })); }
+  await loadUpdates();
+  if (route === 'system') renderUpdates(); else renderPlugins();
 }
 
 $('#lang').textContent = t('switchLang');
@@ -328,7 +442,9 @@ $('#lang').addEventListener('click', () => {
   location.reload();
 });
 $('#boot').textContent = t('connecting');
-(async () => { await refresh(); setInterval(refresh, 4000); })();
+// Every 4 s; every second while an update is being installed, so its
+// progress (and rcplug's restart) shows without delay.
+(async function loop() { await refresh(); setTimeout(loop, jobActive() ? 1000 : 4000); })();
 </script>
 </body>
 </html>

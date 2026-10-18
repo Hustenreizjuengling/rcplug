@@ -48,6 +48,12 @@ statically linked Go programs that are copied there and started as a service.
   `autostart` field of a manifest is the default for plugins that are not listed there.
 - **Dashboard.** `cmd/rcplugd/web` is a single static page. Plugin UIs are shown in an
   iframe; the plugin marked `primary` is the start page.
+- **Updates.** On request, `internal/host/update.go` asks GitHub for the latest
+  releases of rcplug and of plugins with an update source, checks the signed
+  `release.json` and installs what the operator clicks: a plugin by replacing its
+  directory, rcplug itself by running the new package's `install.sh` in its own
+  session, which replaces and restarts rcplugd and goes back to the previous version
+  if the new one does not start. See [updates.md](updates.md).
 - **Priority.** The host lowers every thread to nice 19 before starting anything,
   and children inherit it.
 
@@ -63,6 +69,10 @@ something need the header `X-Rcplug: 1`.
 | `POST /api/plugins/<name>/enable`, `/disable`, `/restart` | Start (and remember as enabled), stop (and remember as disabled), restart an enabled plugin |
 | `POST /api/reload` | Rescan the plugins directory |
 | `GET /api/system` | Host name, version, uptime, load, memory, CPU temperature, free storage |
+| `GET /api/diagnostics` | The diagnostics bundle (zip) |
+| `GET /api/updates` | The last update check: `targets` (`rcplug` and `plugin:<name>`, each with `current`, `latest`, `available`, `notes`, `error`), the running install (`job`), the outcome of the last update of rcplug (`last`) and the trusted key ids. No network access |
+| `POST /api/updates/check` | Ask GitHub for the latest releases (a second check within 20 s returns the first) |
+| `POST /api/updates/install?target=<target>` | Install what the last check found for `rcplug` or `plugin:<name>`; 409 while another install runs. See [updates.md](updates.md) |
 | `/plugins/<name>/…` | The plugin's own web UI and API, proxied |
 
 ### Directory layout on the device
@@ -76,7 +86,9 @@ something need the header `X-Rcplug: 1`.
   config/<name>.json    operator settings per plugin (kept)
   state.json            enabled plugins (kept)
   logs/                 rcplugd.log, <plugin>.log, rcplugd.out (raw output, e.g. a
-                        crash trace); each rotated at 512 KB, one older file kept
+                        crash trace); each rotated at 512 KB, one older file kept;
+                        update.log and update.result from in-app updates
+  .update/              download and unpack area of a running update (removed after)
 /etc/init.d/rcplug      start script (SysV)
 ```
 
@@ -145,3 +157,5 @@ See [plugin-api.md](plugin-api.md).
 - **Safe defaults.** Read-only start, a deny list that the expert mode cannot lift,
   no new properties ever created on the desk, and a guard for the device's own screen.
   See [safety.md](safety.md).
+- **Updates only on request, only signed.** No background contact with the internet;
+  releases must be signed by a key built into rcplugd. See [updates.md](updates.md).

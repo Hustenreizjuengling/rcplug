@@ -13,6 +13,22 @@ firmware, flashing, install tools) and
 Sonar is no longer part of the device package; install it from rcplug-plugins.
 
 ### Added
+- In-app updates (dashboard → System → *Updates*, and an *Update* button on plugin
+  cards): rcplug and plugins with an `update` source in plugin.json update from
+  their latest GitHub release. Nothing is checked, downloaded or installed without a
+  click. Releases carry a `release.json` with the SHA-256 of every package, signed
+  with Ed25519; rcplugd only accepts keys built into it (plus a plugin's own
+  `update.publicKey`), only newer versions, HTTPS only, and unpacks packages without
+  links or paths outside their directory. rcplug updates through the new package's
+  `install.sh`, started in its own session; the dashboard reloads by itself when the
+  new version is up. `RCPLUG_UPDATES=off` switches updates off. See docs/updates.md.
+- `rcplug-release`: creates the signing key, signs releases (`release.json` +
+  `release.json.sig`) and verifies them; the release workflow signs every release
+  with the repository secret `RCPLUG_SIGNING_KEY` and refuses keys rcplugd does not
+  trust. `sdk/release` has the format for plugin authors who sign their own releases.
+- `make update-test`: an update from 0.8.0 to 0.9.0 and the rollback of a 0.9.1 that
+  cannot start, through the API against a fake GitHub; `DUO=<image>` runs it inside
+  the stock firmware's userland.
 - Plugin actions: plugins declare entry points (`actions` in plugin.json) that other
   UIs show; the console shows `channel` actions on every strip and in the channel
   dialog. Sonar uses it: "◉ Sonar" on a strip opens Sonar for that channel.
@@ -23,6 +39,8 @@ Sonar is no longer part of the device package; install it from rcplug-plugins.
   connection statistics and a sanitized copy of the desk state.
 
 ### Changed
+- `install.sh` keeps the previous version until the new one has started, and puts it
+  back (host, init script and the plugins it shipped) if the new one does not start.
 - Everything rcplug assumes about the device was checked against the stock Duo
   firmware 1.7.6 and 1.7.3 (files, scripts, device tree, static analysis of
   `rc_audio_mixer` and `rc_gui_juce`), and the installer, init script and setup

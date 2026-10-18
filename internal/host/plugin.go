@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/Hustenreizjuengling/rcplug/sdk/release"
 )
 
 // Manifest is the on-disk description of a plugin, read from plugin.json in
@@ -47,10 +49,39 @@ type Manifest struct {
 	// button on every channel strip of the console that opens the plugin
 	// for that channel. See docs/plugin-api.md#actions.
 	Actions []Action `json:"actions,omitempty"`
+	// Update says where newer versions of the plugin are published, so the
+	// dashboard can update it (see docs/updates.md). Nil: no in-app updates.
+	Update *UpdateSource `json:"update,omitempty"`
 
 	// Unknown lists fields of plugin.json this host does not understand
 	// (typos, or a manifest written for a newer host).
 	Unknown []string `json:"-"`
+}
+
+// UpdateSource names the GitHub repository ("owner/name") whose signed
+// releases (sdk/release) carry new versions of a plugin. PublicKey, if set,
+// is trusted for this plugin in addition to rcplug's own release keys, so a
+// third-party plugin can be signed with its author's key.
+type UpdateSource struct {
+	GitHub    string `json:"github"`
+	PublicKey string `json:"publicKey,omitempty"`
+}
+
+var githubRepo = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$`)
+
+func validateUpdate(u *UpdateSource) error {
+	if u == nil {
+		return nil
+	}
+	if !githubRepo.MatchString(u.GitHub) {
+		return fmt.Errorf("update: github %q must be owner/repository", u.GitHub)
+	}
+	if u.PublicKey != "" {
+		if _, err := release.ParsePublicKey(u.PublicKey); err != nil {
+			return fmt.Errorf("update: publicKey: %w", err)
+		}
+	}
+	return nil
 }
 
 // Translation is a localised title and description of a plugin.
@@ -135,6 +166,9 @@ func LoadManifest(dir string) (*Manifest, error) {
 	if err := validateActions(&m); err != nil {
 		return nil, fmt.Errorf("plugin %q: %w", m.Name, err)
 	}
+	if err := validateUpdate(m.Update); err != nil {
+		return nil, fmt.Errorf("plugin %q: %w", m.Name, err)
+	}
 	return &m, nil
 }
 
@@ -156,7 +190,7 @@ func loopbackTarget(s string) bool {
 var validName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 var knownFields = map[string]bool{"$schema": true, "name": true, "title": true, "description": true, "version": true,
-	"exec": true, "httpProxy": true, "autostart": true, "needsAudio": true, "primary": true, "order": true, "icon": true, "translations": true, "actions": true}
+	"exec": true, "httpProxy": true, "autostart": true, "needsAudio": true, "primary": true, "order": true, "icon": true, "translations": true, "actions": true, "update": true}
 
 func unknownFields(raw []byte) []string {
 	var all map[string]json.RawMessage

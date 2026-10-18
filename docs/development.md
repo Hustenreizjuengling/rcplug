@@ -17,6 +17,9 @@
 | `make fuzz` | Fuzzes the protocol decoder for 30 s |
 | `make package` | The release files in `dist/`: device tarball, examples, SHA256SUMS |
 | `make package-host` | The device tree for this machine in `dist/payload-host`, used by the toolkit's installer test |
+| `make payload-arm64` | The device tree in `dist/payload-arm64` (`payload-<goarch>` for other architectures) |
+| `make update-test` | In-app update end to end against a fake GitHub; `DUO=<stock os.tar.gz>` runs it in the device's own userland (see [updates.md](updates.md#testing)) |
+| `make sign` | Signs the files from `make package` (`release.json` + `.sig`); the key comes from `RCPLUG_SIGNING_KEY` |
 
 Run a single program from source:
 
@@ -57,8 +60,12 @@ authors; keep it small and compatible.
   every write path, the policy, the GUI guard against a single-client desk, reconnects,
   the event stream. The host tests start real plugin processes (shell scripts).
 - **Web tests** (`tools/webtest`, `node --test`) cover the console's store (loading,
-  batches during a load, epoch changes) and check that both language files have the
-  same keys and that every key used in the code exists.
+  batches during a load, epoch changes) and check, for the console and the dashboard,
+  that both languages have the same keys and that every key used in the code exists.
+- **Update test** (`make update-test`): a build installed as 0.8.0 in a sandbox is
+  updated to a signed 0.9.0 from a fake GitHub through the API; a 0.9.1 that cannot
+  start must be rolled back. With `DUO=` it runs in an aarch64 chroot of a stock
+  firmware image, with the device's BusyBox and shell.
 - **Installer test:** the toolkit's `make installer-test` installs this repository's
   device tree with the wizard in a sandbox (a fake `ssh` runs the remote commands
   locally): install, update, add a plugin, uninstall.
@@ -95,10 +102,13 @@ changes. `window.__rcplug` in the browser console exposes the store for debuggin
 ## Releasing
 
 1. Update `VERSION` and the `version` of the manifests in `plugins/` (a test checks
-   they match), and add a section to `CHANGELOG.md`.
+   they match), and add a section to `CHANGELOG.md`. Its text becomes the release
+   notes, which the dashboard shows next to the update.
 2. Commit, tag `v<version>` and push the tag. The release workflow checks that the tag
-   matches `VERSION`, runs the tests, builds the package and publishes a GitHub release
-   with the notes from the changelog.
+   matches `VERSION`, runs the tests, builds the package, signs it with the repository
+   secret `RCPLUG_SIGNING_KEY`, checks the signature against the keys built into
+   rcplugd and publishes a GitHub release with the notes from the changelog.
+   Devices offer it as an update from then on (see [updates.md](updates.md)).
 
 ## The three repositories
 

@@ -28,6 +28,8 @@ type Server struct {
 
 	// AllowHosts extends the Host-header allowlist (see hostAllowed).
 	AllowHosts []string
+	// Updates checks for and installs updates; nil switches the API off.
+	Updates *Updater
 
 	mu      sync.Mutex
 	proxies map[string]*httputil.ReverseProxy // key: name@target
@@ -89,6 +91,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/diagnostics", s.handleDiagnostics)
 	mux.Handle("POST /api/plugins/{name}/{action}", sdk.CSRF(http.HandlerFunc(s.handleAction)))
 	mux.Handle("POST /api/reload", sdk.CSRF(http.HandlerFunc(s.handleReload)))
+	mux.HandleFunc("GET /api/updates", s.handleUpdates)
+	mux.Handle("POST /api/updates/check", sdk.CSRF(http.HandlerFunc(s.handleUpdateCheck)))
+	mux.Handle("POST /api/updates/install", sdk.CSRF(http.HandlerFunc(s.handleUpdateInstall)))
 	mux.HandleFunc("/plugins/{name}", s.handleProxy)
 	mux.HandleFunc("/plugins/{name}/", s.handleProxy)
 	if s.dashboard != nil {
@@ -254,6 +259,41 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+func (s *Server) handleUpdates(w http.ResponseWriter, r *http.Request) {
+	if s.Updates == nil {
+		writeJSON(w, UpdateStatus{Current: s.version, Targets: []UpdateTarget{}})
+		return
+	}
+	writeJSON(w, s.Updates.Status())
+}
+
+// handleUpdateCheck asks GitHub for new releases (at most every 20 s).
+func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	if s.Updates == nil {
+		sdk.WriteError(w, sdk.NewError(http.StatusNotFound, "updates_off", "updates are switched off"))
+		return
+	}
+	writeJSON(w, s.Updates.Check(r.Context()))
+}
+
+// handleUpdateInstall installs what the last check found for ?target=
+// (rcplug, or plugin:<name>).
+func (s *Server) handleUpdateInstall(w http.ResponseWriter, r *http.Request) {
+	if s.Updates == nil {
+		sdk.WriteError(w, sdk.NewError(http.StatusNotFound, "updates_off", "updates are switched off"))
+		return
+	}
+	if err := s.Updates.Install(r.URL.Query().Get("target")); err != nil {
+		code := "update_failed"
+		if err == ErrUpdateBusy {
+			code = "update_busy"
+		}
+		sdk.WriteError(w, sdk.NewError(http.StatusConflict, code, err.Error()))
+		return
+	}
+	writeJSON(w, s.Updates.Status())
 }
 
 func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {

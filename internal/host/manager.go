@@ -1,6 +1,7 @@
 package host
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -251,6 +252,72 @@ func (m *Manager) Restart(name string) bool {
 		p.start()
 	}
 	return true
+}
+
+// Manifests returns the manifests of the loaded plugins in navigation order.
+func (m *Manager) Manifests() []*Manifest {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]*Manifest, 0, len(m.order))
+	for _, n := range m.order {
+		out = append(out, m.plugins[n].Manifest())
+	}
+	return out
+}
+
+// ReplacePlugin swaps the code of plugin name for the directory staged (an
+// unpacked, checked package) and starts it again if it was running. The
+// plugin's data and its operator config stay untouched. If the swap fails,
+// the previous code is put back.
+func (m *Manager) ReplacePlugin(name, staged string) error {
+	if !validName.MatchString(name) {
+		return fmt.Errorf("invalid plugin name %q", name)
+	}
+	p := m.get(name)
+	wasEnabled := false
+	if p != nil {
+		p.mu.Lock()
+		wasEnabled = p.enabled
+		p.mu.Unlock()
+		p.stop()
+	}
+	target := filepath.Join(m.pluginsDir, name)
+	backup := staged + ".previous"
+	_ = os.RemoveAll(backup)
+	restore := func() {
+		if p != nil && wasEnabled {
+			p.start()
+		}
+	}
+	hadOld := false
+	if _, err := os.Stat(target); err == nil {
+		if err := os.Rename(target, backup); err != nil {
+			restore()
+			return err
+		}
+		hadOld = true
+	}
+	if err := os.MkdirAll(m.pluginsDir, 0o755); err != nil {
+		return err
+	}
+	if err := os.Rename(staged, target); err != nil {
+		if hadOld {
+			_ = os.Rename(backup, target)
+		}
+		restore()
+		return err
+	}
+	if _, err := m.Load(); err != nil {
+		return err
+	}
+	if np := m.get(name); np != nil && wasEnabled {
+		np.start()
+	}
+	if np := m.get(name); np != nil {
+		np.log.add("updated to version " + np.Manifest().Version)
+	}
+	_ = os.RemoveAll(backup)
+	return nil
 }
 
 // Logs returns the recent log lines of a plugin.

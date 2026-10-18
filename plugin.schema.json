@@ -66,6 +66,24 @@
       "maxLength": 8,
       "description": "Short glyph or emoji for the navigation."
     },
+    "update": {
+      "type": "object",
+      "description": "Where updates of this plugin come from: the latest GitHub release of this repository, with a signed release.json (see docs/updates.md). Updates are only offered and installed from the dashboard.",
+      "required": ["github"],
+      "additionalProperties": false,
+      "properties": {
+        "github": {
+          "type": "string",
+          "description": "owner/name of the GitHub repository.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$"
+        },
+        "publicKey": {
+          "type": "string",
+          "description": "Ed25519 public key (base64) that signs this plugin's releases, trusted in addition to rcplug's built-in release keys. The key in the installed plugin.json checks the next update.",
+          "pattern": "^[A-Za-z0-9+/]{43}=$"
+        }
+      }
+    },
     "translations": {
       "type": "object",
       "description": "Localised title and description keyed by language code.",

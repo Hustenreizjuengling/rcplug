@@ -26,9 +26,23 @@ es in diesem Repository ein SDK. Siehe [docs/plugin-api.md](docs/plugin-api.md)
 > nach der Installation nur lesend und zieht sich zurück, wenn sie merkt, dass sie die
 > Geräteoberfläche stören könnte.
 >
-> rcplug steht in keiner Verbindung zu RØDE. Nutzung auf eigene Gefahr.
+> rcplug steht in keiner Verbindung zu RØDE. Nutzung auf eigene Gefahr; bitte den
+> Haftungsausschluss unten lesen.
 
 English: [README.md](README.md)
+
+## ⚠ Haftungsausschluss: Nutzung auf eigene Gefahr
+
+rcplug, seine Plugins und Werkzeuge sind **inoffizielle, experimentelle Software** und
+werden „wie besehen“ **ohne jede Gewährleistung** bereitgestellt (siehe
+[MIT-Lizenz](LICENSE)). Für den SSH-Zugang wird eine veränderte Firmware auf den
+RØDECaster geflasht. Das Flashen, das Installieren von Software auf dem Gerät und das
+Ändern seiner Einstellungen **kann das Gerät unbrauchbar machen („bricken“)**,
+Einstellungen oder Aufnahmen löschen und **die Garantie erlöschen lassen**. RØDE
+unterstützt so veränderte Geräte nicht. Alles, was du mit diesem Projekt machst,
+geschieht **in deiner eigenen Verantwortung**: Die Autoren haften nicht für Schäden an
+deinem Gerät, deinen Daten oder deinen Produktionen. Nicht während einer Sendung
+einsetzen, die nicht ausfallen darf.
 
 ## Unterstützte Geräte
 
@@ -74,6 +88,12 @@ CPU-Priorität, Audio hat also immer Vorrang. Ein Update von rcplug behält die
 Einstellungen. Ein **Firmware-Update** schreibt eine frische Root-Partition, und der Duo
 hat keinen anderen Ort, der das übersteht: rcplug, seine Einstellungen und dein
 SSH-Schlüssel sind danach weg.
+
+**Updates:** Einmal installiert, aktualisiert sich rcplug samt Plugins aus dem
+Dashboard (**System → Updates**): Es fragt GitHub nur, wenn du suchst, zeigt die
+Versionshinweise und installiert nur signierte Releases, die du anklickst. Startet eine
+neue rcplug-Version nicht, kommt die vorherige von selbst zurück. Siehe
+[docs/updates.md](docs/updates.md) (Englisch).
 
 ## Wenn etwas schiefgeht
 

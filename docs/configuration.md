@@ -26,6 +26,10 @@ saved as `config/console.json`, then restart the console.
 | `--allow-host` | `RCPLUG_ALLOW_HOST` | | Extra host names accepted in the `Host` header, comma-separated; `.example.com` allows a suffix |
 | `--base-port` | | `9100` | First loopback port assigned to plugins |
 | `--low-prio` | | `true` | Run everything at nice 19 |
+| `--updates` | `RCPLUG_UPDATES` | on | Offer updates of rcplug and its plugins from signed GitHub releases; `RCPLUG_UPDATES=off` switches them off. See [updates.md](updates.md) |
+| `--update-repo` | `RCPLUG_UPDATE_REPO` | `Hustenreizjuengling/rcplug` | GitHub repository (`owner/name`) of rcplug's own releases |
+| | `RCPLUG_UPDATE_API` | `https://api.github.com` | GitHub API base URL, for tests and mirrors. Plain `http://` only to the loopback interface |
+| | `RCPLUG_UPDATE_KEYS` | | Release keys trusted in addition to the built-in ones (base64 Ed25519, comma-separated), for forks and tests |
 | `--diagnostics FILE` | | | Write a diagnostics zip (`-` = stdout) and exit: from the running host if it answers at `--addr`, otherwise from the files on disk |
 | `--check` | | | Print whether the host answers and the problems found in the logs, then exit (used by the wizard) |
 | `--version` | | | Print the version |

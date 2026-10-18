@@ -14,14 +14,14 @@ GOBUILD   = CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) $(GO) build -trimpath -ldfla
 PLUGINS  := $(notdir $(patsubst %/,%,$(dir $(wildcard plugins/*/plugin.json))))
 # Example plugins carry code and manifest in examples/<name>/.
 EXAMPLES := $(notdir $(patsubst %/,%,$(dir $(wildcard examples/*/plugin.json))))
-SHELL_SCRIPTS := installer/install.sh installer/initd/rcplug examples/hello-sh/run.sh
+SHELL_SCRIPTS := installer/install.sh installer/initd/rcplug examples/hello-sh/run.sh tools/update-test.sh
 
 LOCAL_ADDR  ?= 127.0.0.1:8080
 LOCAL_MIXER ?= 127.0.0.1:2345
 # Extra plugin directories for run-local, e.g. EXTRA_PLUGINS=../my-plugin
 EXTRA_PLUGINS ?=
 
-.PHONY: help all check fmt fmt-check vet lint test test-race test-arm64 fuzz web-test \
+.PHONY: help all check fmt fmt-check vet lint test test-race test-arm64 fuzz web-test update-test sign \
         build build-arm64 build-host examples package package-host run-local sim clean
 
 help: ## show this help
@@ -57,6 +57,9 @@ fuzz: ## fuzz the protocol decoder for 30 s
 
 web-test: ## unit tests of the web UIs (needs Node 18+)
 	node --test tools/webtest/*.test.mjs
+
+update-test: ## in-app update end to end in a sandbox with a fake GitHub (DUO=<stock os.tar.gz>: in the Duo's own userland)
+	tools/update-test.sh $(if $(DUO),--duo $(DUO))
 
 # ---- binaries: $(DIST)/<os>-<arch>/
 build: build-arm64 build-host ## build all binaries for the device and this machine
@@ -119,8 +122,16 @@ package: build-arm64 ## release files in dist/: device tarball, examples tarball
 	cd $(DIST) && sha256sum rcplug-$(VERSION)-aarch64.tar.gz rcplug-examples-$(VERSION)-aarch64.tar.gz > SHA256SUMS
 	@echo "packaged: $(DIST)/rcplug-$(VERSION)-aarch64.tar.gz (+ examples, SHA256SUMS)"
 
+sign: ## sign the release files in dist/ (release.json + .sig); the key comes from $$RCPLUG_SIGNING_KEY
+	$(GO) run ./cmd/rcplug-release sign --project rcplug --version $(VERSION) --out $(DIST) \
+	  $(DIST)/rcplug-$(VERSION)-aarch64.tar.gz $(DIST)/rcplug-examples-$(VERSION)-aarch64.tar.gz
+
 package-host: build-host ## payload for this machine in dist/payload-host (Linux only; for the toolkit's installer test)
 	@$(call stage,$(HOSTOS)-$(HOSTARCH),$(DIST)/payload-host)
+
+payload-%: ## the device tree built for linux/% in $(DIST)/payload-% (payload-arm64: the device)
+	@$(MAKE) --no-print-directory bin OS=linux ARCH=$*
+	@$(call stage,linux-$*,$(DIST)/payload-$*)
 
 # ---- local development
 run-local: build-host ## run the host with the console, the examples and EXTRA_PLUGINS against the simulator

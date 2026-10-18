@@ -23,6 +23,7 @@ import (
 
 	"github.com/Hustenreizjuengling/rcplug/internal/host"
 	"github.com/Hustenreizjuengling/rcplug/sdk"
+	"github.com/Hustenreizjuengling/rcplug/sdk/release"
 )
 
 // version is set at build time via -ldflags "-X main.version=…".
@@ -42,6 +43,8 @@ func main() {
 		diag     = flag.String("diagnostics", "", "write a diagnostics bundle (zip) to this file (\"-\" = stdout) and exit; works without a running host")
 		check    = flag.Bool("check", false, "print problems found in the logs and whether the host answers, then exit")
 		call     = flag.String("call", "", "call the running host's API (\"POST /api/reload\") and print the answer, then exit; for scripts on the device")
+		updates  = flag.Bool("updates", os.Getenv("RCPLUG_UPDATES") != "off", "offer updates of rcplug and its plugins from signed GitHub releases (env RCPLUG_UPDATES=off switches them off)")
+		updRepo  = flag.String("update-repo", envOr("RCPLUG_UPDATE_REPO", host.DefaultUpdateRepo), "GitHub repository (owner/name) of rcplug's releases")
 	)
 	flag.Parse()
 	if *showVer {
@@ -83,6 +86,22 @@ func main() {
 	srv := host.NewServer(m, dash, version)
 	if *allow != "" {
 		srv.AllowHosts = strings.Split(*allow, ",")
+	}
+	if *updates {
+		cfg := host.UpdateConfig{API: os.Getenv("RCPLUG_UPDATE_API"), PlatformRepo: *updRepo}
+		// Extra keys are for forks and tests; rcplugd.env is root's file.
+		for _, k := range strings.Split(os.Getenv("RCPLUG_UPDATE_KEYS"), ",") {
+			if strings.TrimSpace(k) == "" {
+				continue
+			}
+			pk, err := release.ParsePublicKey(k)
+			if err != nil {
+				log.Printf("warning: RCPLUG_UPDATE_KEYS: %v", err)
+				continue
+			}
+			cfg.ExtraKeys = append(cfg.ExtraKeys, pk)
+		}
+		srv.Updates = host.NewUpdater(m, version, cfg)
 	}
 	reload := func() {
 		invalid, err := m.Load()
@@ -260,4 +279,11 @@ func defaultRoot() string {
 		return filepath.Dir(exe)
 	}
 	return "."
+}
+
+func envOr(name, def string) string {
+	if v := os.Getenv(name); v != "" {
+		return v
+	}
+	return def
 }

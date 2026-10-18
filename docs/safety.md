@@ -148,8 +148,9 @@ Captures made with `rccapture` replace every string except structural ones, see
 There are **no user accounts**. The PIN protects changes to the desk, nothing else:
 everyone who can reach the device on the network can read the whole state (including
 the serial number, network addresses and the names of paired devices), watch the
-screen mirror once it is switched on, and start, stop or restart plugins on the
-dashboard. The traffic is plain HTTP. rcplug is made for a home or studio network you
+screen mirror once it is switched on, start, stop or restart plugins on the
+dashboard, and install the latest signed release of rcplug or a plugin (never
+anything unsigned or older, see [updates.md](updates.md)). The traffic is plain HTTP. rcplug is made for a home or studio network you
 trust. Do not expose port 8080 to the internet.
 
 ## Experimental features
@@ -163,6 +164,15 @@ trust. Do not expose port 8080 to the internet.
   boot splash). It
   only reads, never draws. A user must switch it on (*Display* tab), since the
   screen can show private information.
+
+## Updates
+
+rcplug contacts GitHub only when someone presses *Check for updates*, and installs
+only what is clicked. Releases are accepted only with a valid signature by a key built
+into rcplugd, every file must match its SHA-256 in the signed manifest, only newer
+versions are offered, and packages are unpacked without links or paths outside their
+directory. An update of rcplug that does not start is rolled back by its installer.
+`RCPLUG_UPDATES=off` switches the function off. Details: [updates.md](updates.md).
 
 ## Installing and removing
 

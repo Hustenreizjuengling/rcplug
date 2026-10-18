@@ -103,6 +103,17 @@ if [ -x "$INITDIR/rcplug" ]; then
   "$INITDIR/rcplug" stop >/dev/null 2>&1 || true
 fi
 
+# Keep what this install replaces, so a new version that does not start can
+# be swapped back (see the end). In-app updates rely on this: there may be
+# nobody with SSH at hand when one goes wrong.
+PREV="$DIR/.previous"
+rm -rf "$PREV"
+mkdir -p "$PREV/plugins"
+if [ -f "$DIR/rcplugd" ]; then cp -p "$DIR/rcplugd" "$PREV/rcplugd" || fail "saving the previous rcplugd failed"; fi
+if [ -f "$DIR/VERSION" ]; then cp -p "$DIR/VERSION" "$PREV/VERSION"; fi
+if [ -f "$INITDIR/rcplug" ]; then cp -p "$INITDIR/rcplug" "$PREV/initd"; fi
+: > "$PREV/new-plugins"
+
 chmod 0755 "$STAGE/rcplugd"
 mv -f "$STAGE/rcplugd" "$DIR/rcplugd" || fail "installing rcplugd failed"
 # rccapture records the desk state for adding models (docs/adding-a-model.md).
@@ -126,7 +137,11 @@ for p in "$STAGE"/plugins/*/; do
     mkdir -p "$DIR/data/$name"
     if [ ! -e "$DIR/data/$name/$(basename "$old")" ]; then mv "$old" "$DIR/data/$name/"; fi
   done
-  rm -rf "$DIR/plugins/$name"
+  if [ -d "$DIR/plugins/$name" ]; then
+    mv "$DIR/plugins/$name" "$PREV/plugins/$name" || fail "saving the previous plugin $name failed"
+  else
+    echo "$name" >> "$PREV/new-plugins"
+  fi
   mv "$p" "$DIR/plugins/$name" || fail "installing plugin $name failed"
   if [ -f "$DIR/plugins/$name/$name" ]; then chmod 0755 "$DIR/plugins/$name/$name"; fi
 done
@@ -142,7 +157,27 @@ if [ -z "${RCPLUG_INITDIR:-}" ] && command -v update-rc.d >/dev/null 2>&1; then
 fi
 
 STOPPED=0 # a failed start is not retried by the cleanup
-"$INITDIR/rcplug" start || fail "rcplug did not start, see $DIR/logs/"
+if ! "$INITDIR/rcplug" start; then
+  if [ -f "$PREV/rcplugd" ]; then
+    echo "rcplug: the new version did not start; going back to the previous one" >&2
+    "$INITDIR/rcplug" stop >/dev/null 2>&1 || true
+    cp -p "$PREV/rcplugd" "$DIR/rcplugd"
+    if [ -f "$PREV/VERSION" ]; then cp -p "$PREV/VERSION" "$DIR/VERSION"; fi
+    while read -r name; do
+      [ -n "$name" ] && rm -rf "${DIR:?}/plugins/$name"
+    done < "$PREV/new-plugins"
+    for p in "$PREV"/plugins/*/; do
+      [ -d "$p" ] || continue
+      name="$(basename "$p")"
+      rm -rf "${DIR:?}/plugins/$name"
+      mv "$p" "$DIR/plugins/$name"
+    done
+    if [ -f "$PREV/initd" ]; then cp -p "$PREV/initd" "$INITDIR/rcplug"; fi
+    "$INITDIR/rcplug" start >&2 || true
+  fi
+  fail "the new version did not start, see $DIR/logs/"
+fi
+rm -rf "$PREV"
 
 ip="$(ip -4 addr show 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | grep -v '^127\.' | head -1 || true)"
 [ -n "$ip" ] || ip="<device-ip>"

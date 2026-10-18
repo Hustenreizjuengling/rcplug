@@ -18,10 +18,21 @@ jobs:
       - name: Tag must match VERSION
         run: test "v$(cat VERSION)" = "${GITHUB_REF_NAME}"
       - run: make test package
+      # release.json lists every file with its SHA-256; the signature over it
+      # is what rcplugd checks before it offers or installs an update. The
+      # verify step fails unless the key is one rcplugd trusts.
+      - name: Sign the release
+        env:
+          RCPLUG_SIGNING_KEY: ${{ secrets.RCPLUG_SIGNING_KEY }}
+        run: |
+          if [ -z "$RCPLUG_SIGNING_KEY" ]; then echo "::error::the repository secret RCPLUG_SIGNING_KEY is not set"; exit 1; fi
+          make sign
+          go run ./cmd/rcplug-release verify dist
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           notes="$(awk -v v="$(cat VERSION)" '$0 ~ "^## \\[?"v"\\]?" {p=1; next} /^## / && p {exit} p' CHANGELOG.md)"
           gh release create "$GITHUB_REF_NAME" --title "rcplug $GITHUB_REF_NAME" --notes "$notes" \
-            dist/rcplug-*-aarch64.tar.gz dist/rcplug-examples-*-aarch64.tar.gz dist/SHA256SUMS
+            dist/rcplug-*-aarch64.tar.gz dist/rcplug-examples-*-aarch64.tar.gz dist/SHA256SUMS \
+            dist/release.json dist/release.json.sig

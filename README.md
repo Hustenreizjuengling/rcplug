@@ -25,9 +25,21 @@ this repository. See [docs/plugin-api.md](docs/plugin-api.md).
 > read-only, and why the console steps back if it notices it might disturb the
 > device's own screen.
 >
-> rcplug is not affiliated with or endorsed by RØDE. Use it at your own risk.
+> rcplug is not affiliated with or endorsed by RØDE. Use it at your own risk; read the
+> disclaimer below.
 
 Deutsch: [README.de.md](README.de.md)
+
+## ⚠ Disclaimer: use at your own risk
+
+rcplug, its plugins and its tools are **unofficial, experimental software**, provided
+"as is" **without any warranty** (see the [MIT license](LICENSE)). Getting SSH onto
+the RØDECaster means flashing a modified firmware. Flashing, installing software on the
+device and changing its settings **can make the device unusable ("brick" it)**, lose
+settings or recordings and **void your warranty**. RØDE does not support devices
+changed this way. Whatever you do with this project, you do **on your own
+responsibility**: the authors accept no liability for damage to your device, your
+data or your productions. Do not use it during a show that must not fail.
 
 ## Supported devices
 
@@ -67,7 +79,12 @@ directory, `/usr/local/rcplug`. Besides that, rcplug adds a start script
 `/etc/init.d/rcplug` with its autostart links and a PID file in `/var/run`; the logs
 stay in the install directory (`logs/`). Nothing else on the device is changed, and
 uninstalling removes all of it. The host runs as **root** at the lowest CPU priority,
-so audio always comes first. Updating rcplug keeps its settings. A **firmware update**
+so audio always comes first. Updating rcplug keeps its settings.
+
+**Updates:** once installed, rcplug updates itself and its plugins from the dashboard
+(**System → Updates**): it checks GitHub only when you ask, shows the release notes and
+installs only signed releases you click. If a new version of rcplug does not start,
+the previous one comes back by itself. See [docs/updates.md](docs/updates.md). A **firmware update**
 writes a fresh root partition, and the Duo has no other place that survives it:
 rcplug, its settings and your SSH key are gone afterwards.
 
@@ -108,6 +125,7 @@ More: [docs/safety.md](docs/safety.md).
 | [Architecture](docs/architecture.md) | How the host, the plugins and the device fit together; the host's API |
 | [Configuration](docs/configuration.md) | All flags, environment variables and settings files |
 | [Writing plugins](docs/plugin-api.md) | Manifest, environment, lifecycle, Go SDK, examples |
+| [Updates](docs/updates.md) | In-app updates: using them, how they are secured, publishing signed releases |
 | [Console API](docs/console-api.md) | Reading and controlling the desk over HTTP from your own code |
 | [Protocol](docs/protocol.md) | The desk's control port (JUCE ValueTree over TCP) |
 | [Safety](docs/safety.md) | What protects the device and your network |
