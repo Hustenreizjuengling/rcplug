@@ -96,8 +96,9 @@ screen on the mixer's port, which the mixer does not listen on while it has a cl
    again); the mixer connection is never held up.
 3. **Giving the place back.** When full control is switched off, the console stops
    or crashes, or the screen has not connected for 30 seconds, the console's listener
-   closes first and the mixer connection after it, so the mixer can listen again and
-   the screen app finds it. A crash cannot reverse that order: a duplicate of the
+   closes first and the mixer connection after it, so the mixer can listen again.
+   Then the console restarts the screen app (except after a crash), so it connects to
+   the mixer afresh, whatever it would do about a lost connection. A crash cannot reverse that order: a duplicate of the
    mixer connection is kept above every other file descriptor, and a process's
    descriptors are closed in ascending order when it ends.
 

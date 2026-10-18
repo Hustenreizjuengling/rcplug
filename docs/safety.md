@@ -220,7 +220,8 @@ trust. Do not expose port 8080 to the internet.
   ([protocol.md](protocol.md#full-control)). It is off until a user switches it on at
   the *Expert* level (*Display* page, with a warning); switching it on restarts the
   screen app once. The console always closes its own listener before it lets go of the
-  mixer, also when it crashes, so the mixer can listen again and the screen finds it;
+  mixer, also when it crashes, so the mixer can listen again, and then restarts the
+  screen app so it connects to the mixer afresh;
   a screen that does not keep up is disconnected rather than ever holding up the
   mixer; without the screen for 30 seconds the console steps back. Audio does not pass
   through this connection. Switching it off (or `--desk-mode connect`) returns to

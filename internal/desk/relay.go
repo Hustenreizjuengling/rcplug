@@ -27,8 +27,10 @@ import (
 //     crashes: a duplicate of the mixer connection above every other
 //     descriptor keeps it open until the end, see keepHigh), so the mixer
 //     never finds its port taken.
-//   - When the console stops, the screen loses its connection and connects
-//     to the mixer again, as after a restart of the mixer.
+//   - When the session ends (switched off, the console stops, the mixer
+//     went away), the screen app is restarted, as "Read the state again"
+//     does, and connects to the mixer afresh. If the console crashes, the
+//     screen just loses its connection.
 //   - Nothing waits on the screen: frames for it are queued, and a screen
 //     that does not keep up is disconnected (it reconnects and gets the
 //     state anew). The mixer connection is read without pause.
@@ -188,7 +190,12 @@ func (c *Client) runRelay(ctx context.Context, takeover bool, wait time.Duration
 		c.relay, c.conn = nil, nil
 		c.mu.Unlock()
 		c.mirror.SetStale(true)
-		c.cfg.Logf("desk: full control ended; the device's screen connects to the mixer again")
+		// Whatever the screen app does when its connection ends, a restart
+		// (as RØDE's scripts and "Read the state again" do it) connects it to
+		// the mixer afresh. Not waited for: the console may be stopping.
+		restart := restartScreen
+		go func() { _ = restart() }()
+		c.cfg.Logf("desk: full control ended; the device's screen restarts and connects to the mixer")
 	}()
 	c.setState(StateSyncing, "relay_syncing", "")
 
