@@ -258,15 +258,6 @@ func Writable(level Level, nodeType, prop string) bool {
 	return ok
 }
 
-// stepLimit is how far one write may move a property at a level (0: as far
-// as its bounds allow).
-func stepLimit(level Level, nodeType, prop string) float64 {
-	if level != LevelBasic {
-		return 0
-	}
-	return basicRules[nodeType][prop].step
-}
-
 // Capabilities lists, per node type present in root, the properties writable
 // at level — an exact list the UI can use without knowing the rules.
 func Capabilities(level Level, root *rcproto.Node) map[string]interface{} {

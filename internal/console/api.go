@@ -27,9 +27,6 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/clients", c.handleClients)
 	mux.HandleFunc("GET /api/audit", c.handleAudit)
 	mux.HandleFunc("GET /api/changes", c.handleChanges)
-	mux.HandleFunc("GET /api/snapshot", c.handleSnapshot)
-	mux.HandleFunc("POST /api/snapshot/diff", c.handleSnapshotDiff)
-	mux.HandleFunc("POST /api/snapshot/apply", c.withPIN(c.handleSnapshotApply))
 	mux.HandleFunc("POST /api/changes/clear", c.forPeople(c.handleChangesClear))
 	mux.HandleFunc("GET /api/diagnostics", c.handleDiagnostics)
 	mux.HandleFunc("GET /api/hw", c.handleHW)
@@ -263,19 +260,12 @@ func remoteOf(r *http.Request) string {
 var errUntestedModel = sdk.NewError(http.StatusForbidden, "untested_model",
 	"control is not available for this model yet (start the console with --allow-untested-model to try it)")
 
-// levelFor is the level a writer's changes are checked at, and why writes
-// are off (Level).
-func (c *Console) levelFor(by who) (Level, string) {
-	level, limit := c.Level()
+func (c *Console) write(by who, epoch uint64, path []int, name string, value interface{}) (*rcproto.Change, error) {
+	level, limit := c.Level() // outside the mirror lock taken by Write
+	remote := by.label()
 	if by.plugin != "" && limit == "" {
 		level = LevelBasic // a plugin's permission, whatever level the browser has set
 	}
-	return level, limit
-}
-
-func (c *Console) write(by who, epoch uint64, path []int, name string, value interface{}) (*rcproto.Change, error) {
-	level, limit := c.levelFor(by) // outside the mirror lock taken by Write
-	remote := by.label()
 	nodeType := "?"
 	var ch *rcproto.Change
 	var err error

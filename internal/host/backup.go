@@ -15,9 +15,10 @@ import (
 // Backups of rcplug's own settings, for the backup plugin (it keeps them
 // and restores them from the browser): which plugins are installed and
 // switched on, their options, the daily update check and the extra plugin
-// catalogs. Left out: the dashboard's password and the console's PIN (they
-// are entered again), options that look like secrets, the plugins' own data
-// and the logs.
+// catalogs. Left out: the dashboard's password (it is entered again),
+// options that look like secrets, the plugins' own data and the logs, and
+// the plugins of rcplug's device package (the console): what they hold goes
+// with the device and its shows, not with rcplug.
 //
 //	GET  /api/backup          the settings now (RcplugBackup)
 //	POST /api/backup/diff     with a backup: what restoring it would change (BackupPlan)
@@ -50,7 +51,9 @@ type BackupPlugin struct {
 	Name    string `json:"name"`
 	Title   string `json:"title,omitempty"`
 	Version string `json:"version"`
-	// Enabled is the user's choice; absent, the plugin's own default applies.
+	// Enabled: the plugin runs (switched on by the user or by its autostart).
+	// A backup of rcplug 0.8.5 has it only where the user chose; absent,
+	// restoring leaves the plugin as it is.
 	Enabled *bool                      `json:"enabled,omitempty"`
 	Options map[string]json.RawMessage `json:"options,omitempty"`
 	// LeftOut are options left out as secrets (restoring keeps them).
@@ -69,8 +72,12 @@ func (m *Manager) Backup(version string) RcplugBackup {
 		b.Catalogs = []CatalogSource{}
 	}
 	for _, man := range m.Manifests() {
+		if platformPlugins[man.Name] {
+			continue
+		}
 		p := BackupPlugin{Name: man.Name, Title: man.Title, Version: man.Version}
-		if on, ok := ps.Enabled[man.Name]; ok {
+		if pl := m.get(man.Name); pl != nil {
+			on := pl.status().Enabled
 			p.Enabled = &on
 		}
 		cfg, _ := LoadUserConfig(m.root, man.Name)
@@ -145,6 +152,9 @@ func (m *Manager) plan(b RcplugBackup) BackupPlan {
 		manifests[man.Name] = man
 	}
 	for _, want := range b.Plugins {
+		if platformPlugins[want.Name] {
+			continue // in a backup of rcplug 0.8.5: left alone
+		}
 		have, ok := current[want.Name]
 		man := manifests[want.Name]
 		if !ok || man == nil {

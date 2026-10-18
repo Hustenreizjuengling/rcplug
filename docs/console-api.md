@@ -137,7 +137,6 @@ time.
 |---|---|
 | `GET api/clients` | `{"port", "clients": [...]}`: connections to the desk's control port with the process behind each (`pid`, `comm`), e.g. the device's GUI and the console |
 | `GET api/changes` | `{"changes": [...], "dropped": n}`: the last 500 property changes the desk reported, oldest first, each with `time`, `node`, `index` (in its family, -1 for a single node), `path`, `name`, `old` and `new` (secrets redacted). Meters, fader positions, mix levels, progress and the recording time are left out. `POST api/changes/clear` empties it (not for plugins). The diagnostics bundle carries it as `changes.json`, without string values |
-| `GET api/snapshot` | A snapshot of the desk's settings for a backup ([below](#snapshots)) |
 | `GET api/audit` | `{"writes": [...]}`: the last 300 writes and changes to the console itself (node `console`: control level, device buttons, PIN without its value, reconnect, panel), with time, node type, path, property, value, client address and, for refused ones, the error code |
 | `GET api/diagnostics` | A zip with the console's connection statistics, status, clients, audit log, summary, layout and a sanitized copy of the tree; the host adds it to its diagnostics bundle |
 | `GET api/hw` | The device buttons (`panel`: `enabled` where their serial line exists, `error`) and the meter memory (`meters`: `available`, `live`) |
@@ -172,9 +171,6 @@ Every write:
 | `api/pin/reset` | `{}` | No PIN needed: starts a minute in which four presses of channel 1's Listen (or Mute) button at the device within four seconds remove the PIN and set the level to `off`; progress in `api/status` → `pinReset` (`active`, `presses`, `need`, `seconds`, `done`). `no_pin` if none is set |
 | `api/reconnect` | `{}` | Reconnects to the desk, also after the GUI guard stepped back. At most every 10 s. |
 | `api/resync` | `{}` | Reading along only: restarts the device's screen app, whose new connection brings a full sync. At most every 10 s. |
-
-| `api/snapshot/diff` | a snapshot | No write and no PIN: what restoring it would change ([below](#snapshots)) |
-| `api/snapshot/apply` | a snapshot | Restores it ([below](#snapshots)) |
 
 A **marker** is `api/set` on `RECORDER.requestDropMarker` with the current time in
 milliseconds (an int64), as the console's UI does.
@@ -234,46 +230,6 @@ if errors.As(err, &apiErr) && apiErr.Code == "permission_desk_write" {
 }
 ```
 
-### Snapshots
-
-`GET api/snapshot` lists the desk's settings, for the backup plugin to keep and restore:
-
-```json
-{"format": 1, "created": "2026-10-19T01:30:00+02:00", "model": "duo", "firmware": "1.7.6",
- "settings": [{"node": "CHANNEL", "index": 1, "name": "hpfOn", "value": true}, …]}
-```
-
-A setting is addressed by its node family and index (`"CHANNEL"` 1, as in the layout)
-rather than by its path, so a snapshot still fits after a firmware update that moves
-nodes; a routing cell is `"MIX"` with index source × outputs + output. The snapshot
-holds every property writable at the expert level, and leaves out what is not a
-setting: presses and requests, what the screen shows, the player, readings, the
-physical faders' positions and the routing levels they set (the hardware decides
-them; a restore would move a level away from where its fader stands), file paths and
-secrets, and everything the console never writes (network, accounts, updates, shows).
-It also leaves the listening volumes (headphones, monitors) alone, so a restore never
-turns them up all of a sudden. In the simulator (a Duo with firmware 1.7.4) it has
-about 3 500 settings, some 230 KB of JSON.
-
-`POST api/snapshot/diff` with a snapshot answers what differs:
-`{"differences": [{node, index, name, value, current, missing, expert, label}],
-"sameModel", "model", "level", "passive", "pinRequired"}`. `expert` marks settings
-only the expert level writes, `missing` ones the desk does not have, `label` names the
-node for people ("Mic 1 → Headphones 2", "Fader 2 (Mic 2)"); `level` is the level the
-request would write at and `passive` that the console only reads along now. A routing
-level that a physical fader sets now is not compared.
-
-`POST api/snapshot/apply` with a snapshot writes what differs, through the same checks
-as every other write and at the requester's level: `{"written", "refused": [{node,
-index, name, code, error}], "remaining", "missing"}`. It needs full control
-(`needs_full_control` while the console reads along) and a snapshot of the same model
-(`other_model`), and runs one at a time (`busy`).
-Setting one value can change others (a microphone type applies its preset to the gain
-and the voice effects), so the restore looks at the desk again after each pass and
-writes what still differs, up to four passes; routing links come first (with the
-sequence of `api/link`), then the types, then the rest. At the basic level a value
-with a step limit (the gains) moves there in allowed steps. `remaining` counts what is
-still different afterwards.
 ## Error codes
 
 | Code | Status | Meaning |
@@ -298,9 +254,6 @@ still different afterwards.
 | `read_only_forced` | 409 | Write protection cannot be switched off: the console was started with `--read-only` |
 | `no_pin` | 409 | A PIN reset without a PIN set |
 | `stale_epoch` | 409 | The tree changed since you read the path. Reload and retry. |
-| `needs_full_control` | 409 | A snapshot restore while the console only reads along |
-| `busy` | 409 | A snapshot restore is already running |
-| `other_model` | 409 | A snapshot of another model: a restore needs the same model |
 | `pin_locked` | 429 | Too many wrong PINs; wait a minute |
 | `rate_limited` | 429 | Try again in a few seconds |
 | `not_synced` | 503 | The console has no state yet (reads; writes before the first sync answer `offline`) |

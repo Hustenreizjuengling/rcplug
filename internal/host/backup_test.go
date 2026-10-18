@@ -17,6 +17,8 @@ const backupManifest = `{"exec":["./run.sh"],"options":[
 func TestBackupAndRestore(t *testing.T) {
 	root := t.TempDir()
 	writePlugin(t, root, "opt", "#!/bin/sh\ntrap 'exit 0' INT TERM\nwhile true; do sleep 1; done\n", backupManifest)
+	writePlugin(t, root, "auto", "#!/bin/sh\ntrap 'exit 0' INT TERM\nwhile true; do sleep 1; done\n", `{"exec":["./run.sh"],"autostart":true}`)
+	writePlugin(t, root, "console", "#!/bin/sh\ntrap 'exit 0' INT TERM\nwhile true; do sleep 1; done\n", backupManifest)
 	m := NewManager(root, 9670)
 	if _, err := m.Load(); err != nil {
 		t.Fatal(err)
@@ -40,6 +42,9 @@ func TestBackupAndRestore(t *testing.T) {
 	}
 	m.Disable("opt")
 	m.SetAutoCheck(true)
+	if _, _, err := m.SetOptions("console", map[string]json.RawMessage{"meters": json.RawMessage(`"off"`)}); err != nil {
+		t.Fatal(err)
+	}
 
 	rec := call(http.MethodGet, "/api/backup", nil)
 	var b RcplugBackup
@@ -49,10 +54,16 @@ func TestBackupAndRestore(t *testing.T) {
 	if strings.Contains(rec.Body.String(), "s3cret") {
 		t.Fatalf("a secret option in the backup: %s", rec.Body)
 	}
-	if b.Version != "1.2.3" || !b.AutoCheck || len(b.Plugins) != 1 || b.Plugins[0].Enabled == nil || *b.Plugins[0].Enabled ||
-		string(b.Plugins[0].Options["meters"]) != `"off"` || len(b.Plugins[0].LeftOut) != 1 {
+	if b.Version != "1.2.3" || !b.AutoCheck || len(b.Plugins) != 2 || b.Plugins[1].Name != "opt" || b.Plugins[1].Enabled == nil || *b.Plugins[1].Enabled ||
+		string(b.Plugins[1].Options["meters"]) != `"off"` || len(b.Plugins[1].LeftOut) != 1 {
 		t.Fatalf("backup: %s", rec.Body)
 	}
+	// A plugin running by its autostart is recorded as running: switched off
+	// by hand later, a restore switches it on again.
+	if b.Plugins[0].Name != "auto" || b.Plugins[0].Enabled == nil || !*b.Plugins[0].Enabled {
+		t.Fatalf("autostart plugin: %+v", b.Plugins[0])
+	}
+	m.Disable("auto")
 
 	// Change everything, then look at and carry out the restore.
 	if _, _, err := m.SetOptions("opt", map[string]json.RawMessage{"meters": json.RawMessage(`"auto"`), "fps": json.RawMessage(`2`)}); err != nil {
@@ -60,8 +71,11 @@ func TestBackupAndRestore(t *testing.T) {
 	}
 	m.Enable("opt")
 	m.SetAutoCheck(false)
-	b.Plugins = append(b.Plugins, BackupPlugin{Name: "gone", Version: "0.1.0"})
-	b.Plugins[0].Options["old"] = json.RawMessage(`1`)
+	// The console goes with the device: not in a backup, and left alone when
+	// a backup of rcplug 0.8.5 has it.
+	b.Plugins = append(b.Plugins, BackupPlugin{Name: "gone", Version: "0.1.0"},
+		BackupPlugin{Name: "console", Options: map[string]json.RawMessage{"meters": json.RawMessage(`"auto"`)}})
+	b.Plugins[1].Options["old"] = json.RawMessage(`1`)
 	rec = call(http.MethodPost, "/api/backup/diff", b)
 	var plan BackupPlan
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &plan) != nil {
@@ -69,9 +83,9 @@ func TestBackupAndRestore(t *testing.T) {
 	}
 	got := map[string]string{}
 	for _, c := range plan.Changes {
-		got[c.What+":"+c.ID] = string(c.From) + "→" + string(c.To)
+		got[c.Plugin+"/"+c.What+":"+c.ID] = string(c.From) + "→" + string(c.To)
 	}
-	want := map[string]string{"enabled:": "true→false", "option:meters": `"auto"→"off"`, "option:fps": "2→null", "autoCheck:": "false→true"}
+	want := map[string]string{"opt/enabled:": "true→false", "auto/enabled:": "false→true", "opt/option:meters": `"auto"→"off"`, "opt/option:fps": "2→null", "/autoCheck:": "false→true"}
 	for k, v := range want {
 		if got[k] != v {
 			t.Errorf("change %s: %q, want %q (all: %v)", k, got[k], v, got)
@@ -88,8 +102,11 @@ func TestBackupAndRestore(t *testing.T) {
 	if string(opts["meters"]) != `"off"` || opts["fps"] != nil || string(opts["apiToken"]) != `"s3cret"` || !m.AutoCheck() {
 		t.Fatalf("after the restore: %v autoCheck %v", opts, m.AutoCheck())
 	}
-	if m.get("opt").status().Enabled {
-		t.Fatal("opt still on")
+	if c, _, _ := m.Options("console"); string(c["meters"]) != `"off"` {
+		t.Fatalf("the console's options were restored: %v", c)
+	}
+	if m.get("opt").status().Enabled || !m.get("auto").status().Enabled {
+		t.Fatal("opt still on, or auto still off")
 	}
 	rec = call(http.MethodPost, "/api/backup/diff", b)
 	if json.Unmarshal(rec.Body.Bytes(), &plan) != nil || len(plan.Changes) != 0 {

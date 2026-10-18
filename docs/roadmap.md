@@ -4,7 +4,7 @@ Where rcplug is going, and plugins that would be worth building. Nothing here is
 promise; priorities follow what users need and what the first tests on hardware
 show. Ideas and comments are welcome as issues.
 
-**Today (0.8.5):**
+**Today (0.8.6):**
 
 - **Host:** dashboard and plugin supervisor, signed in-app updates with rollback,
   diagnostics, plugin settings in the dashboard, update notices, an optional dashboard
@@ -21,9 +21,8 @@ show. Ideas and comments are welcome as issues.
   - Control levels, write protection and a PIN that can be reset at the device.
   - A change log of the device, to work out what its settings' numbers mean.
   - A side bar with groups, the EQ curve, the headphone volumes.
-  - Snapshots of the desk's settings, compared and restored through the usual checks.
-- **Plugins:** Sonar, and *Backup*, which keeps and restores rcplug's and the desk's
-  settings with a preview of what a restore changes.
+- **Plugins:** Sonar, and *Backup*, which keeps and restores rcplug's settings with a
+  preview of what a restore changes.
 - **Toolkit** for SSH access, flashing (Windows, Linux), installing, stopping and
   uninstalling, and diagnostics.
 - **For plugin authors:** an SDK, a guide and a cookbook.
@@ -53,10 +52,8 @@ show. Ideas and comments are welcome as issues.
    console does that).
 2. **A restart of the device:** the console takes the mixer's place at boot, before
    the device's screen connects.
-3. **Backup and restore** on a real Duo: a restore through full control that the
-   device's screen follows, and how long a full restore takes.
-4. **The headphone volumes** (`POT.potLevel`): whether a write moves them.
-5. **Open values** ([device-notes.md](device-notes.md#assumptions-to-confirm-on-hardware)):
+3. **The headphone volumes** (`POT.potLevel`): whether a write moves them.
+4. **Open values** ([device-notes.md](device-notes.md#assumptions-to-confirm-on-hardware)):
    - the real gain ranges;
    - the meaning of a few integer settings (the console's change log, 0.7.3, shows
      them when a setting is changed on the device's screen);
@@ -105,8 +102,8 @@ missing:
    side bar with groups; a search over every setting would be next.
 
 Done on the way: the headphone volumes and fewer inputs and outputs that the Duo does
-not have (0.8.2), the EQ curve (0.8.4), backups of rcplug's and the desk's settings
-with the *Backup* plugin (0.8.5).
+not have (0.8.2), the EQ curve (0.8.4), backups of rcplug's settings with the
+*Backup* plugin (0.8.5).
 
 Since 0.8.0 there are no switches for experimental features: what the goal needs is
 on, what it does not need is gone.
@@ -134,7 +131,7 @@ Effort: **S** a few days, **M** one or two weeks, **L** more.
 | Plugin | What it does | Builds on | Effort |
 |---|---|---|---|
 | **Recordings** | Browse, play, download and (after confirmation) delete recordings over the network, without taking out the card or switching to USB mode. Optionally copy finished recordings to a NAS or cloud folder (WebDAV). | The firmware's strings point to `/Application/sd-card-mount` (microSD) and `/Application/ssd-mount` (USB SSD); the tree lists `RECORDINGS` and the storage volumes. Read-only, lowest priority while recording. | M |
-| **Scenes** | Save and recall mixer setups (levels, processing, routing) by name, per guest or show, with a preview of what a recall changes. | The console's snapshots (0.8.5), limited to the mixing; on the Duo this needs full control. | S–M |
+| **Scenes** | Save and recall mixer setups (levels, processing, routing) by name, per guest or show, with a preview of what a recall changes. | Console tree and writes at the *Control* level, within the write policy; on the Duo this needs full control. | M |
 | **Remote control bridge** | Simple HTTP endpoints and OSC for Stream Deck, Bitfocus Companion, TouchOSC: mute toggles, pads, markers, record. | Console writes. First check what the firmware's own `OSCPropertyBridge` offers. | S–M |
 | **Home Assistant / MQTT** | Recorder state, mutes and levels as MQTT entities with discovery, commands back: on-air lamps, room light, "do not disturb" on the door. | Summary and events; a small MQTT client in Go. | M |
 | **On-air signal** | Rules like "when recording starts, a mic opens or a pad plays, call this URL". | The [webhook recipe](cookbook.md#call-a-url-when-recording-starts-or-stops). | S |
@@ -175,6 +172,10 @@ How to build any of them: [plugin-guide.md](plugin-guide.md), [cookbook.md](cook
 - No switches for experiments: what the goal (the whole device from the browser)
   needs is on, after it was tried on a real device; what it does not need is not
   built.
+- Backups are rcplug's own settings. The desk's settings stay the device's: thousands
+  of values whose meaning a firmware update can change, kept by the device itself
+  (RØDE's shows). That includes the console, which shows and changes them. A snapshot
+  of the desk was tried in 0.8.5 and removed in 0.8.6.
 - Nothing in the firmware is changed except the one-time SSH key.
 - A firmware update removes rcplug completely and is the way back to the stock device
   in an emergency. rcplug does not try to survive it; reinstalling afterwards stays a

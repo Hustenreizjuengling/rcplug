@@ -6,6 +6,22 @@ may break compatibility).
 
 ## 0.8.6 - Unreleased
 
+### Changed
+- **`/api/backup` leaves the console out**: its options, and on restore a console in a
+  backup of 0.8.5 is left alone. What the console holds goes with the device and its
+  shows, not with rcplug's backups.
+
+### Fixed
+- A backup records whether each plugin runs, also when its autostart started it: a
+  plugin switched off by hand after the backup is switched on again by a restore
+  (0.8.5 recorded only what the user had switched).
+
+### Removed
+- **Snapshots of the desk's settings** (the console's `api/snapshot`, `/diff` and
+  `/apply`, new in 0.8.5). Backups cover rcplug's own settings only: the desk's
+  settings are thousands of values whose meaning a firmware update can change, and the
+  device keeps them itself (RØDE's shows). The *Backup* plugin 0.2.0 follows suit.
+
 ## 0.8.5 - 2026-10-18
 
 ### Added
