@@ -97,8 +97,11 @@ type Status struct {
 	Relay       *RelayStatus `json:"relay,omitempty"`
 	RelayCode   string       `json:"relayCode,omitempty"`
 	RelayError  string       `json:"relayError,omitempty"`
-	Rate        float64      `json:"changesPerSecond"`
-	Stats       Stats        `json:"stats"`
+	// RelayRetry: when full control is tried again (RFC 3339), after it
+	// stepped back.
+	RelayRetry string  `json:"relayRetry,omitempty"`
+	Rate       float64 `json:"changesPerSecond"`
+	Stats      Stats   `json:"stats"`
 }
 
 // sessionError is how a session ended (code for the UI, detail for humans).
@@ -144,6 +147,7 @@ type Client struct {
 	relayFrames uint64
 	relayCode   string
 	relayErr    string
+	relayRetry  time.Time
 	switchMode  context.CancelFunc // ends reading along or the relay session for a mode change
 
 	wmu  sync.Mutex // serialises writes on the socket
@@ -291,7 +295,7 @@ func (c *Client) Status() Status {
 		State: c.state, Addr: c.cfg.Addr, Code: c.code, Error: c.lastErr,
 		Since: c.since.Format(time.RFC3339), Guard: c.guardMode,
 		ReadOnly: c.cfg.ReadOnly, Rate: rate, Stats: c.stats, Mode: c.mode,
-		FullControl: c.wantRelay, RelayCode: c.relayCode, RelayError: c.relayErr,
+		FullControl: c.wantRelay, RelayCode: c.relayCode, RelayError: c.relayErr, RelayRetry: retryText(c.relayRetry),
 	}
 	if c.relay != nil {
 		st.Mode = "relay"
@@ -714,4 +718,11 @@ func (c *Client) Write(epoch uint64, build func(s Snapshot) (*rcproto.Change, er
 		c.mu.Unlock()
 		return nil
 	})
+}
+
+func retryText(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(time.RFC3339)
 }

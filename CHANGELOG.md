@@ -6,6 +6,16 @@ may break compatibility).
 
 ## 0.8.1 - Unreleased
 
+### Fixed
+- **Full control after an update of the console**, seen on a real Duo: the old
+  console restarted the device's screen app as it stopped, the new one took the free
+  place at once, and the screen app, which tried to connect in the moment in between,
+  did not try again; after 30 seconds the console stepped back and stayed reading
+  along. Now the console restarts the screen app once if it has not connected after 8
+  seconds (45 while the device boots), so it connects through the console; and if the
+  console still has to step back, it takes the place over again two minutes later, at
+  most three times. The console's *System* page shows when the next try is.
+
 ## 0.8.0 - 2026-10-18
 
 ### Changed

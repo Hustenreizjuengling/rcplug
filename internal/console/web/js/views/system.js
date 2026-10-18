@@ -101,7 +101,10 @@ function modeText(conn) {
   const r = conn.relay;
   if (conn.mode === 'relay' && r && r.screen) return t('mode.relay', { time: new Date(r.screenSince).toLocaleTimeString() });
   if (conn.mode === 'relay') return t('mode.relayStarting');
-  if (conn.mode === 'tap' && conn.fullControl) return conn.relayError ? t('mode.tapBecause', { err: relayText(conn) }) : t('mode.relayStarting');
+  if (conn.mode === 'tap' && conn.fullControl && conn.relayError) {
+    return t('mode.tapBecause', { err: relayText(conn) }) + ' ' + (conn.relayRetry ? t('mode.retryAt', { time: new Date(conn.relayRetry).toLocaleTimeString() }) : t('mode.retryWhenFree'));
+  }
+  if (conn.mode === 'tap' && conn.fullControl) return t('mode.relayStarting');
   if (conn.mode === 'tap') return t('mode.tapChosen');
   return t('mode.connect');
 }

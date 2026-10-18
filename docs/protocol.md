@@ -101,8 +101,15 @@ routing and channel processing changed from the browser showed on the device.
    written, within the console's control levels. Frames for the screen are queued, and
    a screen that does not keep up is disconnected (it reconnects and gets the state
    again); the mixer connection is never held up.
-3. **Giving the place back.** When the console stops or crashes, or the screen has
-   not connected for 30 seconds, the console's listener
+3. **Waiting for the screen.** A screen app that tried to connect in the moment
+   between the mixer closing its listener and the console opening its own does not
+   try again (seen on a real Duo when an update of the console restarted it: the old
+   console had just restarted the screen app, the new one took the free place). So if
+   the screen has not connected after 8 seconds (45 while the device boots), the
+   console restarts the screen app once, which then connects through it.
+4. **Giving the place back.** When the console stops or crashes, or the screen has
+   not connected for 30 seconds (two minutes while the device boots), the console's
+   listener
    closes first and the mixer connection after it, so the mixer can listen again.
    Then the console restarts the screen app (except after a crash), so it connects to
    the mixer afresh, whatever it would do about a lost connection. A crash cannot reverse that order: a duplicate of the
@@ -110,9 +117,11 @@ routing and channel processing changed from the browser showed on the device.
    descriptors are closed in ascending order when it ends.
 
 At its next start the console waits for the mixer and takes the place before the
-screen app connects. If taking the place fails, the console reads along and tries
-again only when the mixer's place becomes free, so it never restarts the screen app in
-a loop. Implemented in
+screen app connects. If the screen did not connect, the console reads along and takes
+the place over again two minutes later, at most three times in a row; otherwise it
+tries again when the mixer's place becomes free. It never restarts the screen app in a
+loop. The console's *System* page says which of these applies and when the next try
+is (`connection.relayRetry`). Implemented in
 [`internal/desk/relay.go`](../internal/desk/relay.go), tested against the simulator in
 its one-client mode with a screen that reconnects like the device's (`rcsim
 --one-client`).

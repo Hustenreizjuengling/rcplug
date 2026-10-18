@@ -30,8 +30,12 @@ type fakeScreen struct {
 	wg       sync.WaitGroup
 }
 
-func startScreen(t *testing.T, addr string) *fakeScreen {
-	f := &fakeScreen{addr: addr, stop: make(chan struct{})}
+func startScreen(t *testing.T, addr string) *fakeScreen { return startScreenAt(t, addr, time.Time{}) }
+
+// startScreenAt starts a screen that does not connect before until (or a
+// restart).
+func startScreenAt(t *testing.T, addr string, until time.Time) *fakeScreen {
+	f := &fakeScreen{addr: addr, stop: make(chan struct{}), paused: until}
 	f.wg.Add(1)
 	go f.run()
 	t.Cleanup(func() {
@@ -58,7 +62,7 @@ func (f *fakeScreen) run() {
 		wait := time.Until(f.paused)
 		f.mu.Unlock()
 		if wait > 0 {
-			time.Sleep(wait)
+			time.Sleep(min(wait, 20*time.Millisecond)) // a restart shortens the pause
 			continue
 		}
 		conn, err := net.DialTimeout("tcp", f.addr, 100*time.Millisecond)
@@ -410,4 +414,72 @@ func TestFullControlAsksASilentMixerForItsState(t *testing.T) {
 	c.SetFullControl(true)
 	start()
 	waitFor(t, "relay live after the handshake", func() bool { st := c.Status(); return st.Mode == "relay" && st.State == StateLive })
+}
+
+// A screen that missed the console's listener (it tried in the moment the
+// mixer had stopped listening and the console had not started yet) and does
+// not try again: the console restarts it once, and it connects through the
+// console (seen on a real Duo after an update of the console).
+func TestFullControlNudgesAScreenThatMissedIt(t *testing.T) {
+	fastRelay(t)
+	old := []time.Duration{relayNudge}
+	relayNudge = 300 * time.Millisecond
+	t.Cleanup(func() { relayNudge = old[0] })
+	sim := oneClientSim(t, rcsim.Options{OneClient: true})
+	screen := startScreenAt(t, sim.Addr(), time.Now().Add(time.Hour))
+	restarts := 0
+	var mu sync.Mutex
+	oldRestart := restartScreen
+	restartScreen = func() error { mu.Lock(); restarts++; mu.Unlock(); return screen.restart() }
+	t.Cleanup(func() { restartScreen = oldRestart })
+
+	c, start, _ := relayClient(t, sim.Addr())
+	c.SetFullControl(true)
+	start()
+	waitFor(t, "screen through the relay after a nudge", func() bool {
+		st := c.Status()
+		return st.Mode == "relay" && st.Relay != nil && st.Relay.Screen && screen.connected()
+	})
+	mu.Lock()
+	n := restarts
+	mu.Unlock()
+	if n != 1 {
+		t.Fatalf("screen restarted %d times, want 1", n)
+	}
+	time.Sleep(500 * time.Millisecond)
+	if st := c.Status(); st.Mode != "relay" || st.RelayCode != "" {
+		t.Fatalf("after the nudge: %+v", st)
+	}
+}
+
+// After stepping back for want of a screen, the console takes over again a
+// little later, a few times, and then stays reading along.
+func TestFullControlTriesAgainAfterSteppingBack(t *testing.T) {
+	fastRelay(t)
+	old := []time.Duration{relayNoScreen, relayRetry, relayNudge}
+	relayNoScreen, relayRetry, relayNudge = 200*time.Millisecond, 200*time.Millisecond, time.Hour
+	t.Cleanup(func() { relayNoScreen, relayRetry, relayNudge = old[0], old[1], old[2] })
+	oldPlace := placeFree
+	placeFree = func(int) bool { return false } // only the retries take over
+	t.Cleanup(func() { placeFree = oldPlace })
+	oldRestart := restartScreen
+	restartScreen = func() error { return nil }
+	t.Cleanup(func() { restartScreen = oldRestart })
+	sim := oneClientSim(t, rcsim.Options{OneClient: true})
+	c, start, _ := relayClient(t, sim.Addr())
+	c.SetFullControl(true)
+	start()
+	waitFor(t, "first session and three more", func() bool {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		return c.stats.Sessions == uint64(1+relayRetries)
+	})
+	waitFor(t, "reading along at the end", func() bool { st := c.Status(); return st.Mode == "tap" && st.RelayCode == "relay_no_screen" })
+	time.Sleep(time.Second)
+	c.mu.Lock()
+	sessions := c.stats.Sessions
+	c.mu.Unlock()
+	if sessions != uint64(1+relayRetries) {
+		t.Fatalf("%d sessions, want %d", sessions, 1+relayRetries)
+	}
 }

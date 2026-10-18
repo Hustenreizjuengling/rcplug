@@ -34,8 +34,12 @@ import (
 //   - Nothing waits on the screen: frames for it are queued, and a screen
 //     that does not keep up is disconnected (it reconnects and gets the
 //     state anew). The mixer connection is read without pause.
-//   - Without a screen for a while (it should be back within seconds after
-//     a restart) the console steps back, so the screen finds the mixer.
+//   - Without a screen for a few seconds the console restarts the screen app
+//     once: one that tried to connect in the moment between the mixer
+//     closing its listener and the console opening its own does not try
+//     again (seen on a real Duo after an update of the console). Without a
+//     screen for longer the console steps back, so the screen finds the
+//     mixer, and tries to take over again a little later (a few times).
 
 // Relay timing; tests shorten them.
 var (
@@ -44,7 +48,12 @@ var (
 	relayPoll       = 20 * time.Millisecond  // retry interval while the place is free soon
 	relayTakeover   = 6 * time.Second        // after restarting the screen: how long to try
 	relayBoot       = 2 * time.Minute        // at start: how long to wait for the mixer
+	relayNudge      = 8 * time.Second        // without a screen: restart it once
 	relayNoScreen   = 30 * time.Second       // step back after so long without a screen
+	relayBootNudge  = 45 * time.Second       // the same while the device boots (its screen
+	relayBootAlone  = 2 * time.Minute        // app takes a while to come up)
+	relayRetry      = 2 * time.Minute        // after stepping back: when to take over again
+	relayRetries    = 3                      // and how often
 	relayPing       = time.Second            // keep-alive to the mixer while no screen is there
 	relayScreenSend = 2 * time.Second        // write deadline towards the screen
 	relayQueue      = 8192                   // frames queued for the screen
@@ -212,6 +221,11 @@ func (r *relay) watch(ctx context.Context) error {
 	ping := rcproto.Frame([]byte("ping"))
 	timeout := time.NewTimer(r.c.cfg.SyncTimeout)
 	defer timeout.Stop()
+	nudge, noScreen := relayNudge, relayNoScreen
+	if up := uptimeSeconds(); up >= 0 && up < relayBoot.Seconds() {
+		nudge, noScreen = relayBootNudge, relayBootAlone
+	}
+	var nudged time.Time // the alone period a restart of the screen was for
 	// Like the client: if the mixer stays silent, the session-open message
 	// asks for the state (TCP normally needs none).
 	hello := time.NewTimer(r.c.handshakeAfter())
@@ -244,8 +258,14 @@ func (r *relay) watch(ctx context.Context) error {
 			if !alone {
 				continue
 			}
-			if time.Since(since) > relayNoScreen {
+			if time.Since(since) > noScreen {
 				return errNoScreen
+			}
+			if time.Since(since) > nudge && !nudged.Equal(since) {
+				nudged = since
+				r.c.cfg.Logf("desk: full control: the device's screen has not connected; restarting it so it connects through the console")
+				restart := restartScreen
+				go func() { _ = restart() }()
 			}
 			if err := r.toMixer(ping); err != nil {
 				return err
@@ -582,6 +602,8 @@ var placeFree = func(port int) bool { return listener(port) != "" && busyHolder(
 func (c *Client) runDevice(ctx context.Context) {
 	defer c.setState(StateStopped, "", "")
 	first := true
+	retries := 0          // takeovers tried again after stepping back
+	var retryAt time.Time // when to try the next one (zero: none)
 	for ctx.Err() == nil {
 		want, takeover := c.relayWanted()
 		if want {
@@ -595,6 +617,7 @@ func (c *Client) runDevice(ctx context.Context) {
 			sctx, cancel := context.WithCancel(ctx)
 			c.mu.Lock()
 			c.switchMode = cancel
+			c.relayRetry = time.Time{}
 			c.mu.Unlock()
 			err := c.runRelay(sctx, takeover, wait)
 			cancel()
@@ -617,6 +640,18 @@ func (c *Client) runDevice(ctx context.Context) {
 			if msg != "" {
 				c.cfg.Logf("desk: full control: %s", msg)
 			}
+			retryAt = time.Time{}
+			switch {
+			case (code == "relay_no_screen" || code == "relay_race") && retries < relayRetries:
+				retries++
+				retryAt = time.Now().Add(relayRetry)
+				c.cfg.Logf("desk: full control: trying again at %s (%d of %d)", retryAt.Format("15:04:05"), retries, relayRetries)
+			case code != "relay_no_screen" && code != "relay_race":
+				retries = 0
+			}
+			c.mu.Lock()
+			c.relayRetry = retryAt
+			c.mu.Unlock()
 		}
 		first = false
 		tctx, cancel := context.WithCancel(ctx)
@@ -626,7 +661,8 @@ func (c *Client) runDevice(ctx context.Context) {
 		c.mu.Unlock()
 		watched := make(chan struct{})
 		if want {
-			go func() { c.watchPlace(tctx, cancel); close(watched) }()
+			at := retryAt
+			go func() { c.watchPlace(tctx, cancel, at); close(watched) }()
 		} else {
 			close(watched)
 		}
@@ -637,13 +673,26 @@ func (c *Client) runDevice(ctx context.Context) {
 }
 
 // watchPlace ends reading along when the mixer's place becomes free while
-// full control is wanted (the screen is gone, the mixer restarted).
-func (c *Client) watchPlace(ctx context.Context, switchMode context.CancelFunc) {
+// full control is wanted (the screen is gone, the mixer restarted), or at
+// retryAt (not zero) to take the place over again.
+func (c *Client) watchPlace(ctx context.Context, switchMode context.CancelFunc, retryAt time.Time) {
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
+	var retry <-chan time.Time
+	if !retryAt.IsZero() {
+		timer := time.NewTimer(time.Until(retryAt))
+		defer timer.Stop()
+		retry = timer.C
+	}
 	for {
 		select {
 		case <-ctx.Done():
+			return
+		case <-retry:
+			c.mu.Lock()
+			c.takeover = true
+			c.mu.Unlock()
+			switchMode()
 			return
 		case <-t.C:
 			if placeFree(c.Port()) {
