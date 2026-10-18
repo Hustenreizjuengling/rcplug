@@ -19,10 +19,13 @@ FORCE_DIR=""
 INITDIR="${RCPLUG_INITDIR:-/etc/init.d}"
 
 fail() { echo "rcplug: $*" >&2; exit 1; }
-# step: during an in-app update (RCPLUG_STEPS set by rcplugd), each step with
-# the time and the free memory, to see what an update does to the device.
+# step: during an in-app update (RCPLUG_STEPS set by rcplugd; older versions
+# do not set it, but unpack the package to .update/payload), each step with the
+# time and the free memory, to see what an update does to the device.
 step() {
-  [ -n "${RCPLUG_STEPS:-}" ] || return 0
+  if [ -z "${RCPLUG_STEPS:-}" ]; then
+    case "$SRC" in */.update/payload) ;; *) return 0;; esac
+  fi
   echo "rcplug: $(date +%H:%M:%S) $* (free memory $(awk '/^MemAvailable:/ {print int($2/1024)}' /proc/meminfo 2>/dev/null) MB)"
 }
 

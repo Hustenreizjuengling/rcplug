@@ -21,6 +21,8 @@ may break compatibility).
   instead of thirteen "output" meters: the meter order assumed before was wrong.
   The layout's `outputMeters` is replaced by `masterMeter`, `focusMeters` and
   `reductionMeters`; the simulator follows the real order.
+- The installer logs each step of an in-app update also when the update was started
+  by a version before 0.6.2.
 
 ## 0.6.2 - 2026-10-18
 
