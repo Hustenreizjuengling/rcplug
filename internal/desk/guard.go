@@ -251,6 +251,29 @@ func ClientsOf(port int) ([]Peer, error) {
 	return clients, nil
 }
 
+// busyHolder names the client holding the desk when its port refuses
+// connections: rc_audio_mixer serves one client at a time and closes its
+// listener while that client (normally the device's GUI) is connected. It
+// returns "" when something listens on port or nobody is connected.
+func busyHolder(port int) string {
+	if listener(port) != "" {
+		return ""
+	}
+	clients, err := ClientsOf(port)
+	if err != nil {
+		return ""
+	}
+	var names []string
+	for _, p := range clients {
+		if p.Comm != "" {
+			names = append(names, fmt.Sprintf("%s (pid %d)", p.Comm, p.PID))
+		} else {
+			names = append(names, p.Remote)
+		}
+	}
+	return strings.Join(names, ", ")
+}
+
 type owner struct {
 	pid  int
 	comm string

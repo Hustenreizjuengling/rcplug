@@ -93,6 +93,10 @@ func WriteDiagnostics(ctx context.Context, w io.Writer, in DiagnosticsInput) err
 		}
 	}
 	add("system/processes.txt", []byte(processTable()))
+	add("system/sockets.txt", []byte(socketTable()))
+	if t := dbusTable(ctx); t != "" {
+		add("system/dbus.txt", []byte(t))
+	}
 	if out := commandOutput(ctx, 3*time.Second, "dmesg"); out != nil {
 		add("system/dmesg.txt", tailLines(out, 400))
 	}
@@ -189,7 +193,8 @@ func diagReadme(now time.Time, in DiagnosticsInput) string {
 	b.WriteString(`Contents
   problems.txt     crashes, panics and restarts found in the logs (start here)
   rcplug.json      versions, plugin states, device vitals
-  system/          kernel, memory, mounts, processes, kernel log (dmesg)
+  system/          kernel, memory, mounts, processes, network and unix sockets
+                   with their processes, D-Bus names, kernel log (dmesg)
   config/          rcplug settings (passwords, PINs and keys masked)
   logs/            host and plugin logs (logs/memory: the host's in-memory copy)
   plugins/<name>/  what each running plugin reports about itself

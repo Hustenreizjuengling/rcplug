@@ -16,19 +16,21 @@ This page explains each safeguard and its limits.
 
 ## The device's own screen: the GUI guard
 
-The touch screen is a client of the same control port the console uses. The firmware
-serves several clients at once (1.7.3 and 1.7.6: the mixer keeps a list of connections
-and forwards every change to all others, see [protocol.md](protocol.md)), so the
-console and the screen can share the port. Should a future firmware behave
-differently, the console could push the screen's connection out, so the console
-still guards against that:
+The touch screen is a client of the same control port the console uses, and the
+firmware serves **one client at a time** (1.7.3 and 1.7.6, seen on a real Duo; see
+[protocol.md](protocol.md)): while the screen is connected nobody else gets in, and a
+client that connects before the screen would lock it out. So the console:
 
-1. **waits after boot** until the system has been up for 75 s, so the screen is
+1. **never retries a busy desk by itself**: when the port refuses connections while
+   another client holds it, the console shows *busy* (`desk_busy`, naming the
+   process, normally `rc_gui_juce`) and waits for an explicit *Reconnect*. A retry
+   could otherwise take the slot in the moment the screen reconnects after a restart;
+2. **waits after boot** until the system has been up for 75 s, so the screen is
    connected first (`--boot-grace`);
-2. **compares connections**: before connecting it reads all established connections
+3. **compares connections**: before connecting it reads all established connections
    to port 2345 from `/proc/net/tcp`; two seconds after the full sync it reads them
    again;
-3. **steps back for good** if a connection that existed before has disappeared: it
+4. **steps back for good** if a connection that existed before has disappeared: it
    disconnects at once and enters the `conflict` state. The same check runs at once
    if the desk drops the console before the two seconds are over (a single-client desk
    whose GUI reconnected). The console does **not** retry on its own. It shows the

@@ -27,7 +27,7 @@ export default {
   'state.connecting': 'Connecting…', 'state.syncing': 'Loading device state…', 'state.backoff': 'Disconnected', 'state.retryIn': 'retrying in {n} s',
   'state.conflict': 'Protection active: when the console connected, another client (probably the device’s own screen) lost its connection. The console stays disconnected until you choose “Reconnect”.',
   'state.stopped': 'Stopped',
-  'code.boot_grace': 'device starting', 'code.connect_failed': 'mixer not reachable', 'code.no_full_sync': 'no device state received',
+  'code.boot_grace': 'device starting', 'code.connect_failed': 'mixer not reachable', 'code.desk_busy': 'busy – the mixer serves one client at a time and the device’s own screen holds it', 'code.no_full_sync': 'no device state received',
   'code.disconnected': 'connection closed', 'code.desync': 'out of sync, reloading', 'code.guard_conflict': 'protection active',
   'guard.active': 'active', 'guard.off': 'off', 'guard.remote': 'not needed (remote device)', 'guard.unavailable': 'unavailable',
 

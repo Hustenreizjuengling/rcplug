@@ -22,10 +22,12 @@ dazu ein [Kochbuch](docs/cookbook.md) und die [Schnittstellen-Referenz](docs/plu
 > **Stand: früh und inoffiziell.** Alles wurde **offline** getestet: gegen einen
 > Simulator, der einen echten Duo-Gerätezustand (Firmware 1.7.4) abspielt, mit den
 > arm64-Programmen unter QEMU und installiert in die Original-Firmware 1.7.6 und 1.7.3.
-> **Auf einem echten Gerät lief es noch nicht.** Was nur ein laufendes Gerät zeigen
-> kann, steht in [docs/device-notes.md](docs/device-notes.md). Deshalb ist die Konsole
-> nach der Installation nur lesend und zieht sich zurück, wenn sie merkt, dass sie die
-> Geräteoberfläche stören könnte.
+> **Erster Test an einem echten Duo (Firmware 1.7.6):** Flashen, SSH, Installer,
+> Dashboard und Plugins funktionieren. Die Konsole erreicht das Mischpult noch nicht:
+> Es bedient nur einen Client gleichzeitig, und den belegt der Bildschirm des Geräts.
+> Die Konsole wird dafür umgebaut ([docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo),
+> Englisch); sie nimmt dem Bildschirm nie den Platz weg. Nach der Installation ist sie
+> nur lesend.
 >
 > rcplug steht in keiner Verbindung zu RØDE. Nutzung auf eigene Gefahr; bitte den
 > Haftungsausschluss unten lesen.
@@ -49,7 +51,7 @@ einsetzen, die nicht ausfallen darf.
 
 | Gerät | Stand |
 |---|---|
-| RØDECaster Duo, Firmware 1.7.x | Gegen einen echten Gerätezustand und die Original-Firmware entwickelt; Spiegel und Steuerung umgesetzt. Erster Test auf Hardware steht aus. |
+| RØDECaster Duo, Firmware 1.7.x | Läuft auf einem echten Duo (1.7.6): Host, Dashboard, In-App-Updates und Plugins. Spiegel und Steuerung der Konsole sind umgesetzt, kommen aber noch nicht ans Mischpult (es bedient nur den Bildschirm des Geräts); wird umgebaut. |
 | RØDECaster Pro II | Wird erkannt und **nur lesend** angezeigt. Steuerung braucht ein geprüftes Profil, siehe [docs/adding-a-model.md](docs/adding-a-model.md). |
 | Andere / unbekannt | Nur lesend. |
 

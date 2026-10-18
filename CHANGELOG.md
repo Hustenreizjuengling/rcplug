@@ -6,6 +6,22 @@ may break compatibility).
 
 ## 0.5.1 - Unreleased
 
+### Added
+- Diagnostics: `system/sockets.txt` lists the TCP and UDP sockets (listening and
+  connected) and the named unix sockets with the processes owning them, both ends of
+  a local connection named, public addresses cut short; `system/dbus.txt` lists the
+  names on the D-Bus system bus with their processes.
+
+### Changed
+- The console says why the mixer refuses it: when its port is held by another client
+  (on the Duo the device's own screen; the mixer serves one client at a time), the
+  state is *busy* (`desk_busy`, with the holding process) instead of "not reachable",
+  and the console no longer retries by itself, so it can never take the screen's
+  place when the screen reconnects. *Reconnect* tries again.
+- Docs: the first test on a real Duo (flashing from Windows, SSH, installer,
+  dashboard and plugins work; the mixer serves one client at a time) in
+  docs/device-notes.md, docs/protocol.md, docs/safety.md, the READMEs and the roadmap.
+
 ## 0.5.0 - 2026-10-18
 
 rcplug is now three repositories: this one (host, console, SDK, simulator, device

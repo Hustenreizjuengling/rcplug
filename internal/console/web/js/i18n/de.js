@@ -27,7 +27,7 @@ export default {
   'state.connecting': 'Verbinde…', 'state.syncing': 'Lade Gerätezustand…', 'state.backoff': 'Getrennt', 'state.retryIn': 'neuer Versuch in {n} s',
   'state.conflict': 'Schutz aktiv: Beim Verbinden hat ein anderer Client (vermutlich die Oberfläche am Gerät) seine Verbindung verloren. Die Konsole bleibt getrennt, bis du „Erneut verbinden“ wählst.',
   'state.stopped': 'Gestoppt',
-  'code.boot_grace': 'Gerät startet', 'code.connect_failed': 'Mischpult nicht erreichbar', 'code.no_full_sync': 'kein Gerätezustand empfangen',
+  'code.boot_grace': 'Gerät startet', 'code.connect_failed': 'Mischpult nicht erreichbar', 'code.desk_busy': 'belegt – das Mischpult bedient nur einen Client, und die Oberfläche am Gerät hält ihn', 'code.no_full_sync': 'kein Gerätezustand empfangen',
   'code.disconnected': 'Verbindung beendet', 'code.desync': 'Abweichung erkannt, lade neu', 'code.guard_conflict': 'Schutz aktiv',
   'guard.active': 'aktiv', 'guard.off': 'aus', 'guard.remote': 'nicht nötig (entferntes Gerät)', 'guard.unavailable': 'nicht verfügbar',
 

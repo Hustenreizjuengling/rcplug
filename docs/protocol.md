@@ -9,16 +9,25 @@ messages over USB HID. rcplug's implementation is in
 [`internal/desk`](../internal/desk) (the connection).
 
 What the server does, read from `rc_audio_mixer` in firmware 1.7.6 and 1.7.3
-(static analysis; a JUCE `InterprocessConnectionServer` subclass, `SyncMultiServer`):
+(static analysis; a JUCE `InterprocessConnectionServer` subclass,
+`TCPSyncTreeServerConnection`) and seen on a real Duo with 1.7.6:
 
 - It listens on **127.0.0.1:2345 only**, so a client runs on the device (as rcplug
   does) or comes through an SSH tunnel.
-- It serves **several clients at once**: every accepted connection is added to a list
-  and gets its own synchroniser, and each change is forwarded to every other
-  connection. There is no client limit, handshake or authentication.
+- It serves **one client at a time**. When a client connects, the server stops its
+  accept thread and closes the listening socket; only when that client disconnects
+  does it listen again. The device's own screen (`rc_gui_juce`) connects at boot and
+  holds the connection, so any other client gets "connection refused", and a client
+  that came first would lock the screen out. There is no handshake or
+  authentication. (An earlier reading of the code took the connection slot for a list;
+  the first test on hardware showed otherwise.)
 - On connect it sends the full tree at once.
 - A second server of the same kind on 127.0.0.1:2346 is an internal link to the
-  call engine (`callme-t`); rcplug does not use it.
+  call engine (`callme-t`), which holds it; rcplug does not use it.
+- The mixer also registers an object `/org/rodemicrophones/rodecaster/rcui` on the
+  D-Bus system bus. It is not a way to the state: no bus policy lets anyone call it,
+  the binary cannot emit the signals its interface declares, and the methods that
+  would return the tree are commented out in it.
 
 ## Transport
 

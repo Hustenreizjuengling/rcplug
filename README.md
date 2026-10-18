@@ -20,10 +20,11 @@ this repository. Start with the [plugin guide](docs/plugin-guide.md).
 > **Status: early and unofficial.** Everything has been tested **offline**: against a
 > simulator that replays a real Duo state capture (firmware 1.7.4), with the arm64
 > binaries under QEMU, and installed into the stock firmware images 1.7.6 and 1.7.3.
-> **It has not run on a physical device yet.** What only a running device can show is
-> listed in [docs/device-notes.md](docs/device-notes.md). This is why a fresh install is
-> read-only, and why the console steps back if it notices it might disturb the
-> device's own screen.
+> **First test on a real Duo (firmware 1.7.6):** flashing, SSH, the installer, the
+> dashboard and the plugins work. The console cannot reach the mixer yet: the mixer
+> serves one client at a time and the device's own screen holds it. The console is
+> being reworked for that ([docs/device-notes.md](docs/device-notes.md#first-test-on-a-real-duo));
+> it never takes the screen's place. A fresh install is read-only.
 >
 > rcplug is not affiliated with or endorsed by RØDE. Use it at your own risk; read the
 > disclaimer below.
@@ -45,7 +46,7 @@ data or your productions. Do not use it during a show that must not fail.
 
 | Device | Status |
 |---|---|
-| RØDECaster Duo, firmware 1.7.x | Developed against a real state capture and the stock firmware; mirror and control implemented. Waiting for its first test on hardware. |
+| RØDECaster Duo, firmware 1.7.x | Runs on a real Duo (1.7.6): host, dashboard, in-app updates and plugins. The console's mirror and control are implemented but cannot connect yet (the mixer serves only the device's screen); being reworked. |
 | RØDECaster Pro II | Recognised and shown **read-only**. Control needs a verified profile; see [docs/adding-a-model.md](docs/adding-a-model.md). |
 | Other / unknown | Shown read-only. |
 

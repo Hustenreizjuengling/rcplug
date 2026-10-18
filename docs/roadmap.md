@@ -8,15 +8,21 @@ show. Ideas and comments are welcome as issues.
 (the whole desk in the browser); Sonar; the toolkit for SSH access, flashing,
 installing and diagnostics on Windows and Linux; an SDK, a guide and a cookbook for
 plugin authors. Everything is tested against the stock firmware images, a simulator
-and under emulation, **not yet on a physical Duo**.
+and under emulation, and the first test on a real Duo passed for flashing, the host
+and the plugins ([device-notes.md](device-notes.md#first-test-on-a-real-duo)).
 
 ## Now: from "tested offline" to "works on a Duo"
 
-1. **First run on hardware**, following [device-notes.md](device-notes.md#a-careful-first-test),
-   and answers to its open questions: meter mapping and scale, gain ranges, screen
-   capture next to the GUI, CPU load of the JACK bridge, flashing from Windows.
-2. **Public release**: repositories public, signed 0.5.0 releases of all three
-   projects, toolkit downloads for Windows, macOS and Linux.
+1. **The console on a single-client mixer.** On the real Duo the mixer serves one
+   client and the device's screen holds it. Plan: (a) a mirror that reads the
+   screen's connection alongside it on the loopback interface, without being a
+   client, started before the screen at boot (read-only, cannot disturb the desk);
+   (b) control through the front-panel emulation (mute, listen, pads, pages, the
+   wheel), whose effect the mirror then shows; (c) later and experimental, a relay
+   that holds the mixer's slot for the screen, for settings without a button.
+2. **The rest of the first run on hardware**: meter mapping and scale, gain ranges,
+   screen capture next to the GUI, CPU load of the JACK bridge
+   ([device-notes.md](device-notes.md#assumptions-to-confirm-on-hardware)).
 3. **First in-app update on hardware** (0.5.0 → 0.5.1): HTTPS with the firmware's CA
    store and clock, the installer and its rollback under the real init system.
 

@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -377,6 +379,94 @@ func TestProcNetParsing(t *testing.T) {
 	ip, port, ok := splitHexAddr("0000000000000000FFFF00000100007F:0929")
 	if !ok || ip != "127.0.0.1" || port != 2345 {
 		t.Fatalf("v4-mapped: %s %d %v", ip, port, ok)
+	}
+}
+
+// As seen on a Duo with firmware 1.7.6: the GUI holds the only client slot,
+// so nothing listens on 2345 and a further client is refused.
+func TestBusyHolderNamesTheClientHoldingTheDesk(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "tcp")
+	held := "  sl  local_address rem_address   st\n" +
+		"  10: 0100007F:0929 0100007F:B204 01 00000000:00000000 00:00000000 00000000     0        0 16434 1\n" +
+		"  11: 0100007F:B204 0100007F:0929 01 00000000:00000000 00:00000000 00000000     0        0 16439 1\n" +
+		"   6: 0100007F:0929 0100007F:B20C 08 00000000:00000001 00:00000000 00000000     0        0 14497 1\n"
+	_ = os.WriteFile(f, []byte(held), 0644)
+	old := procNetFiles
+	procNetFiles = []string{f}
+	defer func() { procNetFiles = old }()
+	if got := busyHolder(2345); got != "127.0.0.1:45572" { // no such inode here, so no process name
+		t.Fatalf("busyHolder = %q", got)
+	}
+	_ = os.WriteFile(f, []byte(held+"   0: 0100007F:0929 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 100 1\n"), 0644)
+	if got := busyHolder(2345); got != "" {
+		t.Fatalf("with a listener: busyHolder = %q", got)
+	}
+	_ = os.WriteFile(f, []byte("  sl  local_address rem_address   st\n"), 0644)
+	if got := busyHolder(2345); got != "" {
+		t.Fatalf("nobody connected: busyHolder = %q", got)
+	}
+}
+
+// Like rc_audio_mixer: a server that closes its listener once its one client
+// is connected. The console must say who holds the desk instead of "not
+// reachable".
+func TestRefusedBecauseTheOnlySlotIsTaken(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("reads /proc")
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	holder, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer holder.Close()
+	served, err := ln.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer served.Close()
+	ln.Close() // the slot is taken: no listener any more
+	port := ln.Addr().(*net.TCPAddr).Port
+	want := fmt.Sprintf("(pid %d)", os.Getpid())
+	if got := busyHolder(port); !strings.Contains(got, want) {
+		t.Fatalf("busyHolder = %q, want the test process %s", got, want)
+	}
+	c, _ := run(t, Config{Addr: ln.Addr().String()})
+	waitFor(t, "desk_busy", func() bool { return c.Status().Code == "desk_busy" })
+	if st := c.Status(); !strings.Contains(st.Error, "serves one client at a time") || !strings.Contains(st.Error, want) || st.NextRetry != 0 {
+		t.Fatalf("status %+v", st)
+	}
+
+	// The slot frees up (the holder reconnects in a moment): the console must
+	// not take it by itself, only after an explicit reconnect.
+	holder.Close()
+	served.Close()
+	again, err := net.Listen("tcp", ln.Addr().String())
+	if err != nil {
+		t.Skipf("cannot listen on %s again: %v", ln.Addr(), err)
+	}
+	defer again.Close()
+	accepted := make(chan net.Conn, 1)
+	go func() {
+		if conn, err := again.Accept(); err == nil {
+			accepted <- conn
+		}
+	}()
+	select {
+	case conn := <-accepted:
+		conn.Close()
+		t.Fatal("the console retried by itself and took the free slot")
+	case <-time.After(2500 * time.Millisecond): // longer than the first backoff steps
+	}
+	c.Reconnect()
+	select {
+	case conn := <-accepted:
+		conn.Close()
+	case <-time.After(5 * time.Second):
+		t.Fatal("no connection after an explicit reconnect")
 	}
 }
 

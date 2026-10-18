@@ -315,6 +315,27 @@ func (c *Client) Run(ctx context.Context) {
 		} else if err != nil {
 			msg = err.Error()
 		}
+		if code == "desk_busy" {
+			// The mixer serves one client at a time and someone (normally the
+			// device's screen) holds it. A retry could take the screen's place
+			// the moment it reconnects, so only an explicit reconnect tries again.
+			c.mu.Lock()
+			c.retryAt = time.Time{}
+			c.mu.Unlock()
+			c.setState(StateBackoff, code, msg)
+			c.cfg.Logf("desk: %s; not retrying until a manual reconnect", msg)
+			select {
+			case <-c.kick:
+			default:
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-c.kick:
+				backoff = time.Second
+				continue
+			}
+		}
 		c.mu.Lock()
 		c.retryAt = time.Now().Add(backoff)
 		c.mu.Unlock()
@@ -383,6 +404,11 @@ func (c *Client) session(ctx context.Context) error {
 		}
 	}
 	if err != nil {
+		if errors.Is(err, syscall.ECONNREFUSED) && isLocalAddr(addr) {
+			if who := busyHolder(c.Port()); who != "" {
+				return sessionErr("desk_busy", "%s accepts no further client: rc_audio_mixer serves one client at a time and %s holds it", addr, who)
+			}
+		}
 		return sessionErr("connect_failed", "connecting to %s: %w", addr, err)
 	}
 	if tc, ok := conn.(*net.TCPConn); ok {
