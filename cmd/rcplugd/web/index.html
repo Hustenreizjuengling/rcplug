@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rcplug · RØDECaster</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Ccircle cx=%228%22 cy=%228%22 r=%227%22 fill=%22%2319c37d%22/%3E%3Ccircle cx=%228%22 cy=%228%22 r=%223%22 fill=%22%230d1015%22/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0d1015; --panel:#151a21; --panel2:#1c232c; --line:#2a333f;
+    --fg:#e7edf3; --muted:#9aa8b6; --accent:#19c37d; --blue:#2f81f7;
+    --danger:#f85149; --warn:#e3a008;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+    font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;font-weight:650;white-space:nowrap}
+  header .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  header .dot.off{background:var(--danger);box-shadow:none}
+  .vitals{display:flex;gap:14px;color:var(--muted);font-size:12px;margin-left:auto;flex-wrap:wrap}
+  .vitals b{color:var(--fg);font-weight:600}
+  nav{display:flex;gap:2px;padding:0 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav a{padding:9px 12px;color:var(--muted);text-decoration:none;white-space:nowrap;border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px}
+  nav a:hover{color:var(--fg)}
+  nav a.on{color:var(--fg);border-bottom-color:var(--accent)}
+  nav a .st{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  nav a .st.running{background:var(--accent)}
+  nav a .st.backoff{background:var(--warn)}
+  nav .sep{flex:1}
+  #view{flex:1;min-height:0;display:flex;flex-direction:column}
+  iframe{flex:1;border:0;width:100%;background:var(--bg)}
+  .page{max-width:960px;margin:0 auto;padding:20px;width:100%;overflow:auto}
+  .grid{display:grid;gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card h2{margin:0 0 2px;font-size:16px}
+  .card .desc{color:var(--muted);font-size:13px;margin:0 0 12px}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .tag{font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  .tag.running{color:var(--accent);border-color:var(--accent)}
+  .tag.starting{color:var(--blue);border-color:var(--blue)}
+  .tag.backoff{color:var(--warn);border-color:var(--warn)}
+  .spacer{flex:1}
+  button,.btn{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);padding:7px 14px;text-decoration:none}
+  button:hover,.btn:hover{border-color:var(--blue)}
+  button:disabled{opacity:.5;cursor:default}
+  button.primary,.btn.primary{background:var(--accent);border-color:var(--accent);color:#04261a;font-weight:600}
+  button.danger{color:var(--danger);border-color:var(--danger);background:transparent}
+  button.small{padding:3px 10px;font-size:12px}
+  .logs{margin-top:12px;background:#0a0d12;border:1px solid var(--line);border-radius:8px;padding:10px;
+    font:12px ui-monospace,Menlo,Consolas,monospace;color:#c9d4df;max-height:240px;overflow:auto;white-space:pre-wrap}
+  .muted{color:var(--muted)}
+  .empty{color:var(--muted);text-align:center;padding:50px 20px}
+  .linkbtn{background:none;border:none;color:var(--muted);text-decoration:underline;padding:0;font-size:12px}
+  .banner{background:#2a2110;border:1px solid var(--warn);color:#ffe2a3;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px}
+  .error{color:#ffb3ae;font-size:12px}
+  dl.kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin:0}
+  dl.kv dt{color:var(--muted)} dl.kv dd{margin:0}
+  .bar{height:6px;background:#0a0d12;border-radius:3px;overflow:hidden;border:1px solid var(--line);margin-top:4px}
+  .bar i{display:block;height:100%;background:var(--accent)}
+  .note{color:var(--muted);font-size:12px;margin-top:16px}
+  @media (max-width:700px){ .vitals{margin-left:0;width:100%} }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="dot" aria-hidden="true"></span>
+  <h1 id="title">rcplug</h1>
+  <div class="vitals" id="vitals" aria-live="polite"></div>
+  <button type="button" class="small" id="lang"></button>
+</header>
+<nav id="nav" aria-label="Plugins"></nav>
+<div id="view"><div class="empty" id="boot"></div></div>
+<script>
+'use strict';
+const T = {
+  en: {
+    connecting: 'connecting…', offline: 'Host not reachable', cpu: 'CPU', load: 'load', ramFree: 'RAM free', up: 'up for',
+    plugins: 'Plugins', system: 'System', rescan: 'Rescan', rescanHint: 'Read the plugins folder again', skipped: 'Skipped plugin folders:',
+    none: 'No plugins installed yet.', noneHint: 'Copy a plugin folder into plugins/ and press “Rescan”.', open: 'Open', newTab: 'new tab ↗',
+    stop: 'Stop', restart: 'Restart', start: 'Start', log: 'Log', restarts: 'restarts: {n}', startpage: 'start page', audio: 'audio',
+    unknown: 'unknown plugin.json fields: {f}', notFound: 'Plugin not found.', isState: 'The plugin is {state}', autoRestart: 'It is restarted automatically…',
+    failed: 'Action failed: {err}', emptyLog: '(empty)', noLog: '(no log)', footer: 'rcplug – add-ons for the RØDECaster, without new firmware.',
+    st_running: 'running', st_starting: 'starting', st_backoff: 'restarting…', st_stopped: 'stopped',
+    sysTitle: 'System', sysDesc: 'State of the device and of the plugin host.', hostname: 'Hostname', arch: 'Architecture', temp: 'CPU temperature',
+    loadAvg: 'Load (1/5/15 min)', memory: 'Memory', disk: 'Storage (rcplug)', devUp: 'Device up for', hostUp: 'rcplug up for',
+    version: 'rcplug version', clock: 'Device time', memUsed: '{used} of {total} MB used', diskFree: '{free} MB free of {total} MB',
+    disclaimer: 'rcplug is unofficial software, not affiliated with or endorsed by RØDE Microphones. RØDE and RØDECaster are trademarks of their owner. Use at your own risk.',
+    diagTitle: 'Diagnostics', diagText: 'If something does not work: download this bundle (logs, versions, device state; passwords and keys masked) and attach it to a bug report. Review it before posting it publicly.',
+    diagButton: 'Download diagnostics',
+    days: '{d} d {h} h', hours: '{h} h {m} min', mins: '{m} min', switchLang: 'Deutsch',
+  },
+  de: {
+    connecting: 'verbinde…', offline: 'Host nicht erreichbar', cpu: 'CPU', load: 'Last', ramFree: 'RAM frei', up: 'an seit',
+    plugins: 'Plugins', system: 'System', rescan: 'Neu einlesen', rescanHint: 'Plugin-Ordner neu einlesen', skipped: 'Übersprungene Plugin-Ordner:',
+    none: 'Noch keine Plugins installiert.', noneHint: 'Plugin-Ordner nach plugins/ kopieren und „Neu einlesen“ drücken.', open: 'Öffnen', newTab: 'neuer Tab ↗',
+    stop: 'Stoppen', restart: 'Neu starten', start: 'Starten', log: 'Log', restarts: 'Neustarts: {n}', startpage: 'Startseite', audio: 'Audio',
+    unknown: 'unbekannte plugin.json-Felder: {f}', notFound: 'Plugin nicht gefunden.', isState: 'Das Plugin ist gerade {state}', autoRestart: 'Es wird automatisch neu gestartet…',
+    failed: 'Aktion fehlgeschlagen: {err}', emptyLog: '(leer)', noLog: '(kein Log)', footer: 'rcplug – Funktionen für den RØDECaster ohne neue Firmware.',
+    st_running: 'läuft', st_starting: 'startet', st_backoff: 'Neustart…', st_stopped: 'gestoppt',
+    sysTitle: 'System', sysDesc: 'Zustand des Geräts und des Plugin-Hosts.', hostname: 'Hostname', arch: 'Architektur', temp: 'CPU-Temperatur',
+    loadAvg: 'Last (1/5/15 min)', memory: 'Arbeitsspeicher', disk: 'Speicher (rcplug)', devUp: 'Gerät läuft seit', hostUp: 'rcplug läuft seit',
+    version: 'rcplug-Version', clock: 'Uhrzeit (Gerät)', memUsed: '{used} / {total} MB belegt', diskFree: '{free} MB frei von {total} MB',
+    disclaimer: 'rcplug ist inoffizielle Software und steht in keiner Verbindung zu RØDE Microphones. RØDE und RØDECaster sind Marken ihres Inhabers. Nutzung auf eigene Gefahr.',
+    diagTitle: 'Diagnose', diagText: 'Wenn etwas nicht funktioniert: dieses Paket herunterladen (Logs, Versionen, Gerätezustand; Passwörter und Schlüssel maskiert) und an einen Fehlerbericht hängen. Vor dem öffentlichen Teilen bitte durchsehen.',
+    diagButton: 'Diagnose herunterladen',
+    days: '{d} T {h} h', hours: '{h} h {m} min', mins: '{m} min', switchLang: 'English',
+  },
+};
+let lang = 'en';
+try { lang = localStorage.getItem('rcplug-lang') || ((navigator.language || '').toLowerCase().startsWith('de') ? 'de' : 'en'); } catch (e) { /* ignore */ }
+if (!T[lang]) lang = 'en';
+document.documentElement.lang = lang;
+const t = (k, p) => (T[lang][k] ?? T.en[k] ?? k).replace(/\{(\w+)\}/g, (m, n) => (p && n in p ? p[n] : m));
+
+const $ = (s, r = document) => r.querySelector(s);
+const dec = (s) => { try { return decodeURIComponent(s); } catch (e) { return s; } };
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+async function jget(u) { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+async function jpost(u) {
+  const r = await fetch(u, { method: 'POST', headers: { 'X-Rcplug': '1' } });
+  if (!r.ok) {
+    const body = (await r.text()).trim();
+    let msg = body;
+    try { msg = JSON.parse(body).error || body; } catch (e) { /* plain text */ }
+    throw new Error(msg || 'HTTP ' + r.status);
+  }
+  return r.json();
+}
+
+let plugins = [], invalid = [], sys = null, route = '', loaded = false, pageSig = '';
+const openLogs = {};
+
+function fmtUptime(s) {
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? t('days', { d, h }) : h ? t('hours', { h, m }) : t('mins', { m });
+}
+
+async function refresh() {
+  try {
+    sys = await jget('api/system');
+    $('#dot').classList.remove('off');
+    const v = [];
+    if (sys.cpuTempC !== undefined) v.push(`${t('cpu')} <b>${esc(sys.cpuTempC.toFixed(0))} °C</b>`);
+    if (sys.load) v.push(`${t('load')} <b>${esc(sys.load[0])}</b>`);
+    if (sys.memTotalKB) v.push(`${t('ramFree')} <b>${esc(Math.round(sys.memAvailableKB / 1024))} MB</b>`);
+    if (sys.systemUptimeSec !== undefined) v.push(`${t('up')} <b>${esc(fmtUptime(sys.systemUptimeSec))}</b>`);
+    v.push(`rcplug <b>${esc(sys.version)}</b>`);
+    $('#vitals').innerHTML = v.join(' · ');
+    $('#title').textContent = 'rcplug · ' + (sys.host || 'RØDECaster');
+  } catch (e) {
+    $('#dot').classList.add('off');
+    $('#vitals').textContent = t('offline');
+  }
+  try { const d = await jget('api/plugins'); plugins = d.plugins || []; invalid = d.invalid || []; loaded = true; } catch (e) { /* keep last */ }
+  renderNav();
+  if (!route) go();
+  else if (route === 'plugins') renderPlugins();
+  else if (route === 'system') renderSystem();
+  else if (route.startsWith('p/')) checkFrame();
+}
+
+const uiPlugins = () => plugins.filter((p) => p.hasUI);
+// Localised manifest texts (plugin.json "translations"), English otherwise.
+const tr = (p, k) => (p.translations && p.translations[lang] && p.translations[lang][k]) || p[k] || '';
+function defaultRoute() {
+  const ui = uiPlugins();
+  const primary = ui.find((p) => p.primary && p.enabled) || ui.find((p) => p.enabled);
+  return primary ? 'p/' + primary.name : 'plugins';
+}
+
+// A plugin route is p/<name>, optionally followed by a path or query inside
+// the plugin's UI (p/sonar?strip=physical1), e.g. from a console action.
+function frameRoute() {
+  const rest = route.slice(2);
+  const i = rest.search(/[/?]/);
+  const name = dec(i < 0 ? rest : rest.slice(0, i));
+  let sub = i < 0 ? '' : rest.slice(i).replace(/^\//, '');
+  if (sub.split(/[/?#]/).includes('..')) sub = ''; // stay inside the plugin
+  return { name, sub };
+}
+const currentPlugin = () => (route.startsWith('p/') ? frameRoute().name : null);
+
+function renderNav() {
+  const cur = currentPlugin();
+  const items = uiPlugins().map((p) => `<a href="#/p/${encodeURIComponent(p.name)}" class="${cur === p.name ? 'on' : ''}"${cur === p.name ? ' aria-current="page"' : ''}><span class="st ${esc(p.state)}" aria-hidden="true"></span>${esc(p.icon || '')} ${esc(tr(p, 'title'))}</a>`);
+  items.push('<span class="sep"></span>');
+  items.push(`<a href="#/plugins" class="${route === 'plugins' ? 'on' : ''}">${esc(t('plugins'))}</a>`);
+  items.push(`<a href="#/system" class="${route === 'system' ? 'on' : ''}">${esc(t('system'))}</a>`);
+  $('#nav').innerHTML = items.join('');
+}
+
+function go() {
+  route = location.hash.replace(/^#\/?/, '');
+  if (!route) {
+    if (!loaded) return; // refresh() calls go() again once the plugin list arrived
+    route = defaultRoute();
+    history.replaceState(null, '', '#/' + route);
+  }
+  renderNav();
+  pageSig = '';
+  if (route.startsWith('p/')) { const f = frameRoute(); renderFrame(f.name, f.sub); }
+  else if (route === 'system') renderSystem();
+  else renderPlugins();
+}
+window.addEventListener('hashchange', go);
+
+// ---- embedded plugin UI
+let frameFor = null;
+function renderFrame(name, sub = '') {
+  const p = plugins.find((x) => x.name === name);
+  const view = $('#view');
+  if (!p) { view.innerHTML = `<div class="empty">${esc(t('notFound'))}</div>`; frameFor = null; return; }
+  if (!p.running) {
+    frameFor = null;
+    view.innerHTML = `<div class="page"><div class="card"><h2>${esc(tr(p, 'title'))}</h2><p class="desc">${esc(tr(p, 'description'))}</p>
+      <p>${esc(t('isState', { state: t('st_' + p.state) }))}${p.lastErr ? ' (' + esc(p.lastErr) + ')' : ''}.</p>
+      ${p.enabled ? `<p class="muted">${esc(t('autoRestart'))}</p>` : `<button class="primary" id="startIt">${esc(t('start'))}</button>`}<p class="error" id="err"></p></div></div>`;
+    const b = $('#startIt');
+    if (b) b.onclick = () => act(p.name, 'enable', b);
+    return;
+  }
+  if (frameFor === name + '|' + sub && $('#view iframe')) return;
+  frameFor = name + '|' + sub;
+  view.innerHTML = `<iframe src="plugins/${encodeURIComponent(name)}/${esc(sub)}" title="${esc(tr(p, 'title'))}" allow="fullscreen"></iframe>`;
+}
+function checkFrame() {
+  const { name, sub } = frameRoute();
+  const p = plugins.find((x) => x.name === name);
+  if (!p || (frameFor === name + '|' + sub) !== !!p.running) renderFrame(name, sub);
+}
+
+async function act(name, action, btn) {
+  if (btn) btn.disabled = true;
+  try { await jpost(`api/plugins/${encodeURIComponent(name)}/${action}`); }
+  catch (e) { const el = $('#err') || $(`.card[data-name="${CSS.escape(name)}"] .error`); if (el) el.textContent = t('failed', { err: e.message }); }
+  setTimeout(() => { if (btn) btn.disabled = false; refresh(); }, 400);
+}
+
+// ---- plugin management (rebuilt only when something changed, so focus,
+// open logs and scroll positions survive the periodic refresh)
+function renderPlugins() {
+  frameFor = null;
+  const sig = JSON.stringify([plugins, invalid, lang]);
+  if (sig === pageSig && $('#view .page')) { refreshLogs(); return; }
+  pageSig = sig;
+  let html = '<div class="page">';
+  if (invalid.length) html += `<div class="banner"><b>${esc(t('skipped'))}</b><br>${invalid.map(esc).join('<br>')}</div>`;
+  html += `<div class="row" style="margin-bottom:14px"><h2 style="margin:0;font-size:18px">${esc(t('plugins'))}</h2><span class="spacer"></span><button id="rescan" title="${esc(t('rescanHint'))}">${esc(t('rescan'))}</button></div><div class="grid">`;
+  if (!plugins.length) html += `<div class="empty">${esc(t('none'))}<br>${esc(t('noneHint'))}</div>`;
+  for (const p of plugins) {
+    const st = p.state || 'stopped';
+    html += `<div class="card" data-name="${esc(p.name)}">
+      <div class="row"><h2>${esc(p.icon || '')} ${esc(tr(p, 'title'))}</h2><span class="tag">v${esc(p.version || '?')}</span>${p.needsAudio ? `<span class="tag">${esc(t('audio'))}</span>` : ''}${p.primary ? `<span class="tag">${esc(t('startpage'))}</span>` : ''}
+        <span class="spacer"></span><span class="tag ${esc(st)}">${esc(t('st_' + st))}${p.pid ? ' · PID ' + esc(p.pid) : ''}</span></div>
+      <p class="desc">${esc(tr(p, 'description'))}</p>
+      ${p.unknownFields ? `<p class="error">${esc(t('unknown', { f: p.unknownFields.join(', ') }))}</p>` : ''}
+      <div class="row">
+        ${p.hasUI ? `<a class="btn" href="#/p/${encodeURIComponent(p.name)}">${esc(t('open'))}</a><a class="btn" href="plugins/${encodeURIComponent(p.name)}/" target="_blank" rel="noopener">${esc(t('newTab'))}</a>` : ''}
+        ${p.enabled ? `<button class="danger" data-act="disable">${esc(t('stop'))}</button><button data-act="restart">${esc(t('restart'))}</button>` : `<button class="primary" data-act="enable">${esc(t('start'))}</button>`}
+        <button class="linkbtn" data-act="logs" aria-expanded="${!!openLogs[p.name]}">${esc(t('log'))}</button>
+        ${p.restarts ? `<span class="muted" style="font-size:12px">${esc(t('restarts', { n: p.restarts }))}</span>` : ''}
+        ${p.lastErr && st !== 'running' ? `<span style="font-size:12px;color:var(--warn)">${esc(p.lastErr)}</span>` : ''}
+      </div><p class="error"></p><pre class="logs" ${openLogs[p.name] ? '' : 'hidden'}></pre></div>`;
+  }
+  html += `</div><p class="note" style="text-align:center">${esc(t('footer'))}</p></div>`;
+  $('#view').innerHTML = html;
+  $('#rescan').onclick = async (e) => {
+    e.target.disabled = true;
+    try { await jpost('api/reload'); } catch (x) { alert(t('failed', { err: x.message })); }
+    e.target.disabled = false;
+    refresh();
+  };
+  document.querySelectorAll('#view .card[data-name]').forEach((c) => {
+    const name = c.dataset.name, logsEl = $('.logs', c);
+    c.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.act === 'logs') {
+        openLogs[name] = !openLogs[name];
+        logsEl.hidden = !openLogs[name];
+        b.setAttribute('aria-expanded', String(!!openLogs[name]));
+        if (openLogs[name]) loadLogs(name, logsEl);
+        return;
+      }
+      act(name, b.dataset.act, b);
+    }));
+  });
+  refreshLogs();
+}
+function refreshLogs() {
+  for (const [name, open] of Object.entries(openLogs)) {
+    const el = $(`.card[data-name="${CSS.escape(name)}"] .logs`);
+    if (open && el) loadLogs(name, el);
+  }
+}
+async function loadLogs(name, el) {
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
+  try {
+    const d = await jget(`api/plugins/${encodeURIComponent(name)}/logs`);
+    el.textContent = (d.lines || []).join('\n') || t('emptyLog');
+    if (atBottom) el.scrollTop = el.scrollHeight;
+  } catch (e) { el.textContent = t('noLog'); }
+}
+
+// ---- system page
+function renderSystem() {
+  frameFor = null;
+  if (!sys) { $('#view').innerHTML = `<div class="empty">${esc(t('offline'))}</div>`; return; }
+  const mem = sys.memTotalKB ? `${esc(t('memUsed', { used: Math.round((sys.memTotalKB - sys.memAvailableKB) / 1024), total: Math.round(sys.memTotalKB / 1024) }))}<div class="bar"><i style="width:${((1 - sys.memAvailableKB / sys.memTotalKB) * 100).toFixed(0)}%"></i></div>` : '—';
+  const disk = sys.diskTotalMB ? `${esc(t('diskFree', { free: sys.diskFreeMB, total: sys.diskTotalMB }))}<div class="bar"><i style="width:${((1 - sys.diskFreeMB / sys.diskTotalMB) * 100).toFixed(0)}%"></i></div>` : '—';
+  const row = (k, v) => `<dt>${esc(t(k))}</dt><dd>${v}</dd>`;
+  $('#view').innerHTML = `<div class="page"><div class="card"><h2>${esc(t('sysTitle'))}</h2><p class="desc">${esc(t('sysDesc'))}</p><dl class="kv">
+    ${row('hostname', esc(sys.host))}${row('arch', esc(sys.arch + '/' + sys.os))}
+    ${row('temp', sys.cpuTempC !== undefined ? esc(sys.cpuTempC.toFixed(1)) + ' °C' : '—')}${row('loadAvg', sys.load ? esc(sys.load.join(' / ')) : '—')}
+    ${row('memory', mem)}${row('disk', disk)}
+    ${row('devUp', sys.systemUptimeSec !== undefined ? esc(fmtUptime(sys.systemUptimeSec)) : '—')}${row('hostUp', esc(fmtUptime(sys.uptimeSec)))}
+    ${row('version', esc(sys.version))}${row('clock', esc(new Date(sys.time).toLocaleString(lang)))}
+  </dl></div>
+  <div class="card" style="margin-top:14px"><h2>${esc(t('diagTitle'))}</h2><p class="desc">${esc(t('diagText'))}</p>
+    <a class="btn primary" href="api/diagnostics" download>${esc(t('diagButton'))}</a></div>
+  <p class="note">${esc(t('disclaimer'))}</p></div>`;
+}
+
+$('#lang').textContent = t('switchLang');
+$('#lang').addEventListener('click', () => {
+  try { localStorage.setItem('rcplug-lang', lang === 'de' ? 'en' : 'de'); } catch (e) { /* ignore */ }
+  location.reload();
+});
+$('#boot').textContent = t('connecting');
+(async () => { await refresh(); setInterval(refresh, 4000); })();
+</script>
+</body>
+</html>

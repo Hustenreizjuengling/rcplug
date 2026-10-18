@@ -1,0 +1,37 @@
+name: Device report
+description: Report how rcplug works on a model or firmware version not listed in the README.
+labels: [device-support]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This helps to add models (see docs/adding-a-model.md). Attach a capture made with
+        `rccapture` only in its default, **sanitized** form – never use `--raw` for a report.
+  - type: input
+    id: device
+    attributes:
+      label: Model and firmware
+      placeholder: RØDECaster Pro II, firmware 1.6.8
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: rcplug version
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Console status
+      description: The "Connection" and "Console" cards of the console's System page.
+  - type: textarea
+    id: notes
+    attributes:
+      label: What works, what does not?
+  - type: checkboxes
+    id: capture
+    attributes:
+      label: Capture
+      options:
+        - label: I attached a sanitized capture (`rccapture --out <file>`), and I checked it contains nothing personal.

@@ -1,0 +1,89 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          rcplug
+# Required-Start:
+# Required-Stop:
+# Default-Start:     5
+# Default-Stop:
+# Short-Description: rcplug plugin host (add-ons for the RØDECaster)
+### END INIT INFO
+#
+# /etc/init.d/rcplug: starts the rcplug plugin host.
+# RCPLUG_DIR and RCPLUG_ADDR are filled in by the installer.
+
+RCPLUG_DIR="__RCPLUG_DIR__"
+RCPLUG_ADDR="__RCPLUG_ADDR__"
+BIN="$RCPLUG_DIR/rcplugd"
+PIDFILE="${RCPLUG_PIDFILE:-/var/run/rcplug.pid}"
+# rcplugd writes its log to $RCPLUG_DIR/logs/rcplugd.log itself; this file
+# only catches raw output, such as the stack trace of a crash. Both live in the
+# install directory, so they survive a reboot (/var/log may be in RAM).
+LOG="${RCPLUG_LOG:-$RCPLUG_DIR/logs/rcplugd.out}"
+
+# running succeeds if the PID file names a live rcplugd. Checking the command
+# line keeps a stale PID file (after a crash, with the PID reused) from
+# making us signal an unrelated process.
+running() {
+  [ -f "$PIDFILE" ] || return 1
+  pid="$(cat "$PIDFILE" 2>/dev/null)"
+  case "$pid" in ''|*[!0-9]*) return 1;; esac
+  kill -0 "$pid" 2>/dev/null || return 1
+  [ -r "/proc/$pid/cmdline" ] || return 0
+  tr '\000' ' ' < "/proc/$pid/cmdline" | grep -qF -- "$BIN"
+}
+
+do_start() {
+  if running; then
+    echo "rcplug already running (pid $pid)"
+    return 0
+  fi
+  rm -f "$PIDFILE"
+  echo "Starting rcplug"
+  [ -x "$BIN" ] || { echo "rcplug: $BIN missing" >&2; return 1; }
+  # Optional host settings, e.g. RCPLUG_ALLOW_HOST=studio.example (see
+  # docs/configuration.md). Kept across updates.
+  if [ -f "$RCPLUG_DIR/config/rcplugd.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    . "$RCPLUG_DIR/config/rcplugd.env"
+    set +a
+  fi
+  mkdir -p "$(dirname "$LOG")"
+  if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 524288 ]; then mv -f "$LOG" "$LOG.1"; fi
+  # Lowest CPU priority is set by rcplugd itself (audio always comes first).
+  # Short options: BusyBox start-stop-daemon may lack the long ones.
+  start-stop-daemon -S -b -m -p "$PIDFILE" \
+    -x /bin/sh -- -c "exec \"$BIN\" --root \"$RCPLUG_DIR\" --addr \"$RCPLUG_ADDR\" >>\"$LOG\" 2>&1" || return 1
+  # Report a host that exits right away (e.g. the port is taken).
+  sleep 1
+  running || { echo "rcplug: failed to start, see $LOG" >&2; return 1; }
+}
+
+do_stop() {
+  echo "Stopping rcplug"
+  if running; then
+    kill -TERM "$pid" 2>/dev/null
+    # rcplugd stops its plugins gracefully (up to ~3 s each, in parallel).
+    # Whole-second sleeps: BusyBox sleep may not support fractions.
+    i=0
+    while kill -0 "$pid" 2>/dev/null && [ $i -lt 10 ]; do sleep 1; i=$((i+1)); done
+    kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null
+  fi
+  rm -f "$PIDFILE"
+  return 0
+}
+
+case "$1" in
+  start)   do_start; exit $? ;;
+  stop)    do_stop; exit $? ;;
+  restart) do_stop; do_start; exit $? ;;
+  reload)
+    if running; then kill -HUP "$pid" && echo "rcplug: plugins rescanned"; exit $?; fi
+    echo "rcplug not running" >&2; exit 1 ;;
+  status)
+    if running; then echo "rcplug running (pid $pid)"; else echo "rcplug not running"; exit 1; fi ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|reload|status}"
+    exit 1 ;;
+esac
+exit 0

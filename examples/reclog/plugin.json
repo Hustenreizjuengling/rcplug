@@ -1,0 +1,18 @@
+{
+  "$schema": "../../plugin.schema.json",
+  "name": "reclog",
+  "title": "Recording log",
+  "description": "Example plugin: keeps a log of every recording (start, end, length, show) by watching the console.",
+  "version": "0.1.0",
+  "exec": ["./reclog", "--addr", "127.0.0.1:{{port}}"],
+  "httpProxy": "127.0.0.1:{{port}}",
+  "autostart": true,
+  "order": 60,
+  "icon": "⏺",
+  "translations": {
+    "de": {
+      "title": "Aufnahme-Log",
+      "description": "Beispiel-Plugin: protokolliert jede Aufnahme (Start, Ende, Länge, Show) über die Konsole."
+    }
+  }
+}

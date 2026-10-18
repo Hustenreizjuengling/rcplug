@@ -1,0 +1,244 @@
+# Console API
+
+The console plugin offers the desk's state and controls over HTTP, for its own web UI,
+for other plugins and for scripts.
+
+- From the network: `http://<device>:8080/plugins/console/`
+- From a plugin on the device: `$RCPLUG_HOST_URL/plugins/console/`
+- From Go: the client in [`sdk/console`](../sdk/console)
+
+Responses are JSON, except the screen images. Errors look like `{"error": "human readable text", "code":
+"machine_readable"}` with a matching HTTP status. The codes are listed
+[at the end](#error-codes).
+
+## Reading
+
+### `GET api/status`
+
+```json
+{
+  "connection": {"state": "live", "addr": "127.0.0.1:2345", "changesPerSecond": 1363.2, "guard": "active", "...": "..."},
+  "control": "off",
+  "controlLimit": "",
+  "readOnly": false,
+  "pinRequired": false,
+  "screen": false,
+  "panel": false,
+  "version": "0.4.0",
+  "epoch": 1,
+  "seq": 48210,
+  "stale": false,
+  "model": "duo",
+  "modelName": "RØDECaster Duo",
+  "firmware": "1.7.4",
+  "supported": true
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `connection.state` | `waiting` (boot grace), `connecting`, `syncing`, `live`, `backoff` (retrying), `conflict` (the GUI guard stepped back, see [safety.md](safety.md)), `stopped` |
+| `control` | The current control level: `off`, `basic` or `expert` |
+| `controlLimit` | Why control is limited even if a level is set: `read_only` (started with `--read-only`), `untested_model` (no verified profile), or empty |
+| `epoch` | Changes whenever the tree's structure changes. Writes must carry it. |
+| `seq` | Increases with every change the console has applied |
+| `stale` | `true` while the console is disconnected and shows the last known state |
+| `supported` | Whether the model has a verified profile that allows control |
+
+### `GET api/summary`
+
+A compact, semantic view for plugins that do not want to walk the tree. The Go type is
+`console.Summary` in [`sdk/console/types.go`](../sdk/console/types.go).
+
+```json
+{
+  "model": "duo", "modelName": "RØDECaster Duo", "name": "…", "firmware": "1.7.4",
+  "show": "Episode 7", "stale": false,
+  "strips": [
+    {"index": 0, "id": "physical1", "label": "Fader 1", "physical": true,
+     "source": 0, "sourceId": "combo1", "sourceLabel": "Mic 1",
+     "fader": 90, "faderDb": 0, "muted": false, "cue": false, "meterL": 0.42, "meterR": 0.40}
+  ],
+  "monitor": {"level": 0.55, "muted": false},
+  "bluetooth": {"level": 0.7, "muted": false},
+  "recorder": {"state": 0, "label": "ready", "timeMs": 0},
+  "padBank": 0,
+  "pads": [{"index": 0, "bank": 0, "slot": 0, "name": "Applause", "colour": 4, "active": false}]
+}
+```
+
+`recorder.state` is 0 ready, 1 paused, 2 recording, 3 no destination. `faderDb` is an
+approximation relative to the unity position (90 of 127).
+
+### `GET api/tree`
+
+The whole state:
+
+```json
+{
+  "epoch": 1, "seq": 48210, "stale": false,
+  "meta": {
+    "layout": {"model": "duo", "runs": {"CHANNEL": {"parent": [], "first": 28, "count": 10}, "...": {}}},
+    "sources": [{"id": "combo1", "label": "Mic 1"}],
+    "outputs": [{"id": "headphone1", "label": "Headphones 1"}],
+    "faders": [{"id": "physical1", "label": "Fader 1"}],
+    "control": {"level": "off", "writable": {}},
+    "controlLimit": "",
+    "unityFader": 90
+  },
+  "root": {"t": "Rodecaster", "p": {}, "y": "", "c": [
+    {"t": "CHANNEL", "p": {"channelOutputMute": false, "channelInputSource": 0}, "y": "bi", "c": []}
+  ]}
+}
+```
+
+Nodes are `{"t": type, "p": {property: value}, "y": types, "c": [children]}`. `y` has
+one letter per property, in property order: `i` int32, `l` int64, `b` bool, `d`
+double, `s` string, `a` array, `x` binary (the value is hex), `v` void, `r` redacted.
+Secrets (passwords, keys, codes, account names) are always sent as `"••••••"` (an empty secret stays `""`) with the type letter `r`.
+
+`meta.layout.runs` tells where each family of nodes lives: `parent` is the path of the
+parent node, the family's members are its children `first` … `first+count-1`. Use it
+instead of hard-coding indices; firmware versions may reorder the tree.
+
+`meta.control.writable` lists, per node type, the properties writable at the current
+level. It is empty when control is off.
+
+A **path** is the list of child indices from the root, e.g. `[28]` for the first
+`CHANNEL` above. Paths are only valid for the epoch they were read in.
+
+### `GET api/events`
+
+Server-Sent Events. The stream starts with `hello` and then sends:
+
+| Event | Data |
+|---|---|
+| `hello` | The status document. If its `epoch` differs from your tree, or its `seq` is ahead of it, reload `api/tree`. |
+| `changes` | `{"epoch": 1, "seq": 48230, "ch": [[[28], "channelOutputMute", true, "b"], …]}`: path, property, value, type letter. At most every 60 ms, with only the latest value per property. |
+| `resync` | `{"epoch", "seq"}`: changes were dropped (your client was too slow, or the tree changed structurally). Reload `api/tree`. |
+| `status` | The `connection` object of the status document after a connection change |
+| `control` | The status document after the control level changed |
+
+Comments (`: ping`) keep idle connections alive. At most 32 streams are served at a
+time.
+
+### Other reads
+
+| Request | Content |
+|---|---|
+| `GET api/clients` | `{"port", "clients": [...]}`: connections to the desk's control port with the process behind each (`pid`, `comm`), e.g. the device's GUI and the console |
+| `GET api/audit` | `{"writes": [...]}`: the last writes with time, node type, path, property, value, client address and, for refused writes, the error code |
+| `GET api/hw` | Screen mirror and front-panel status |
+| `GET api/screen.jpg`, `api/screen.png`, `api/screen.mjpg` | The device's screen, if the user switched the mirror on |
+
+## Writing
+
+Every write:
+
+- is a `POST` with `Content-Type: application/json` and the header `X-Rcplug: 1`,
+- carries `X-Rcplug-Pin: <pin>` if a PIN is set (a plugin that writes needs the PIN
+  from its user, e.g. through an environment variable in its `config/<name>.json`, and
+  sets it as `Client.PIN`),
+- carries the `epoch` the path was computed against,
+- is checked against the control level and the write policy (see
+  [safety.md](safety.md)) and recorded in the audit log.
+
+| Request | Body | Effect |
+|---|---|---|
+| `api/set` | `{"epoch", "path", "name", "value"}` | Sets an existing property. The value is converted to the property's type; numeric strings are refused. |
+| `api/press` | `{"epoch", "path", "name", "ms"}` | A button press: `true`, then `false` after `ms` (e.g. `PADBUTTON.padButtonPressed`) |
+| `api/trigger` | `{"epoch", "path", "name"}` | A binary trigger pulse (e.g. `MIX.mixLinkRequest`) |
+| `api/link` | `{"epoch", "source", "output", "link"}` | Links or unlinks a routing cell with the sequence the device expects |
+| `api/record` | `{"epoch", "value"}` | Recorder: 0 stop, 1 pause, 2 record |
+| `api/control` | `{"level": "off" \| "basic" \| "expert"}` | Changes the control level (refused with `read_only` or `untested_model` where control is not possible) |
+| `api/settings` | `{"screen": true}` | Switches the screen mirror on or off |
+| `api/pin` | `{"current", "new"}` | Sets, changes (`current` required) or removes (`new: ""`) the PIN |
+| `api/reconnect` | `{}` | Reconnects to the desk, also after the GUI guard stepped back. At most every 10 s. |
+| `api/panel` | `{"control", "value"}` | Experimental front-panel emulation; needs `--panel` and the expert level |
+
+A **marker** is `api/set` on `RECORDER.requestDropMarker` with the current time in
+milliseconds (an int64), as the console's UI does.
+
+A successful write answers `{"ok": true}` (`api/set` adds the `value` as stored). The desk does not echo writes back to the
+client that made them; the console applies them to its mirror at once and sends them
+to all other browsers.
+
+### Example with curl
+
+```bash
+B=http://192.168.1.50:8080/plugins/console
+E=$(curl -s $B/api/status | jq .epoch)
+curl -s -X POST $B/api/control -H 'X-Rcplug: 1' -H 'Content-Type: application/json' -d '{"level":"basic"}'
+# Mute the first channel strip. Its path comes from meta.layout.runs.CHANNEL.
+P=$(curl -s $B/api/tree | jq -c '.meta.layout.runs.CHANNEL | .parent + [.first]')
+curl -s -X POST $B/api/set -H 'X-Rcplug: 1' -H 'Content-Type: application/json' \
+     -d "{\"epoch\":$E,\"path\":$P,\"name\":\"channelOutputMute\",\"value\":true}"
+```
+
+### Example in Go
+
+```go
+c := capi.New("") // $RCPLUG_HOST_URL, or http://127.0.0.1:8080
+s, err := c.Summary(ctx)
+if err != nil {
+	return err
+}
+log.Printf("%s is recording: %v", s.Show, s.Recorder.State == 2)
+
+// Find the first channel strip in the layout instead of hard-coding its path.
+raw, err := c.Tree(ctx)
+if err != nil {
+	return err
+}
+var tree struct {
+	Epoch uint64
+	Meta  struct {
+		Layout struct {
+			Runs map[string]struct {
+				Parent []int
+				First  int
+			}
+		}
+	}
+}
+if err := json.Unmarshal(raw, &tree); err != nil {
+	return err
+}
+ch := tree.Meta.Layout.Runs["CHANNEL"]
+path := append(append([]int{}, ch.Parent...), ch.First)
+
+err = c.Set(ctx, tree.Epoch, path, "channelOutputMute", true)
+var apiErr *capi.Error
+if errors.As(err, &apiErr) && apiErr.Code == "control_off" {
+	log.Print("the user has not enabled control")
+}
+```
+
+## Error codes
+
+| Code | Status | Meaning |
+|---|---|---|
+| `bad_request` | 400 | Malformed body or parameters |
+| `no_node` | 400 | No node at this path |
+| `unknown_property` | 400 | The node has no such property (the console never creates properties) |
+| `invalid_value` | 400 | The value does not fit the property's type |
+| `out_of_range` | 400 | Outside the allowed range: the curated ranges at `basic`, the node's own limits (e.g. fader min/max) at both levels |
+| `invalid_change` | 400 | The change could not be encoded |
+| `invalid_level` | 400 | Unknown control level |
+| `invalid_pin` | 400 | The new PIN is longer than 64 characters or contains characters other than printable ASCII |
+| `pin_required` | 401 | A PIN is set and was missing or wrong |
+| `control_off` | 403 | The control level is `off` |
+| `denied` | 403 | The property is not writable at this level, or never |
+| `read_only` | 403 | The console runs with `--read-only` |
+| `untested_model` | 403 | The model has no verified profile; control needs `--allow-untested-model` |
+| `expert_required` | 403 | Needs the expert level |
+| `panel_disabled`, `screen_disabled` | 403 | Feature not switched on |
+| `csrf` | 403 | The `X-Rcplug` header is missing |
+| `screen_unavailable` | 404, 409 | No screen source found |
+| `stale_epoch` | 409 | The tree changed since you read the path. Reload and retry. |
+| `pin_locked` | 429 | Too many wrong PINs; wait a minute |
+| `rate_limited` | 429 | Try again in a few seconds |
+| `not_synced` | 503 | The console has no state yet |
+| `offline` | 503 | The console is not connected to the desk |
+| `send_failed` | 503 | The connection broke while sending |
+| `busy`, `too_many_clients`, `capture_failed` | 503 | Limits of the screen mirror or the event stream |

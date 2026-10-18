@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rcplug plugin manifest",
+  "description": "plugin.json in a plugin directory. See docs/plugin-api.md.",
+  "type": "object",
+  "required": [
+    "exec"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "description": "Informational. The plugin id is always the directory name.",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "title": {
+      "type": "string",
+      "description": "Name shown in the dashboard (English)."
+    },
+    "description": {
+      "type": "string",
+      "description": "One or two sentences for the plugin list (English)."
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of the plugin."
+    },
+    "exec": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "description": "Command line, run in the plugin directory. Start the plugin's own program with ./ (a bare name is looked up in PATH). {{port}} becomes the assigned loopback port, {{dir}} the plugin directory."
+    },
+    "httpProxy": {
+      "type": "string",
+      "description": "Loopback address the host proxies /plugins/<name>/ to, usually 127.0.0.1:{{port}}. Omit for plugins without a web UI.",
+      "pattern": "^(http://)?(127\\.0\\.0\\.1|localhost|\\[::1\\]):(\\{\\{port\\}\\}|[0-9]{1,5})$"
+    },
+    "autostart": {
+      "type": "boolean",
+      "default": false,
+      "description": "Run the plugin by default."
+    },
+    "needsAudio": {
+      "type": "boolean",
+      "default": false,
+      "description": "Advisory badge in the dashboard."
+    },
+    "primary": {
+      "type": "boolean",
+      "default": false,
+      "description": "Open this plugin as the dashboard's start page."
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Navigation order, lower first."
+    },
+    "icon": {
+      "type": "string",
+      "maxLength": 8,
+      "description": "Short glyph or emoji for the navigation."
+    },
+    "translations": {
+      "type": "object",
+      "description": "Localised title and description keyed by language code.",
+      "propertyNames": {
+        "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "description": "Entry points other UIs show for this plugin, e.g. a button on every channel strip of the console. Needs httpProxy.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "context",
+          "title",
+          "path"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+          },
+          "context": {
+            "type": "string",
+            "description": "Where the action is shown. The console knows \"channel\".",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string",
+            "maxLength": 8
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative to the plugin's UI. Placeholders for \"channel\": {strip}, {index}, {source}, {label}."
+          },
+          "translations": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "title": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

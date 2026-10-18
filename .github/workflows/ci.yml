@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Go tests, lint and web tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: gofmt, vet, race tests, web tests, shellcheck
+        run: make check
+
+  arm64:
+    name: Tests on arm64 (qemu-user)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install qemu-user
+        run: sudo apt-get update && sudo apt-get install -y qemu-user
+      - run: make test-arm64
+
+  cross:
+    name: Device package and other platforms
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Device package
+        run: make package
+      - name: Development tools build everywhere
+        run: |
+          for target in darwin/arm64 darwin/amd64 windows/amd64; do
+            echo "== $target"
+            GOOS=${target%/*} GOARCH=${target#*/} CGO_ENABLED=0 go build ./...
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rcplug-package
+          path: |
+            dist/rcplug-*-aarch64.tar.gz
+            dist/rcplug-examples-*-aarch64.tar.gz
+            dist/SHA256SUMS

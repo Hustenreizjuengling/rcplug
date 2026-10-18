@@ -1,0 +1,17 @@
+{
+  "$schema": "../../plugin.schema.json",
+  "name": "hello-sh",
+  "title": "Hello (shell)",
+  "description": "Example plugin in POSIX sh without a web UI: logs the CPU temperature and the console state once a minute.",
+  "version": "0.1.0",
+  "exec": ["/bin/sh", "./run.sh"],
+  "autostart": false,
+  "order": 90,
+  "icon": "$",
+  "translations": {
+    "de": {
+      "title": "Hallo (Shell)",
+      "description": "Beispiel-Plugin in POSIX-sh ohne Weboberfläche: schreibt einmal pro Minute CPU-Temperatur und Konsolen-Status ins Log."
+    }
+  }
+}

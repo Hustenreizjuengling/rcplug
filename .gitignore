@@ -1,0 +1,21 @@
+# Build output (binaries, payload, release tarballs), produced by `make`.
+/dist/
+# Go test and coverage artefacts
+*.test
+*.out
+coverage.*
+# Editors and OS files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+# State written by plugins started from the source tree
+*.state.json
+log.json
+starts
+# Command binaries accidentally built into the repository root
+/rcplugd
+/rcsim
+/rccapture
+/console
+/reclog

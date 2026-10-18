@@ -1,0 +1,19 @@
+{
+  "$schema": "../../plugin.schema.json",
+  "name": "console",
+  "title": "Console",
+  "description": "The whole mixer in the browser: channels, levels, routing, inputs, effects, pads, recorder and system – mirrored live and optionally remote-controllable.",
+  "version": "0.5.0",
+  "exec": ["./console", "--addr", "127.0.0.1:{{port}}"],
+  "httpProxy": "127.0.0.1:{{port}}",
+  "autostart": true,
+  "primary": true,
+  "order": 10,
+  "icon": "🎛",
+  "translations": {
+    "de": {
+      "title": "Konsole",
+      "description": "Das komplette Mischpult im Browser: Kanäle, Pegel, Routing, Eingänge, Effekte, Pads, Aufnahme und System – live gespiegelt und optional fernsteuerbar."
+    }
+  }
+}

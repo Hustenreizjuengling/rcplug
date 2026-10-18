@@ -1,0 +1,211 @@
+package hw
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
+	"sync"
+	"time"
+)
+
+// Screen serves throttled screenshots of the desk's display. Viewers share
+// captures, so the device never does more than MaxFPS captures per second no
+// matter how many browsers watch, and at most MaxStreams streams run at once.
+type Screen struct {
+	FB         string // framebuffer device, e.g. /dev/fb0 ("" = skip)
+	DRM        string // DRM card, e.g. /dev/dri/card0 ("" = skip)
+	Mode       string // auto | fb | drm
+	MaxFPS     float64
+	MaxStreams int // concurrent MJPEG streams (default 2)
+
+	grab func() (image.Image, string, string, error) // test hook replacing capture
+
+	mu      sync.Mutex
+	at      time.Time
+	img     image.Image
+	jpg     []byte
+	err     error
+	source  string // "fb" | "drm" of the last capture
+	detail  string
+	streams int
+}
+
+// ScreenStatus describes the mirror for the UI.
+type ScreenStatus struct {
+	Available bool    `json:"available"`
+	Source    string  `json:"source,omitempty"`
+	Blank     bool    `json:"blank"`
+	Width     int     `json:"width,omitempty"`
+	Height    int     `json:"height,omitempty"`
+	Detail    string  `json:"detail,omitempty"`
+	Error     string  `json:"error,omitempty"`
+	FPS       float64 `json:"fps"`
+}
+
+// ErrBusy is returned when the stream limit is reached.
+var ErrBusy = errors.New("too many screen streams")
+
+func (s *Screen) interval() time.Duration {
+	fps := s.MaxFPS
+	if fps <= 0 {
+		fps = 2
+	}
+	return time.Duration(float64(time.Second) / fps)
+}
+
+// frameLocked returns the current frame, capturing only if the cached one is
+// older than one frame interval.
+func (s *Screen) frameLocked() (image.Image, error) {
+	if !s.at.IsZero() && time.Since(s.at) < s.interval() {
+		return s.img, s.err
+	}
+	grab := s.capture
+	if s.grab != nil {
+		grab = s.grab
+	}
+	img, src, detail, err := grab()
+	s.at, s.img, s.err, s.jpg = time.Now(), img, err, nil
+	if err == nil {
+		s.source, s.detail = src, detail
+	}
+	return img, err
+}
+
+// capture grabs one frame from the configured source(s).
+func (s *Screen) capture() (image.Image, string, string, error) {
+	tryFB := func() (image.Image, string, error) {
+		img, info, err := Capture(s.FB)
+		if err != nil {
+			return nil, "", err
+		}
+		return img, fmt.Sprintf("%s · %d bit", s.FB, info.BitsPerPixel), nil
+	}
+	tryDRM := func() (image.Image, string, error) {
+		img, info, err := CaptureDRM(s.DRM)
+		if err != nil {
+			return nil, "", err
+		}
+		return img, fmt.Sprintf("%s · %s · %s", s.DRM, info.Format, info.Via), nil
+	}
+	if s.FB == "" {
+		tryFB = nil
+	}
+	if s.DRM == "" {
+		tryDRM = nil
+	}
+	return pickSource(s.Mode, tryFB, tryDRM)
+}
+
+type tryFunc func() (image.Image, string, error)
+
+// pickSource captures from the source the mode names, or in auto mode from
+// DRM first: the Duo's GUI draws into a DRM/KMS buffer (rc_gui_juce, firmware
+// 1.7.x), while /dev/fb0 is the kernel's fbdev emulation, which keeps the
+// boot splash and so is not black. The framebuffer is the fallback when DRM
+// cannot be read or shows nothing. A nil try function means not configured.
+func pickSource(mode string, tryFB, tryDRM tryFunc) (image.Image, string, string, error) {
+	missing := func() (image.Image, string, error) { return nil, "", errors.New("not configured") }
+	if tryFB == nil {
+		tryFB = missing
+	}
+	if tryDRM == nil {
+		tryDRM = missing
+	}
+	switch mode {
+	case "fb":
+		img, d, err := tryFB()
+		return img, "fb", d, err
+	case "drm":
+		img, d, err := tryDRM()
+		return img, "drm", d, err
+	}
+	drmImg, drmDetail, drmErr := tryDRM()
+	if drmErr == nil && !isBlank(drmImg) {
+		return drmImg, "drm", drmDetail, nil
+	}
+	fbImg, fbDetail, fbErr := tryFB()
+	if fbErr == nil && (!isBlank(fbImg) || drmErr != nil) {
+		return fbImg, "fb", fbDetail, nil
+	}
+	if drmErr == nil {
+		return drmImg, "drm", drmDetail, nil // both blank: the GUI's buffer is the live one
+	}
+	return nil, "", "", fmt.Errorf("DRM: %v; framebuffer: %v", drmErr, fbErr)
+}
+
+// JPEG returns a recent frame as JPEG.
+func (s *Screen) JPEG() ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	img, err := s.frameLocked()
+	if err != nil {
+		return nil, err
+	}
+	if s.jpg == nil {
+		var b bytes.Buffer
+		if err := jpeg.Encode(&b, img, &jpeg.Options{Quality: 80}); err != nil {
+			return nil, err
+		}
+		s.jpg = b.Bytes()
+	}
+	return s.jpg, nil
+}
+
+// PNG returns a recent frame losslessly (for the "save screenshot" button).
+func (s *Screen) PNG() ([]byte, error) {
+	s.mu.Lock()
+	img, err := s.frameLocked()
+	s.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	var b bytes.Buffer
+	enc := png.Encoder{CompressionLevel: png.BestSpeed}
+	if err := enc.Encode(&b, img); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
+
+// Status reports what the mirror sees (rate-limited like the frames).
+func (s *Screen) Status() ScreenStatus {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := ScreenStatus{FPS: s.MaxFPS}
+	img, err := s.frameLocked()
+	if err != nil {
+		st.Error = err.Error()
+		return st
+	}
+	st.Available, st.Source, st.Detail, st.Blank = true, s.source, s.detail, isBlank(img)
+	st.Width, st.Height = img.Bounds().Dx(), img.Bounds().Dy()
+	return st
+}
+
+// Acquire reserves one stream slot; call the returned release when done.
+func (s *Screen) Acquire() (release func(), err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	max := s.MaxStreams
+	if max <= 0 {
+		max = 2
+	}
+	if s.streams >= max {
+		return nil, ErrBusy
+	}
+	s.streams++
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			s.mu.Lock()
+			s.streams--
+			s.mu.Unlock()
+		})
+	}, nil
+}
+
+// Interval is the time between frames of a stream.
+func (s *Screen) Interval() time.Duration { return s.interval() }

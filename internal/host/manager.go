@@ -1,0 +1,280 @@
+package host
+
+import (
+	"net"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"sync"
+
+	"github.com/Hustenreizjuengling/rcplug/sdk"
+)
+
+// Manager loads plugins from <root>/plugins, assigns each a loopback port, and
+// tracks enable/disable state persisted to <root>/state.json.
+//
+// Directory layout under root:
+//
+//	plugins/<name>/   code (plugin.json + executable), replaced on reinstall
+//	data/<name>/      the plugin's persistent data (RCPLUG_DATA_DIR)
+//	config/<name>.json  optional operator overlay (extra args/env)
+//	state.json        which plugins are enabled
+type Manager struct {
+	root       string
+	pluginsDir string
+	basePort   int
+
+	// HostURL and Version are passed to plugins (RCPLUG_HOST_URL, RCPLUG_VERSION).
+	HostURL string
+	Version string
+
+	mu       sync.Mutex
+	plugins  map[string]*Plugin
+	order    []string
+	nextPort int
+	saveMu   sync.Mutex
+}
+
+type persistState struct {
+	Enabled map[string]bool `json:"enabled"`
+}
+
+// NewManager creates a manager rooted at root. basePort is the first loopback
+// port handed to plugins; each plugin with a web UI gets the next free one.
+func NewManager(root string, basePort int) *Manager {
+	return &Manager{
+		root:       root,
+		pluginsDir: filepath.Join(root, "plugins"),
+		basePort:   basePort,
+		nextPort:   basePort,
+		plugins:    map[string]*Plugin{},
+		HostURL:    "http://127.0.0.1:8080",
+		Version:    "dev",
+	}
+}
+
+// Root returns the rcplug root directory.
+func (m *Manager) Root() string { return m.root }
+
+func (m *Manager) stateFile() string { return filepath.Join(m.root, "state.json") }
+
+func (m *Manager) dataDir(name string) string { return filepath.Join(m.root, "data", name) }
+
+// LogDir holds the persistent logs: <plugin>.log per plugin and rcplugd.log.
+func (m *Manager) LogDir() string { return filepath.Join(m.root, "logs") }
+
+func (m *Manager) loadState() persistState {
+	ps := persistState{Enabled: map[string]bool{}}
+	_ = sdk.LoadJSON(m.stateFile(), &ps)
+	if ps.Enabled == nil {
+		ps.Enabled = map[string]bool{}
+	}
+	return ps
+}
+
+func (m *Manager) saveState() {
+	m.saveMu.Lock()
+	defer m.saveMu.Unlock()
+	ps := m.loadState() // keep entries of plugins that are currently not installed
+	m.mu.Lock()
+	for name, p := range m.plugins {
+		p.mu.Lock()
+		ps.Enabled[name] = p.enabled
+		p.mu.Unlock()
+	}
+	m.mu.Unlock()
+	_ = sdk.SaveJSON(m.stateFile(), ps)
+}
+
+// Load scans the plugins directory and starts plugins that should run per
+// manifest autostart + persisted state. It is safe to call again later: new
+// plugin directories are picked up, removed ones are stopped and forgotten,
+// known ones keep their port and process (with a refreshed manifest). It
+// returns the names of plugins skipped because their manifest was invalid.
+func (m *Manager) Load() ([]string, error) {
+	entries, err := os.ReadDir(m.pluginsDir)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	ps := m.loadState()
+	var invalid, added []string
+	found := map[string]*Manifest{}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		man, err := LoadManifest(filepath.Join(m.pluginsDir, e.Name()))
+		if err != nil {
+			invalid = append(invalid, e.Name()+": "+err.Error())
+			continue
+		}
+		found[man.Name] = man
+	}
+	names := make([]string, 0, len(found))
+	for n := range found {
+		names = append(names, n)
+	}
+	sort.Strings(names) // stable port assignment across restarts
+
+	m.mu.Lock()
+	var removed []*Plugin
+	for name, p := range m.plugins {
+		if _, ok := found[name]; !ok {
+			removed = append(removed, p)
+			delete(m.plugins, name)
+		}
+	}
+	for _, name := range names {
+		man := found[name]
+		p, ok := m.plugins[name]
+		if !ok {
+			p = &Plugin{dir: filepath.Join(m.pluginsDir, name), host: m,
+				log: newRingLog(500, NewRotatingFile(filepath.Join(m.LogDir(), name+".log"), LogFileMax))}
+			m.plugins[name] = p
+			added = append(added, name)
+		}
+		p.mu.Lock()
+		p.manifest = man
+		if man.HTTPProxy != "" && p.port == 0 {
+			p.port = m.freePortLocked()
+		}
+		p.mu.Unlock()
+	}
+	m.order = m.order[:0]
+	for name := range m.plugins {
+		m.order = append(m.order, name)
+	}
+	m.sortLocked()
+	m.mu.Unlock()
+
+	for _, p := range removed {
+		p.stop()
+		p.log.add("removed: plugin folder no longer exists")
+	}
+	for _, name := range added {
+		p := m.get(name)
+		want := p.Manifest().Autostart
+		if v, ok := ps.Enabled[name]; ok {
+			want = v
+		}
+		if want {
+			p.start()
+		}
+	}
+	return invalid, nil
+}
+
+// freePortLocked hands out the next loopback port nobody listens on, so a
+// port taken by another program (or a second rcplug) does not trap a plugin
+// in a restart loop.
+func (m *Manager) freePortLocked() int {
+	for tries := 0; tries < 200; tries++ {
+		port := m.nextPort
+		m.nextPort++
+		ln, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+		if err == nil {
+			ln.Close()
+			return port
+		}
+	}
+	port := m.nextPort // give up looking; the plugin's log will say why it fails
+	m.nextPort++
+	return port
+}
+
+// sortLocked orders plugins by manifest order, then name.
+func (m *Manager) sortLocked() {
+	sort.SliceStable(m.order, func(i, j int) bool {
+		a, b := m.plugins[m.order[i]].Manifest(), m.plugins[m.order[j]].Manifest()
+		if a.Order != b.Order {
+			return a.Order < b.Order
+		}
+		return a.Name < b.Name
+	})
+}
+
+func (m *Manager) get(name string) *Plugin {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.plugins[name]
+}
+
+// List returns the status of all plugins in navigation order.
+func (m *Manager) List() []Status {
+	m.mu.Lock()
+	names := append([]string(nil), m.order...)
+	m.mu.Unlock()
+	out := make([]Status, 0, len(names))
+	for _, n := range names {
+		if p := m.get(n); p != nil {
+			out = append(out, p.status())
+		}
+	}
+	return out
+}
+
+// Enable starts a plugin and persists the choice.
+func (m *Manager) Enable(name string) bool {
+	p := m.get(name)
+	if p == nil {
+		return false
+	}
+	p.start()
+	m.saveState()
+	return true
+}
+
+// Disable stops a plugin and persists the choice.
+func (m *Manager) Disable(name string) bool {
+	p := m.get(name)
+	if p == nil {
+		return false
+	}
+	p.stop()
+	m.saveState()
+	return true
+}
+
+// Restart stops and starts an enabled plugin without changing its persisted
+// state. A disabled plugin is left alone (use Enable).
+func (m *Manager) Restart(name string) bool {
+	p := m.get(name)
+	if p == nil {
+		return false
+	}
+	p.mu.Lock()
+	enabled := p.enabled
+	p.mu.Unlock()
+	if enabled {
+		p.stop()
+		p.start()
+	}
+	return true
+}
+
+// Logs returns the recent log lines of a plugin.
+func (m *Manager) Logs(name string) []string {
+	p := m.get(name)
+	if p == nil {
+		return nil
+	}
+	return p.log.snapshot()
+}
+
+// StopAll stops every plugin in parallel (used on host shutdown). Persisted
+// state is left untouched so the same plugins come back on the next boot.
+func (m *Manager) StopAll() {
+	m.mu.Lock()
+	ps := make([]*Plugin, 0, len(m.plugins))
+	for _, p := range m.plugins {
+		ps = append(ps, p)
+	}
+	m.mu.Unlock()
+	var wg sync.WaitGroup
+	for _, p := range ps {
+		wg.Add(1)
+		go func(p *Plugin) { defer wg.Done(); p.stop() }(p)
+	}
+	wg.Wait()
+}
