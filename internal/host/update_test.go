@@ -263,9 +263,10 @@ func TestUpdatePlatform(t *testing.T) {
 	if j := u.Status().Job; j == nil || j.State != "error" {
 		t.Fatalf("job after a failed installer: %+v", j)
 	}
-	if err := u.Install("rcplug"); err == ErrUpdateBusy {
-		t.Fatal("still busy after the installer failed")
+	if err := u.Install("rcplug"); err != nil {
+		t.Fatalf("still busy after the installer failed: %v", err)
 	}
+	waitJob(t, u, "restarting") // it unpacks into root: done before the test cleans up
 }
 
 func mustRead(t *testing.T, f string) []byte {
