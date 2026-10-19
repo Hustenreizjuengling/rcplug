@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.8.12 - Unreleased
+## 0.8.12 - 2026-10-19
 
 ### Fixed
 - **The device's screen after a restart of the Duo:** at boot the console took the
