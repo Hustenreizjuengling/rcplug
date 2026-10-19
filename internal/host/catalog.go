@@ -333,11 +333,11 @@ func (m *Manager) RemovePlugin(name string, purge bool) error {
 		return err
 	}
 	_ = os.RemoveAll(trash)
-	m.saveMu.Lock()
+	stateMu.Lock()
 	ps := m.loadState()
 	delete(ps.Enabled, name)
 	_ = sdk.SaveJSON(m.stateFile(), ps)
-	m.saveMu.Unlock()
+	stateMu.Unlock()
 	if purge {
 		_ = os.RemoveAll(m.dataDir(name))
 		_ = os.Remove(filepath.Join(m.root, "config", name+".json"))
@@ -367,8 +367,8 @@ func (m *Manager) AddCatalog(src CatalogSource) error {
 	if _, err := release.ParsePublicKey(src.PublicKey); err != nil {
 		return fmt.Errorf("public key: %w", err)
 	}
-	m.saveMu.Lock()
-	defer m.saveMu.Unlock()
+	stateMu.Lock()
+	defer stateMu.Unlock()
 	ps := m.loadState()
 	for i, s := range ps.Catalogs {
 		if strings.EqualFold(s.GitHub, src.GitHub) {
@@ -385,8 +385,8 @@ func (m *Manager) AddCatalog(src CatalogSource) error {
 
 // RemoveCatalog forgets a catalog the user added.
 func (m *Manager) RemoveCatalog(repo string) bool {
-	m.saveMu.Lock()
-	defer m.saveMu.Unlock()
+	stateMu.Lock()
+	defer stateMu.Unlock()
 	ps := m.loadState()
 	for i, s := range ps.Catalogs {
 		if strings.EqualFold(s.GitHub, repo) {

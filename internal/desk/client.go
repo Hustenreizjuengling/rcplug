@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -58,7 +59,11 @@ type Config struct {
 	// ResumeFile (reading along) keeps the state across a restart of the
 	// console, as ResumeFile.json and .frame; "" keeps nothing.
 	ResumeFile string
-	Logf       func(format string, args ...interface{})
+	// ScreenMarker is the file rcplugd writes while a plugin has the
+	// device's screen (its name inside): the console then holds the mixer
+	// alone instead of waiting for the screen. "" never looks.
+	ScreenMarker string
+	Logf         func(format string, args ...interface{})
 }
 
 // rodeMixer is the mixer's binary on a RØDECaster; "auto" reads along where it
@@ -725,4 +730,20 @@ func retryText(t time.Time) string {
 		return ""
 	}
 	return t.Format(time.RFC3339)
+}
+
+// screenAway names the plugin that has the device's screen ("" while
+// RØDE's screen program has it).
+func (c *Client) screenAway() string {
+	if c.cfg.ScreenMarker == "" {
+		return ""
+	}
+	b, err := os.ReadFile(c.cfg.ScreenMarker)
+	if err != nil {
+		return ""
+	}
+	if name := strings.TrimSpace(string(b)); name != "" {
+		return name
+	}
+	return "a plugin"
 }

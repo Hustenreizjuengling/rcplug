@@ -52,10 +52,12 @@ test-race: ## unit tests with the race detector
 test-arm64: ## unit tests as arm64 binaries under qemu-user (needs qemu-aarch64)
 	CGO_ENABLED=0 GOARCH=arm64 $(GO) test -exec qemu-aarch64 ./...
 
-test-root: ## the tests that need root (reading along on lo), run with sudo
+test-root: ## the tests that need root (reading along on lo, bind mounts), run with sudo
 	@tmp="$$(mktemp -d)"; trap 'rm -rf "$$tmp"' EXIT; set -e; \
 	$(GO) test -c -o "$$tmp/desk.test" ./internal/desk; \
-	sudo "$$tmp/desk.test" -test.run 'OnLoopback' -test.count=1 -test.v
+	$(GO) test -c -o "$$tmp/host.test" ./internal/host; \
+	sudo "$$tmp/desk.test" -test.run 'OnLoopback' -test.count=1 -test.v; \
+	sudo "$$tmp/host.test" -test.run 'AsRoot' -test.count=1 -test.v
 
 fuzz: ## fuzz the protocol decoder for 30 s
 	$(GO) test -run '^$$' -fuzz FuzzDecodeChange -fuzztime 30s ./internal/rcproto

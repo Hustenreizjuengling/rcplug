@@ -299,6 +299,19 @@ func (r *relay) watch(ctx context.Context) error {
 			if !alone {
 				continue
 			}
+			if away := r.c.screenAway(); away != "" {
+				// A plugin has the screen on purpose: stay alone with the
+				// mixer. The waits start afresh when RØDE's screen comes
+				// back, which takes it a few seconds.
+				r.mu.Lock()
+				r.alone = time.Now()
+				r.mu.Unlock()
+				r.setStatus()
+				if err := r.toMixer(ping); err != nil {
+					return err
+				}
+				continue
+			}
 			if time.Since(since) > noScreen {
 				return errNoScreen
 			}
@@ -597,9 +610,12 @@ func (r *relay) setStatus() {
 	r.mu.Lock()
 	screen := r.screen != nil
 	r.mu.Unlock()
-	if screen {
+	switch away := r.c.screenAway(); {
+	case screen:
 		r.c.setState(StateLive, "", "")
-	} else {
+	case away != "":
+		r.c.setState(StateLive, "screen_away", "full control; the device's screen is with the plugin "+away)
+	default:
 		r.c.setState(StateLive, "relay_no_screen", "full control; the device's screen is not connected (it reconnects within seconds)")
 	}
 }
@@ -661,9 +677,10 @@ func (c *Client) SetFullControl(on bool) {
 // relayWanted reports whether relay mode is wanted and whether an explicit
 // takeover request is pending (and consumes it).
 func (c *Client) relayWanted() (want, takeover bool) {
+	away := c.screenAway() != "" // the mixer's place is free: hold it
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	want, takeover = c.wantRelay, c.takeover
+	want, takeover = c.wantRelay || away, c.takeover
 	c.takeover = false
 	return
 }
@@ -736,7 +753,7 @@ func (c *Client) runDevice(ctx context.Context) {
 		want = c.wantRelay
 		c.mu.Unlock()
 		watched := make(chan struct{})
-		if want {
+		if want || c.cfg.ScreenMarker != "" { // a plugin may take the screen while reading along
 			at := retryAt
 			go func() { c.watchPlace(tctx, cancel, at); close(watched) }()
 		} else {
@@ -771,7 +788,10 @@ func (c *Client) watchPlace(ctx context.Context, switchMode context.CancelFunc, 
 			switchMode()
 			return
 		case <-t.C:
-			if placeFree(c.Port()) {
+			c.mu.Lock()
+			want := c.wantRelay
+			c.mu.Unlock()
+			if (want || c.screenAway() != "") && placeFree(c.Port()) {
 				switchMode()
 				return
 			}

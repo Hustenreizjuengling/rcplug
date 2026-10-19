@@ -173,6 +173,9 @@ func (p *Plugin) start() {
 			<-prev // an earlier loop may still be stopping its process
 		}
 		p.supervise(ctx)
+		if p.Manifest().has("screen") && p.host.Screen != nil {
+			p.host.Screen.Release(p.Manifest().Name) // however it ended
+		}
 	}()
 }
 
@@ -210,6 +213,18 @@ func (p *Plugin) supervise(ctx context.Context) {
 		msg := "exited"
 		if err != nil {
 			msg = err.Error()
+		}
+		if p.Manifest().has("screen") {
+			// A plugin with the screen runs once: it ends by itself (back
+			// to RØDE's screen) or fails, and is not started again.
+			p.mu.Lock()
+			p.cancel, p.enabled, p.state, p.pid = nil, false, StateStopped, 0
+			if err != nil {
+				p.lastErr = msg
+			}
+			p.mu.Unlock()
+			p.log.add(fmt.Sprintf("ended (%s); RØDE's screen comes back", msg))
+			return
 		}
 		p.mu.Lock()
 		p.restarts++

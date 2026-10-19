@@ -98,7 +98,7 @@ func main() {
 	}
 	client := desk.NewClient(desk.Config{
 		Addr: *deskAddr, Guard: *guard, BootGrace: *bootGrace, ReadOnly: *readOnly, Handshake: *handshake, Mode: *deskMode,
-		ResumeFile: resume,
+		ResumeFile: resume, ScreenMarker: screenMarker(),
 	}, desk.NewMirror())
 	opts := console.Options{
 		Client: client, DataDir: dataDir, AllowUntested: *untested, LegacyPIN: *legacyPIN, Version: version,
@@ -157,4 +157,13 @@ func localHostsOnly(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// screenMarker is the file rcplugd writes while a plugin has the device's
+// screen (internal/host/screen.go); a console without rcplugd never looks.
+func screenMarker() string {
+	if sdk.Name() == "" {
+		return ""
+	}
+	return "/run/rcplug-screen"
 }

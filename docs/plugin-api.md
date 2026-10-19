@@ -80,7 +80,7 @@ warning on the dashboard and in the host's log; the plugin still loads.
 | `order` | int | `0` | Position in the navigation and the plugin list, lower first; ties by id |
 | `icon` | string | | A short glyph or emoji for the navigation (at most 8 characters) |
 | `needsAudio` | bool | `false` | Shows an "audio" badge in the plugin list (older form of the permission `audio`, which it grants) |
-| `permissions` | string array | | What the plugin does beyond its own pages: `desk:write`, `audio`, `network`, `device`, see [Permissions](#permissions) |
+| `permissions` | string array | | What the plugin does beyond its own pages: `desk:write`, `audio`, `network`, `device`, `screen`, see [Permissions](#permissions) |
 | `translations` | object | | Localised `title` and `description` per language code: `{"de": {"title": "…", "description": "…"}}` |
 | `actions` | array | | Entry points other UIs show, see [Actions](#actions). Needs `httpProxy`. |
 | `update` | object | | Where updates come from, see [Updates](#updates) |
@@ -174,7 +174,8 @@ output and handle SIGINT, see the [guide](plugin-guide.md#12-other-languages).
 The pause after an exit doubles from 1 s up to about 30 s; a process that ran for over
 a minute starts again with 1 s. An exit with status 0 counts like a crash: a plugin
 that is enabled is supposed to run. The dashboard shows the number of restarts and the
-last error.
+last error. A plugin with the permission `screen` is the exception: it runs once and
+is never restarted (see [Permissions](#permissions)).
 
 ### Priority and resources
 
@@ -269,6 +270,26 @@ shows it on the plugin's card, so users know before they start it.
 | `audio` | Hears the desk's inputs and outputs through the [shared audio taps](#audio) | the host: `api/audio/stream` answers 403 without it |
 | `network` | Talks to other machines on the network or the internet | shown only |
 | `device` | Uses the device's hardware, or files outside its own directories | shown only |
+| `screen` | Takes over the device's screen while it runs (see below) | the host: it stops RØDE's screen before the plugin starts and starts it again when the plugin ends |
+
+**`screen`: the device's screen.** While a plugin with this permission runs, RØDE's
+screen program and the loop that restarts it are stopped, and the plugin may draw on
+the display (`/dev/dri/card0`, 720 × 1280 portrait) and read the touchscreen
+(`/dev/input/event0`). When the plugin ends, however it ends (stopped in the dashboard,
+exited by itself, crashed, rcplug stopped or updated), the host starts RØDE's display
+service again; a restarted rcplugd does the same if it finds the screen still away. Such
+a plugin:
+
+- never starts by itself: `autostart` must be false, its running state is not
+  remembered and not restored from a backup; it starts only from the dashboard;
+- runs once: when its process exits, it is not started again (to give the screen back,
+  it simply exits);
+- is not started again after its options change or after an update;
+- is the only one with the screen: a second one does not start while one has it.
+
+Meanwhile the console holds the mixer alone (it reads `/run/rcplug-screen`, where the
+host writes the plugin's name) instead of waiting for RØDE's screen. The device's big
+encoder is read by RØDE's screen program and does nothing while a plugin has the screen.
 
 How the host knows who asks: every plugin gets a token (`$RCPLUG_TOKEN`). When a
 plugin calls another plugin through the host (`$RCPLUG_HOST_URL/plugins/<name>/`) with

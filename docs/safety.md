@@ -267,6 +267,26 @@ versions are offered, and packages are unpacked without links or paths outside t
 directory. An update of rcplug that does not start is rolled back by its installer.
 `RCPLUG_UPDATES=off` switches the function off. Details: [updates.md](updates.md).
 
+## RØDE's own services
+
+*System › RØDE services* in the dashboard switches off services of RØDE's that a user
+does not need: CallMe (SIP calls; it listens on ports 5060/5061 and holds a connection
+to RØDE's cloud), rpcbind (an NFS helper listening on port 111) and ModemManager (the Duo
+has no modem). Switching one off stops it and lays a script that does nothing over the
+file that starts it, with a bind mount: its init script, so that neither the boot nor
+RØDE's own restarts (`audio-start.sh` restarts CallMe whenever audio restarts) start it,
+or for ModemManager, which D-Bus starts, the program itself.
+
+- **No file of RØDE's changes.** A bind mount lives in memory. rcplug's init script
+  makes them again at every boot (`rcplugd --services apply`, before RØDE's services
+  start); switching a service on removes it and starts the service, without a restart.
+- **Only known files.** rcplug covers a file only if its SHA-256 is that of a firmware
+  version it was tested with (1.7.3 and 1.7.6 ship the same scripts). On other firmware
+  the service stays on and the dashboard says why.
+- **The way back.** Uninstalling rcplug switches every service on again
+  (`rcplugd --services restore`); a firmware update removes rcplug and with it every
+  bind mount. A backup of rcplug's settings carries which services are off.
+
 ## Installing and removing
 
 Installing is done by [rcplug-toolkit](https://github.com/Hustenreizjuengling/rcplug-toolkit):

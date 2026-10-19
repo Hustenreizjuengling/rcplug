@@ -36,6 +36,8 @@ saved as `config/console.json`, then restart the console.
 | `--diagnostics FILE` | | | Write a diagnostics zip (`-` = stdout) and exit: from the running host if it answers at `--addr`, otherwise from the files on disk |
 | `--call "METHOD /path"` | | | Call the running host's API (e.g. `POST /api/reload`) and print the answer, then exit; for scripts on the device. Exit status 0 on success, 1 on an error answer, 2 on a bad call |
 | `--check` | | | Print whether the host answers and the problems found in the logs, then exit (used by the wizard) |
+| `--services apply\|restore` | | | `apply`: lay the bind mounts for the RØDE services switched off in the dashboard (the init script, at boot before they start); `restore`: remove them all and start the services again (uninstalling). Then exit; see [safety.md](safety.md#rødes-own-services) |
+| | `RCPLUG_SERVICES_PREFIX` | | For tests only: a folder that stands in for the device's `/` when switching services |
 | `--version` | | | Print the version |
 
 `SIGHUP` (or `/etc/init.d/rcplug reload`) rescans the plugins directory.

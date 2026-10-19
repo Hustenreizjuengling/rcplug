@@ -6,6 +6,20 @@ may break compatibility).
 
 ## 0.8.11 - Unreleased
 
+### Added
+- **RØDE services** (*System › RØDE services*): switch off CallMe (SIP calls, ports
+  5060/5061 and a connection to RØDE's cloud), rpcbind (port 111) and ModemManager if
+  you never use them, and on again at any time. No file of RØDE's changes: rcplug lays a
+  script that does nothing over the service's starter with a bind mount, again at every
+  boot; uninstalling rcplug or a firmware update switches everything on again. Only
+  files rcplug knows (1.7.3, 1.7.6) are covered. The card shows what each service costs
+  (CPU, RAM, open ports, connections to the internet). Backups carry the choice.
+- **Plugins can take over the device's screen** (permission `screen`): while such a
+  plugin runs, RØDE's screen is stopped, and rcplugd starts it again when the plugin
+  ends, however it ends. Such a plugin starts only from the dashboard, runs once and is
+  never restarted, started by a backup or remembered; the console holds the mixer alone
+  meanwhile.
+
 ## 0.8.10 - 2026-10-19
 
 ### Added

@@ -3,7 +3,10 @@ package desk
 import (
 	"context"
 	"net"
+	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
@@ -541,4 +544,48 @@ func TestFullControlKeepsTheScreenForOtherClients(t *testing.T) {
 	if !screen.connected() || !c.Status().Relay.Screen {
 		t.Fatal("the screen was cut off")
 	}
+}
+
+// While a plugin has the device's screen (rcplugd's marker), full control
+// stays alone with the mixer: no restart of the screen, no stepping back.
+// When the marker goes, the waits for RØDE's screen start afresh.
+func TestFullControlStaysWhileAPluginHasTheScreen(t *testing.T) {
+	fastRelay(t)
+	old := []time.Duration{relayNudge, relayNoScreen}
+	relayNudge, relayNoScreen = 300*time.Millisecond, 900*time.Millisecond
+	t.Cleanup(func() { relayNudge, relayNoScreen = old[0], old[1] })
+	restarts := 0
+	var mu sync.Mutex
+	oldRestart := restartScreen
+	restartScreen = func() error { mu.Lock(); restarts++; mu.Unlock(); return nil }
+	t.Cleanup(func() { restartScreen = oldRestart })
+	oldFree := placeFree
+	placeFree = func(int) bool { return false }
+	t.Cleanup(func() { placeFree = oldFree })
+
+	marker := filepath.Join(t.TempDir(), "rcplug-screen")
+	os.WriteFile(marker, []byte("screendemo\n"), 0o644)
+	sim := oneClientSim(t, rcsim.Options{OneClient: true})
+	c, start, _ := relayClient(t, sim.Addr())
+	c.cfg.ScreenMarker = marker
+	c.SetFullControl(true)
+	start()
+	waitFor(t, "relay", func() bool { return c.Status().Mode == "relay" })
+	time.Sleep(2 * time.Second) // well past the nudge and the step back
+	mu.Lock()
+	n := restarts
+	mu.Unlock()
+	if st := c.Status(); st.Mode != "relay" || n != 0 || st.Code != "screen_away" || !strings.Contains(st.Error, "screendemo") {
+		t.Fatalf("with the screen away: %+v, %d restarts", st, n)
+	}
+
+	// The screen comes back: the nudge and the step back come in their own
+	// time from now on, not at once.
+	os.Remove(marker)
+	time.Sleep(150 * time.Millisecond)
+	if st := c.Status(); st.Mode != "relay" {
+		t.Fatalf("stepped back at once: %+v", st)
+	}
+	waitFor(t, "the screen nudged", func() bool { mu.Lock(); defer mu.Unlock(); return restarts == 1 })
+	waitFor(t, "stepping back without the screen", func() bool { return c.Status().RelayCode == "relay_no_screen" })
 }

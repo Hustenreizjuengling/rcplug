@@ -192,6 +192,9 @@ func LoadManifest(dir string) (*Manifest, error) {
 	if err := validateOptions(&m); err != nil {
 		return nil, fmt.Errorf("plugin %q: %w", m.Name, err)
 	}
+	if m.has("screen") && m.Autostart {
+		return nil, fmt.Errorf("plugin %q: a plugin that takes over the screen (permission screen) never starts by itself; set autostart to false", m.Name)
+	}
 	if err := validatePermissions(&m); err != nil {
 		return nil, fmt.Errorf("plugin %q: %w", m.Name, err)
 	}

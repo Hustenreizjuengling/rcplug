@@ -44,6 +44,7 @@ func main() {
 		diag     = flag.String("diagnostics", "", "write a diagnostics bundle (zip) to this file (\"-\" = stdout) and exit; works without a running host")
 		check    = flag.Bool("check", false, "print problems found in the logs and whether the host answers, then exit")
 		call     = flag.String("call", "", "call the running host's API (\"POST /api/reload\") and print the answer, then exit; for scripts on the device")
+		services = flag.String("services", "", "apply: switch off the RØDE services chosen in the dashboard (the init script, at boot before they start); restore: switch them all on again (uninstall); then exit")
 		updates  = flag.Bool("updates", !isOff(os.Getenv("RCPLUG_UPDATES")), "offer updates of rcplug and its plugins from signed GitHub releases (env RCPLUG_UPDATES=off switches them off)")
 		updRepo  = flag.String("update-repo", envOr("RCPLUG_UPDATE_REPO", host.DefaultUpdateRepo), "GitHub repository (owner/name) of rcplug's releases")
 	)
@@ -65,6 +66,9 @@ func main() {
 	}
 	if *call != "" {
 		os.Exit(callAPI(*call, *addr))
+	}
+	if *services != "" {
+		os.Exit(runServices(*services, *root))
 	}
 	// The host's own log goes to <root>/logs/rcplugd.log (rotated), and to
 	// the terminal when there is one. Without a terminal (started by the init
@@ -88,6 +92,10 @@ func main() {
 
 	m := host.NewManager(*root, *basePort)
 	m.HostURL, m.Version = loopbackURL(*addr), version
+	// The device's screen for plugins that take it over; one left away by
+	// an earlier rcplugd comes back now.
+	m.Screen = host.NewScreen(log.Printf)
+	m.Screen.Release("")
 	dash, _ := fs.Sub(webFS, "web")
 	m.Events = host.NewBus()
 	srv := host.NewServer(m, dash, version)
@@ -95,6 +103,8 @@ func main() {
 	srv.Taps = host.NewTaps(host.NewJackBridge())
 	srv.Access = host.NewAccess(*root)
 	srv.Access.Presence = host.PresenceViaConsole(m)
+	srv.Services = host.NewServices(*root, log.Printf)
+	srv.Services.Prefix = os.Getenv("RCPLUG_SERVICES_PREFIX") // tests only
 	if *allow != "" {
 		srv.AllowHosts = strings.Split(*allow, ",")
 	}
@@ -337,4 +347,26 @@ func envOr(name, def string) string {
 		return v
 	}
 	return def
+}
+
+// runServices is rcplugd --services apply|restore, for the init script and
+// uninstalling: it prints what it did and never stops a boot (exit 0 also
+// when a service could not be switched off; it then stays on).
+func runServices(what, root string) int {
+	s := host.NewServices(root, func(format string, args ...interface{}) { fmt.Printf("rcplug: "+format+"\n", args...) })
+	s.Prefix = os.Getenv("RCPLUG_SERVICES_PREFIX") // tests only
+	var err error
+	switch what {
+	case "apply":
+		err = s.Apply()
+	case "restore":
+		err = s.Restore()
+	default:
+		fmt.Fprintln(os.Stderr, "rcplugd: --services is apply or restore")
+		return 2
+	}
+	if err != nil {
+		fmt.Printf("rcplug: services: %v\n", err)
+	}
+	return 0
 }

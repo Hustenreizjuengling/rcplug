@@ -2,6 +2,7 @@ package host
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -32,12 +33,14 @@ type Manager struct {
 	Version string
 	// Events is the event bus; plugins get a token for it (RCPLUG_TOKEN).
 	Events *Bus
+	// Screen hands the device's screen to plugins with the permission
+	// "screen" (nil: no such plugin starts).
+	Screen *Screen
 
 	mu       sync.Mutex
 	plugins  map[string]*Plugin
 	order    []string
 	nextPort int
-	saveMu   sync.Mutex
 	opMu     sync.Mutex // one change to a plugin's state or options at a time
 	groups   *groupLog  // process groups of running plugins (groups.go)
 }
@@ -48,7 +51,12 @@ type persistState struct {
 	AutoCheck bool `json:"autoCheck,omitempty"`
 	// Catalogs: plugin catalogs the user added (catalog.go).
 	Catalogs []CatalogSource `json:"catalogs,omitempty"`
+	// ServicesOff: RØDE's services the user switched off (services.go).
+	ServicesOff []string `json:"servicesOff,omitempty"`
 }
+
+// stateMu serializes changes to state.json (plugins, catalogs, services).
+var stateMu sync.Mutex
 
 // NewManager creates a manager rooted at root. basePort is the first loopback
 // port handed to plugins; each plugin with a web UI gets the next free one.
@@ -88,8 +96,8 @@ func (m *Manager) loadState() persistState {
 // never started or stopped stay unlisted, so their manifest's autostart
 // remains the default (a new version may change it).
 func (m *Manager) saveState(name string, enabled bool) {
-	m.saveMu.Lock()
-	defer m.saveMu.Unlock()
+	stateMu.Lock()
+	defer stateMu.Unlock()
 	ps := m.loadState()
 	ps.Enabled[name] = enabled
 	_ = sdk.SaveJSON(m.stateFile(), ps)
@@ -100,8 +108,8 @@ func (m *Manager) AutoCheck() bool { return m.loadState().AutoCheck }
 
 // SetAutoCheck records the user's choice for the daily update check.
 func (m *Manager) SetAutoCheck(on bool) {
-	m.saveMu.Lock()
-	defer m.saveMu.Unlock()
+	stateMu.Lock()
+	defer stateMu.Unlock()
 	ps := m.loadState()
 	ps.AutoCheck = on
 	_ = sdk.SaveJSON(m.stateFile(), ps)
@@ -178,6 +186,9 @@ func (m *Manager) Load() ([]string, error) {
 	}
 	for _, name := range added {
 		p := m.get(name)
+		if p.Manifest().has("screen") {
+			continue // only ever started from the dashboard (Enable)
+		}
 		want := p.Manifest().Autostart
 		if v, ok := ps.Enabled[name]; ok {
 			want = v
@@ -246,9 +257,28 @@ func (m *Manager) Enable(name string) bool {
 	if p == nil {
 		return false
 	}
+	if p.Manifest().has("screen") {
+		// The screen first, for this run only: nothing is remembered.
+		if err := m.takeScreen(name); err != nil {
+			p.mu.Lock()
+			p.lastErr = err.Error()
+			p.mu.Unlock()
+			p.log.add("not started: " + err.Error())
+			return true
+		}
+		p.start()
+		return true
+	}
 	p.start()
 	m.saveState(name, true)
 	return true
+}
+
+func (m *Manager) takeScreen(name string) error {
+	if m.Screen == nil {
+		return errors.New("this rcplug cannot hand over the device's screen")
+	}
+	return m.Screen.Take(name)
 }
 
 // Disable stops a plugin and persists the choice.
@@ -278,6 +308,13 @@ func (m *Manager) Restart(name string) bool {
 	p.mu.Unlock()
 	if enabled {
 		p.stop()
+		if p.Manifest().has("screen") {
+			// Stopping gave the screen back; take it again for the new run.
+			if err := m.takeScreen(name); err != nil {
+				p.log.add("not started again: " + err.Error())
+				return true
+			}
+		}
 		p.start()
 	}
 	return true
@@ -313,9 +350,14 @@ func (m *Manager) SetOptions(name string, values map[string]json.RawMessage) (fo
 	enabled := p.enabled
 	p.mu.Unlock()
 	if enabled {
-		p.log.add("options changed in the dashboard; restarting")
-		p.stop()
-		p.start()
+		if p.Manifest().has("screen") {
+			p.log.add("options changed in the dashboard; stopped (start it again to use them)")
+			p.stop()
+		} else {
+			p.log.add("options changed in the dashboard; restarting")
+			p.stop()
+			p.start()
+		}
 	}
 	return true, enabled, nil
 }
@@ -350,6 +392,11 @@ func (m *Manager) ReplacePlugin(name, staged string) (started bool, err error) {
 	target := filepath.Join(m.pluginsDir, name)
 	backup := staged + ".previous"
 	_ = os.RemoveAll(backup)
+	// A plugin with the screen is not started again by an update: that is
+	// always the user's step (the screen came back when it stopped).
+	if p != nil && p.Manifest().has("screen") {
+		wasEnabled = false
+	}
 	restore := func() {
 		if p != nil && wasEnabled {
 			p.start()

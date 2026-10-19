@@ -10,14 +10,16 @@ import (
 )
 
 // Uninstalling from the dashboard, the last step that needed a computer: a
-// detached script stops rcplug (this process and every plugin), removes its
-// init script and then the whole install directory, plugin data included.
+// detached script stops rcplug (this process and every plugin), switches
+// RØDE's services on again that were switched off, removes its init script
+// and then the whole install directory, plugin data included.
 // The device itself keeps running; installing again takes the toolkit.
 
 // uninstallScript runs detached: $1 init dir, $2 install dir, $3 "1" to
 // remove the boot links with update-rc.d.
 const uninstallScript = `sleep 1
 "$1/rcplug" stop >/dev/null 2>&1
+"$2/rcplugd" --root "$2" --services restore >/dev/null 2>&1
 if [ "$3" = 1 ] && command -v update-rc.d >/dev/null 2>&1; then update-rc.d -f rcplug remove >/dev/null 2>&1; fi
 rm -f "$1/rcplug" /var/log/rcplug.log /var/log/rcplug.log.1
 case "$2" in */rcplug) rm -rf "$2";; esac`

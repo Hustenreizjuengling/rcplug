@@ -2,7 +2,9 @@ package host
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -42,6 +44,9 @@ type RcplugBackup struct {
 	Plugins   []BackupPlugin  `json:"plugins"`
 	AutoCheck bool            `json:"autoCheck"`
 	Catalogs  []CatalogSource `json:"catalogs"`
+	// ServicesOff are RØDE's services switched off (services.go); nil in a
+	// backup made before rcplug knew them, which then leaves them alone.
+	ServicesOff *[]string `json:"servicesOff,omitempty"`
 }
 
 const backupKind = "rcplug-settings"
@@ -66,8 +71,9 @@ func secretOption(o Option) bool { return o.Type == "text" && secretKey.MatchStr
 // Backup reads rcplug's settings.
 func (m *Manager) Backup(version string) RcplugBackup {
 	ps := m.loadState()
+	off := append([]string{}, ps.ServicesOff...)
 	b := RcplugBackup{Format: BackupFormat, Kind: backupKind, Created: time.Now().Format(time.RFC3339), Version: version,
-		Plugins: []BackupPlugin{}, AutoCheck: ps.AutoCheck, Catalogs: ps.Catalogs}
+		Plugins: []BackupPlugin{}, AutoCheck: ps.AutoCheck, Catalogs: ps.Catalogs, ServicesOff: &off}
 	if b.Catalogs == nil {
 		b.Catalogs = []CatalogSource{}
 	}
@@ -76,7 +82,7 @@ func (m *Manager) Backup(version string) RcplugBackup {
 			continue
 		}
 		p := BackupPlugin{Name: man.Name, Title: man.Title, Version: man.Version}
-		if pl := m.get(man.Name); pl != nil {
+		if pl := m.get(man.Name); pl != nil && !man.has("screen") { // one with the screen only ever starts by hand
 			on := pl.status().Enabled
 			p.Enabled = &on
 		}
@@ -161,7 +167,7 @@ func (m *Manager) plan(b RcplugBackup) BackupPlan {
 			plan.Missing = append(plan.Missing, want)
 			continue
 		}
-		if want.Enabled != nil && (have.Enabled == nil || *have.Enabled != *want.Enabled) {
+		if want.Enabled != nil && !man.has("screen") && (have.Enabled == nil || *have.Enabled != *want.Enabled) {
 			from := json.RawMessage("null")
 			if have.Enabled != nil {
 				from = rawJSON(*have.Enabled)
@@ -236,12 +242,31 @@ func (m *Manager) plan(b RcplugBackup) BackupPlan {
 			plan.Changes = append(plan.Changes, BackupChange{What: "catalog", ID: c.GitHub, From: rawJSON(c), To: json.RawMessage("null")})
 		}
 	}
+	if b.ServicesOff != nil { // RØDE's services: what the backup has switched off, and nothing else
+		offNow, offThen := map[string]bool{}, map[string]bool{}
+		for _, id := range *now.ServicesOff {
+			offNow[id] = true
+		}
+		for _, id := range *b.ServicesOff {
+			offThen[id] = true
+		}
+		for _, sv := range defaultServices {
+			if offNow[sv.ID] != offThen[sv.ID] {
+				plan.Changes = append(plan.Changes, BackupChange{What: "service", ID: sv.ID, From: rawJSON(!offNow[sv.ID]), To: rawJSON(!offThen[sv.ID])})
+			}
+		}
+		for _, id := range *b.ServicesOff {
+			if _, known := (&Services{catalog: defaultServices}).lookup(id); !known {
+				plan.Skipped = append(plan.Skipped, BackupSkip{Plugin: "rcplug", ID: id, Reason: "this rcplug does not know the RØDE service"})
+			}
+		}
+	}
 	return plan
 }
 
 // restore carries out a plan: plugins switched off first, then the options
 // (a running plugin restarts with them), then plugins switched on.
-func (m *Manager) restore(plan BackupPlan) (catalogs bool, errs []string) {
+func (m *Manager) restore(plan BackupPlan, services *Services) (catalogs bool, errs []string) {
 	options := map[string]map[string]json.RawMessage{}
 	var on, off []string
 	for _, c := range plan.Changes {
@@ -259,6 +284,19 @@ func (m *Manager) restore(plan BackupPlan) (catalogs bool, errs []string) {
 			options[c.Plugin][c.ID] = c.To
 		case "autoCheck":
 			m.SetAutoCheck(string(c.To) == "true")
+		case "service":
+			var err error
+			switch {
+			case services == nil:
+				err = errors.New("switching RØDE's services is not available here")
+			case string(c.To) == "true":
+				err = services.On(c.ID)
+			default:
+				err = services.Off(context.Background(), c.ID)
+			}
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("RØDE service %s: %v", c.ID, err))
+			}
 		case "catalog":
 			catalogs = true
 			if string(c.To) == "null" {
@@ -321,7 +359,7 @@ func (s *Server) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	plan := s.m.plan(b)
-	catalogs, errs := s.m.restore(plan)
+	catalogs, errs := s.m.restore(plan, s.Services)
 	if catalogs && s.Updates != nil {
 		s.Updates.forgetCatalog()
 	}

@@ -19,12 +19,16 @@ import (
 //	network     talk to other machines (shown, not enforced)
 //	device      use the device's hardware or files outside its data
 //	            directory (shown, not enforced)
+//	screen      take over the device's screen: while the plugin runs, RØDE's
+//	            screen program is stopped, and it is started again when the
+//	            plugin ends (screen.go). Such a plugin never starts by
+//	            itself: only from the dashboard, and only once (no restarts)
 //
 // Plugins run as root on the device, so this guards against mistakes and
 // tells users what a plugin is for; it does not contain a plugin that means
 // harm.
 
-var knownPermissions = map[string]bool{"desk:write": true, "audio": true, "network": true, "device": true}
+var knownPermissions = map[string]bool{"desk:write": true, "audio": true, "network": true, "device": true, "screen": true}
 
 func validatePermissions(m *Manifest) error {
 	seen := map[string]bool{}

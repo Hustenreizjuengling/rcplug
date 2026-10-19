@@ -22,17 +22,28 @@ const T = {
     catSources: 'Catalogs', catSourcesHint: 'The official catalog holds the plugins published with rcplug. Add other catalogs only from people you trust, since their plugins run with full rights on the device. A catalog is a GitHub repository with signed releases; you need the public key it is signed with.',
     catSrcRelease: 'release {v}', catSrcPlugins: 'plugins: {n}', catSrcKey: 'key {id}', catRepo: 'GitHub repository (owner/name)', catKey: 'Public key (base64)',
     catAdd: 'Add', catRemoveSrc: 'Remove', catRemoveSrcQ: 'Remove the catalog {repo}? Plugins installed from it stay.',
-    perms: 'Permissions:', 'perm_desk:write': 'changes the desk', perm_audio: 'hears the desk', perm_network: 'network', perm_device: 'device',
+    perms: 'Permissions:', 'perm_desk:write': 'changes the desk', perm_audio: 'hears the desk', perm_network: 'network', perm_device: 'device', perm_screen: 'takes over the screen',
     'permHint_desk:write': 'May change the mixer, the recorder and the pads through the console, without the PIN and whatever control level the console has; write protection stops it.',
     permHint_audio: 'May listen to the desk\'s inputs and outputs through the shared audio taps.',
     permHint_network: 'Talks to other machines on the network or the internet.',
     permHint_device: 'Uses the device\'s hardware or files outside its own directory.',
+    permHint_screen: 'Shows its own pages on the device\'s screen while it runs: RØDE\'s screen is stopped meanwhile and comes back when the plugin stops. It never starts by itself.',
     unknown: 'unknown plugin.json fields: {f}', notFound: 'Plugin not found.', isState: 'The plugin is {state}', autoRestart: 'It is restarted automatically…',
     failed: 'Action failed: {err}', emptyLog: '(empty)', noLog: '(no log)', footer: 'rcplug – add-ons for the RØDECaster, without new firmware.',
     st_running: 'running', st_starting: 'starting', st_backoff: 'restarting…', st_stopped: 'stopped',
     sysTitle: 'System', sysDesc: 'The device and rcplug at a glance.', hostname: 'Hostname', arch: 'Architecture', temp: 'CPU temperature',
     loadAvg: 'Load (1/5/15 min)', memory: 'Memory', disk: 'Storage (rcplug)', devUp: 'Device up for', hostUp: 'rcplug up for',
     version: 'rcplug version', clock: 'Device time', memUsed: '{used} of {total} MB used', diskFree: '{free} MB free of {total} MB',
+    sysServices: 'RØDE services', svcTitle: 'RØDE services', svcDesc: 'Some of RØDE\'s built-in services can be switched off if you never use them. A switched-off service does not start any more, also after a restart. No file of RØDE\'s is changed: a firmware update or removing rcplug switches everything on again.',
+    svcOn: 'on', svcOff: 'off', svcNotRunning: 'on, not running', svcUnavailable: 'not available', svcTurnOff: 'Switch off', svcTurnOn: 'Switch on',
+    svcCost: 'Now: CPU {cpu} %, own RAM {ram} MB', svcPorts: 'Open ports: {list}', svcOutside: 'Connections to the internet: {n}', svcNoPorts: 'No open ports',
+    svcWithout: 'Without it: {what}', svcConfirmOff: 'Switch {name} off?\n\nWithout it: {what}\n\nYou can switch it on again here at any time.',
+    svcWhy_unknown_version: 'This firmware has another version of it than rcplug knows, so rcplug leaves it on.', svcWhy_not_present: 'Not on this device.',
+    svcWhy_unreadable: 'Its starter cannot be read.', svcWhy_not_applied: 'Switched off, takes effect at the next start of the device.',
+    svc_callme: 'CallMe', svc_callme_what: 'RØDE\'s remote calls over the internet (SIP/Opus): CallMe calls, hosting and Quick Dial.', svc_callme_off: 'no CallMe calls, no hosting, no Quick Dial; the CallMe channels stay silent.',
+    svc_rpcbind: 'rpcbind', svc_rpcbind_what: 'A helper for network file systems (NFS). The Duo does not use it, but it listens on port 111.', svc_rpcbind_off: 'nothing you would notice.',
+    svc_modemmanager: 'ModemManager', svc_modemmanager_what: 'Manages mobile network modems. The Duo has none.', svc_modemmanager_off: 'nothing you would notice.',
+    svcScreen: 'The device\'s screen is with the plugin {name}; RØDE\'s screen comes back when it stops.',
     sysOverview: 'Overview', sysProcs: 'Processes', sysUpdates: 'Updates', sysAccess: 'Access', sysAudio: 'Audio & events', sysHelp: 'Help',
     sysDevice: 'Device', statLoad: 'Load', statMem: 'Memory used', statDisk: 'Storage free', statUp: 'Device up for', statTemp: 'CPU temperature',
     disclaimer: 'rcplug is unofficial software, not affiliated with or endorsed by RØDE Microphones. RØDE and RØDECaster are trademarks of their owner. Use at your own risk.',
@@ -95,17 +106,28 @@ const T = {
     catSources: 'Kataloge', catSourcesHint: 'Der offizielle Katalog enthält die Plugins, die mit rcplug veröffentlicht werden. Füge andere Kataloge nur von Leuten hinzu, denen du vertraust, denn ihre Plugins laufen mit allen Rechten auf dem Gerät. Ein Katalog ist ein GitHub-Repository mit signierten Releases; du brauchst den öffentlichen Schlüssel, mit dem es signiert wird.',
     catSrcRelease: 'Release {v}', catSrcPlugins: 'Plugins: {n}', catSrcKey: 'Schlüssel {id}', catRepo: 'GitHub-Repository (owner/name)', catKey: 'Öffentlicher Schlüssel (base64)',
     catAdd: 'Hinzufügen', catRemoveSrc: 'Entfernen', catRemoveSrcQ: 'Den Katalog {repo} entfernen? Daraus installierte Plugins bleiben.',
-    perms: 'Berechtigungen:', 'perm_desk:write': 'ändert das Pult', perm_audio: 'hört das Pult', perm_network: 'Netzwerk', perm_device: 'Gerät',
+    perms: 'Berechtigungen:', 'perm_desk:write': 'ändert das Pult', perm_audio: 'hört das Pult', perm_network: 'Netzwerk', perm_device: 'Gerät', perm_screen: 'übernimmt den Bildschirm',
     'permHint_desk:write': 'Darf über die Konsole Mixer, Recorder und Pads ändern, ohne PIN und unabhängig von der Steuerungsstufe der Konsole; der Schreibschutz hält es auf.',
     permHint_audio: 'Darf die Ein- und Ausgänge des Pults über die gemeinsamen Audio-Abgriffe hören.',
     permHint_network: 'Spricht mit anderen Rechnern im Netzwerk oder im Internet.',
     permHint_device: 'Nutzt die Hardware des Geräts oder Dateien außerhalb seines eigenen Verzeichnisses.',
+    permHint_screen: 'Zeigt eigene Seiten auf dem Bildschirm des Geräts, solange es läuft: RØDEs Bildschirm ist so lange aus und kommt zurück, wenn das Plugin stoppt. Startet nie von selbst.',
     unknown: 'unbekannte plugin.json-Felder: {f}', notFound: 'Plugin nicht gefunden.', isState: 'Das Plugin ist gerade {state}', autoRestart: 'Es wird automatisch neu gestartet…',
     failed: 'Aktion fehlgeschlagen: {err}', emptyLog: '(leer)', noLog: '(kein Log)', footer: 'rcplug – Funktionen für den RØDECaster ohne neue Firmware.',
     st_running: 'läuft', st_starting: 'startet', st_backoff: 'Neustart…', st_stopped: 'gestoppt',
     sysTitle: 'System', sysDesc: 'Das Gerät und rcplug auf einen Blick.', hostname: 'Hostname', arch: 'Architektur', temp: 'CPU-Temperatur',
     loadAvg: 'Last (1/5/15 min)', memory: 'Arbeitsspeicher', disk: 'Speicherplatz (rcplug)', devUp: 'Gerät läuft seit', hostUp: 'rcplug läuft seit',
     version: 'rcplug-Version', clock: 'Uhrzeit (Gerät)', memUsed: '{used} / {total} MB belegt', diskFree: '{free} MB frei von {total} MB',
+    sysServices: 'RØDE-Dienste', svcTitle: 'RØDE-Dienste', svcDesc: 'Einige eingebaute Dienste von RØDE lassen sich ausschalten, wenn du sie nie benutzt. Ein ausgeschalteter Dienst startet nicht mehr, auch nicht nach einem Neustart. Keine Datei von RØDE wird verändert: Ein Firmware-Update oder das Entfernen von rcplug schaltet alles wieder ein.',
+    svcOn: 'an', svcOff: 'aus', svcNotRunning: 'an, läuft nicht', svcUnavailable: 'nicht verfügbar', svcTurnOff: 'Ausschalten', svcTurnOn: 'Einschalten',
+    svcCost: 'Gerade: CPU {cpu} %, eigener RAM {ram} MB', svcPorts: 'Offene Ports: {list}', svcOutside: 'Verbindungen ins Internet: {n}', svcNoPorts: 'Keine offenen Ports',
+    svcWithout: 'Ohne ihn: {what}', svcConfirmOff: '{name} ausschalten?\n\nOhne ihn: {what}\n\nDu kannst ihn hier jederzeit wieder einschalten.',
+    svcWhy_unknown_version: 'Diese Firmware hat eine andere Fassung davon, als rcplug kennt – deshalb bleibt er an.', svcWhy_not_present: 'Gibt es auf diesem Gerät nicht.',
+    svcWhy_unreadable: 'Sein Start-Skript lässt sich nicht lesen.', svcWhy_not_applied: 'Ausgeschaltet, wirkt ab dem nächsten Start des Geräts.',
+    svc_callme: 'CallMe', svc_callme_what: 'RØDEs Fernanrufe übers Internet (SIP/Opus): CallMe-Anrufe, Hosting und Quick Dial.', svc_callme_off: 'keine CallMe-Anrufe, kein Hosting, kein Quick Dial; die CallMe-Kanäle bleiben stumm.',
+    svc_rpcbind: 'rpcbind', svc_rpcbind_what: 'Ein Hilfsdienst für Netzwerk-Dateisysteme (NFS). Der Duo nutzt ihn nicht, aber er lauscht auf Port 111.', svc_rpcbind_off: 'nichts, was du merken würdest.',
+    svc_modemmanager: 'ModemManager', svc_modemmanager_what: 'Verwaltet Mobilfunk-Modems. Der Duo hat keins.', svc_modemmanager_off: 'nichts, was du merken würdest.',
+    svcScreen: 'Der Bildschirm des Geräts ist beim Plugin {name}; RØDEs Bildschirm kommt zurück, wenn es stoppt.',
     sysOverview: 'Übersicht', sysProcs: 'Prozesse', sysUpdates: 'Updates', sysAccess: 'Zugang', sysAudio: 'Audio & Ereignisse', sysHelp: 'Hilfe',
     sysDevice: 'Gerät', statLoad: 'Last', statMem: 'Arbeitsspeicher belegt', statDisk: 'Speicherplatz frei', statUp: 'Gerät läuft seit', statTemp: 'CPU-Temperatur',
     disclaimer: 'rcplug ist inoffizielle Software und steht in keiner Verbindung zu RØDE Microphones. RØDE und RØDECaster sind Marken ihres Inhabers. Nutzung auf eigene Gefahr.',
@@ -664,7 +686,7 @@ async function installFromCatalog(e, btn) {
 }
 
 // ---- the System pages: #/system[/procs|updates|access|audio|help]
-const SYS_TABS = [['', 'sysOverview'], ['procs', 'sysProcs'], ['updates', 'sysUpdates'], ['access', 'sysAccess'], ['audio', 'sysAudio'], ['help', 'sysHelp']];
+const SYS_TABS = [['', 'sysOverview'], ['procs', 'sysProcs'], ['services', 'sysServices'], ['updates', 'sysUpdates'], ['access', 'sysAccess'], ['audio', 'sysAudio'], ['help', 'sysHelp']];
 let sysTabShown = null;
 function renderSystem() {
   frameFor = null;
@@ -685,6 +707,8 @@ function renderSystem() {
         <div class="actions"><div class="seg" role="radiogroup"><button type="button" role="radio" data-sort="cpu">${esc(t('procByCPU'))}</button><button type="button" role="radio" data-sort="mem">${esc(t('procByMem'))}</button></div></div></div>
         <div id="procList"></div><details style="margin-top:14px"><summary>${esc(t('procWhat'))}</summary><p class="hint">${esc(t('procExplain'))}</p></details></div>`;
       bindProcSort();
+    } else if (tab === 'services') {
+      body.innerHTML = `<div class="stack" style="--gap:14px"><p class="lead" style="margin:0">${esc(t('svcDesc'))}</p><div id="svcScreen"></div><div id="svcList" class="stack" style="--gap:14px"></div></div>`;
     } else if (tab === 'updates') body.innerHTML = '<div class="card" id="updCard"></div>';
     else if (tab === 'access') { body.innerHTML = '<div class="card" id="accCard"></div>'; renderAccess(); }
     else if (tab === 'audio') {
@@ -708,6 +732,7 @@ function renderSystem() {
   }
   if (tab === '') renderOverview();
   else if (tab === 'procs') loadProcs();
+  else if (tab === 'services') loadServices();
   else if (tab === 'updates') renderUpdates();
   else if (tab === 'audio') renderTaps();
 }
@@ -767,6 +792,47 @@ async function loadProcs() {
     + d.processes.map((p) => `<tr title="${esc(p.command || p.name)}"><td>${esc(p.name)} ${owner(p)}</td><td class="dim num">${esc(p.pid)}</td><td class="num">${esc(pc(p.cpu / cores))} %</td><td class="num">${esc(fmb(p.ownKB || 0))} MB</td><td class="num dim">${esc(fmb(p.sharedKB || 0))} MB</td><td class="num dim">${esc(p.threads)}</td></tr>`).join('')
     + (kt.count ? `<tr class="dim"><td>${esc(t('procKernel', { n: kt.count }))}</td><td></td><td class="num">${esc(pc(kt.cpu / cores))} %</td><td class="num">–</td><td class="num">–</td><td></td></tr>` : '')
     + `</tbody></table></div><p class="hint">${esc(t('procFoot', { n: d.count, own: fmb(d.ownKB || 0), programs: fmb((d.memory && d.memory.programsKB) || 0) }))}</p>`;
+}
+
+// ---- RØDE's services: switched off and on (internal/host/services.go)
+let svcBusy = '';
+async function loadServices() {
+  const el = $('#svcList');
+  if (!el || svcBusy) return;
+  let d;
+  try { d = await jget('api/services'); } catch (e) { el.innerHTML = `<p class="muted">${esc(t('failed', { err: e.message }))}</p>`; return; }
+  $('#svcScreen').innerHTML = d.screen ? `<div class="banner info">${ico('info')}<div>${esc(t('svcScreen', { name: d.screen }))}</div></div>` : '';
+  const pc = (x) => (x || 0).toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const cores = d.cores || 1;
+  el.innerHTML = d.services.map((x) => {
+    const procs = x.procs || [], running = procs.length > 0;
+    const cpu = procs.reduce((a, p) => a + (p.cpu || 0), 0) / cores, ram = procs.reduce((a, p) => a + (p.ownKB || 0), 0) / 1024;
+    const pill = x.state === 'off' ? `<span class="pill plain">${esc(t('svcOff'))}</span>`
+      : x.state === 'unavailable' ? `<span class="pill warn">${esc(t('svcUnavailable'))}</span>`
+      : running ? `<span class="pill ok">${esc(t('svcOn'))}</span>` : `<span class="pill plain">${esc(t('svcNotRunning'))}</span>`;
+    const facts = [];
+    if (running) facts.push(t('svcCost', { cpu: pc(cpu), ram: ram.toLocaleString(lang, { maximumFractionDigits: 1 }) }));
+    if (running) facts.push((x.listening || []).length ? t('svcPorts', { list: x.listening.join(', ') }) : t('svcNoPorts'));
+    if (x.outside) facts.push(t('svcOutside', { n: x.outside }));
+    const btn = x.state === 'unavailable' ? ''
+      : x.state === 'off' ? `<button class="btn primary sm" data-svc="${esc(x.id)}" data-on="1">${esc(t('svcTurnOn'))}</button>`
+      : `<button class="btn sm" data-svc="${esc(x.id)}" data-on="0">${ico('power', 'i-sm')}${esc(t('svcTurnOff'))}</button>`;
+    return `<div class="card svc"><div class="card-head"><h2>${esc(t('svc_' + x.id))}</h2>${pill}<span class="spacer"></span>${btn}</div>
+      <p class="lead" style="margin:0 0 6px">${esc(t('svc_' + x.id + '_what'))}</p>
+      <p class="small">${esc(t('svcWithout', { what: t('svc_' + x.id + '_off') }))}</p>
+      ${facts.length ? `<p class="hint">${esc(facts.join(' · '))}</p>` : ''}
+      ${x.reason ? `<p class="${x.state === 'unavailable' ? 'warn-text' : 'hint'} small">${esc(t('svcWhy_' + x.reason))}</p>` : ''}<p class="error small"></p></div>`;
+  }).join('');
+  el.querySelectorAll('[data-svc]').forEach((b) => (b.onclick = async () => {
+    const id = b.dataset.svc, on = b.dataset.on === '1';
+    if (!on && !confirm(t('svcConfirmOff', { name: t('svc_' + id), what: t('svc_' + id + '_off') }))) return;
+    b.disabled = true;
+    svcBusy = id;
+    try { await jpost('api/services/' + encodeURIComponent(id), { on }); }
+    catch (e) { const err = b.closest('.svc').querySelector('.error'); if (err) err.textContent = t('failed', { err: e.message }); }
+    finally { svcBusy = ''; }
+    loadServices();
+  }));
 }
 
 // ---- shared audio taps

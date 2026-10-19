@@ -40,6 +40,8 @@ type Server struct {
 	Events *Bus
 	// Taps are the shared audio taps; nil switches their API off.
 	Taps *Taps
+	// Services switches RØDE's services off and on; nil switches the API off.
+	Services *Services
 	// Rescan reloads the plugins for POST /api/reload (and logs what it
 	// found); nil means Manager.Load.
 	Rescan func() ([]string, error)
@@ -125,6 +127,8 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/catalog/install", sdk.CSRF(http.HandlerFunc(s.handleCatalogInstall)))
 	mux.Handle("POST /api/catalog/sources", sdk.CSRF(http.HandlerFunc(s.handleCatalogSource)))
 	mux.Handle("POST /api/plugins/{name}/remove", sdk.CSRF(http.HandlerFunc(s.handleRemovePlugin)))
+	mux.HandleFunc("GET /api/services", s.handleServices)
+	mux.Handle("POST /api/services/{id}", sdk.CSRF(http.HandlerFunc(s.handleService)))
 	mux.HandleFunc("GET /api/backup", s.handleBackup)
 	mux.Handle("POST /api/backup/diff", sdk.CSRF(http.HandlerFunc(s.handleBackupDiff)))
 	mux.Handle("POST /api/backup/restore", sdk.CSRF(http.HandlerFunc(s.handleBackupRestore)))

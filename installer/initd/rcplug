@@ -50,6 +50,10 @@ do_start() {
   fi
   mkdir -p "$(dirname "$LOG")"
   if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 524288 ]; then mv -f "$LOG" "$LOG.1"; fi
+  # RØDE services switched off in the dashboard stay off. At boot this runs
+  # before they start (rcplug is S05, rpcbind S12, CallMe S30); it only lays
+  # bind mounts and never stops the boot.
+  "$BIN" --root "$RCPLUG_DIR" --services apply >>"$LOG" 2>&1 || true
   # Lowest CPU priority is set by rcplugd itself (audio always comes first).
   # Short options: BusyBox start-stop-daemon may lack the long ones.
   start-stop-daemon -S -b -m -p "$PIDFILE" \
