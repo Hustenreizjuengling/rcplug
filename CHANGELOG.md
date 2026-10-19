@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.8.13 - Unreleased
+## 0.8.13 - 2026-10-19
 
 ### Changed
 - **Opening the console sends a fraction of what it did.** Its pages were sent in full
