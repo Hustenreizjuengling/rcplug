@@ -1,5 +1,5 @@
 // Mixer: recorder, monitor, device info, the channel strips and the level meters.
-import { h } from '../dom.js';
+import { h, icon } from '../dom.js';
 import { t } from '../i18n.js';
 import { store, single, famPath, val, runPath, mixPath } from '../store.js';
 import { canWrite } from '../policy.js';
@@ -58,6 +58,7 @@ function strip(scope, i) {
   const name = faderLabel(i);
   scope.rerenderOn(ch, 'channelInputSource');
   const el = h('section', { class: 'strip' + (physical ? '' : ' virtual') + (src < 0 ? ' emptysrc' : ''), 'aria-label': name });
+  if (colour) el.style.setProperty('--src', colour);
   el.append(h('div', { class: 'sh' }, h('b', null, name), h('span', { class: 'spacer' }), h('span', { class: 'tag' }, physical ? t('mixer.physical') : t('mixer.virtual'))));
   el.append(h('div', { class: 'colorbar', style: colour ? 'background:' + colour : '' }));
   if (canWrite(ch, 'channelInputSource')) el.append(selectCtl(scope, ch, 'channelInputSource', sourceOptions(), { raw: true, label: t('mixer.source'), confirm: t('mixer.sourceConfirm') }));
@@ -78,9 +79,8 @@ function strip(scope, i) {
   const chips = h('div', { class: 'chips' });
   for (const p of PROC) if (p.chip && val(ch, p.on) !== undefined) chips.append(chip(scope, ch, p.on, p.chip));
   chips.append(chip(scope, ch, 'channelBypassProcessing', 'Bypass'));
-  el.append(chips, h('button', { class: 'btn small', type: 'button', onclick: () => openChannel(i) }, t('details')));
-  const acts = actionButtons('channel', channelVars(i));
-  if (acts) el.append(acts);
+  // Details and the plugins' actions for this channel (e.g. Sonar) in one row.
+  el.append(chips, h('div', { class: 'sfoot' }, h('button', { class: 'btn small', type: 'button', onclick: () => openChannel(i) }, icon('sliders', 'i-sm'), t('details')), actionButtons('channel', channelVars(i))));
   return el;
 }
 

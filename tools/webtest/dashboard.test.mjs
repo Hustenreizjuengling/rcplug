@@ -1,4 +1,4 @@
-// The dashboard (cmd/rcplugd/web/index.html): German and English have the
+// The dashboard (cmd/rcplugd/web/app.js): German and English have the
 // same keys, and every key the page uses literally exists
 // (node --test tools/webtest).
 import { test } from 'node:test';
@@ -7,8 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../cmd/rcplugd/web/index.html'), 'utf8');
-const script = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
+const script = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../cmd/rcplugd/web/app.js'), 'utf8');
 const block = script.slice(script.indexOf('const T = {'), script.indexOf('\n};\n') + 3);
 const T = new Function(block.replace('const T =', 'return'))();
 

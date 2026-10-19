@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/Hustenreizjuengling/rcplug/sdk/ui"
 )
 
 // Every file referenced by index.html and every ES module import must exist
@@ -21,6 +23,12 @@ func TestEmbeddedUIReferencesResolve(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, m := range regexp.MustCompile(`(?:src|href)="([^"#:]+)"`).FindAllStringSubmatch(string(html), -1) {
+		if name, shared := strings.CutPrefix(m[1], "ui/"); shared { // rcplug's shared look, sdk/ui
+			if _, err := fs.Stat(ui.FS, name); err != nil {
+				t.Errorf("index.html references %s, which sdk/ui does not have", m[1])
+			}
+			continue
+		}
 		if !exists(m[1]) {
 			t.Errorf("index.html references missing %s", m[1])
 		}

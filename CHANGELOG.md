@@ -6,6 +6,27 @@ may break compatibility).
 
 ## 0.8.8 - Unreleased
 
+### Changed
+- **A new look, one application:** rcplug's dashboard, its console and its login page
+  share one design (`sdk/ui`: colours, type, components and an icon set, about 24 KB)
+  and plugins can use it too.
+  - The **dashboard** has a side bar with the device, the plugins' pages and *Plugins*
+    and *System*; a plugin's page fills the rest, without a second bar. On a phone the
+    side bar folds into a menu. *System* is split into Overview (memory, storage,
+    load and uptime at a glance), Processes, Updates, Access, Audio & events and
+    Help; the plugin list has clearer cards with the main action first.
+  - The **console** has one bar with the device, its views as tabs, the connection
+    and the control level, instead of a header and a second side bar. Channel strips
+    show their source in full and carry their colour at the top; settings show their
+    name and value above the slider; recorder buttons have icons; cards keep their
+    own height.
+  - Fewer explanations in the way: long texts moved into hints and folds.
+
+### Added
+- **`sdk/ui`** serves the shared stylesheet and icons for plugins
+  (`ui.Handler("/ui/")`); rcplugd serves them at `/ui/` too
+  ([plugin guide](docs/plugin-guide.md#look-like-the-rest-of-rcplug)).
+
 ## 0.8.7 - 2026-10-19
 
 ### Added

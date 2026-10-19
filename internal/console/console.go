@@ -17,6 +17,7 @@ import (
 	"github.com/Hustenreizjuengling/rcplug/internal/desk"
 	"github.com/Hustenreizjuengling/rcplug/internal/rcproto"
 	"github.com/Hustenreizjuengling/rcplug/sdk"
+	"github.com/Hustenreizjuengling/rcplug/sdk/ui"
 )
 
 //go:embed web
@@ -180,6 +181,7 @@ func (c *Console) Run(ctx context.Context) {
 func (c *Console) Handler() http.Handler {
 	mux := http.NewServeMux()
 	c.register(mux)
+	mux.Handle("GET /ui/", ui.Handler("/ui/")) // rcplug's shared look (sdk/ui)
 	sub, _ := fs.Sub(webFS, "web")
 	files := http.FileServer(http.FS(sub))
 	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

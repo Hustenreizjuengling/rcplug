@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug/sdk"
+	"github.com/Hustenreizjuengling/rcplug/sdk/ui"
 )
 
 // Server wires the manager to an HTTP mux: dashboard, JSON API and per-plugin
@@ -105,6 +106,7 @@ func (s *Server) SetInvalid(invalid []string) {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.Handle("GET /ui/", ui.Handler("/ui/"))
 	mux.HandleFunc("GET /api/plugins", s.handlePlugins)
 	mux.HandleFunc("GET /api/system", s.handleSystem)
 	mux.HandleFunc("GET /api/processes", s.handleProcesses)

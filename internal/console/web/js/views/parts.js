@@ -1,5 +1,5 @@
 // Building blocks shared by several views.
-import { h, pct, fmtMs, fmtValue } from '../dom.js';
+import { h, pct, fmtMs, fmtValue, icon } from '../dom.js';
 import { t } from '../i18n.js';
 import { single, famPath, mixPath, nodeAt, typeOf, val } from '../store.js';
 import { canWrite } from '../policy.js';
@@ -32,12 +32,12 @@ export function recorderCard(scope) {
   tick();
   scope.interval(tick, 500);
   const can = canWrite(rp, 'requestRecordState');
-  const btn = (text, v, hint) => h('button', { class: 'btn', type: 'button', disabled: !can, title: hint, onclick: () => record(scope, v) }, text);
+  const btn = (ic, text, v, hint, cls = '') => h('button', { class: 'btn small ' + cls, type: 'button', disabled: !can, title: hint || text, onclick: () => record(scope, v) }, icon(ic, 'i-sm'), text);
   return card(t('rec.title'),
-    h('div', { class: 'rec' }, dot, time, state),
-    h('div', { class: 'row', style: 'margin-top:8px' },
-      btn('● ' + t('rec.record'), 2, t('rec.recordHint')), btn('❚❚ ' + t('rec.pause'), 1), btn('■ ' + t('rec.stop'), 0),
-      h('button', { class: 'btn', type: 'button', disabled: !canWrite(rp, 'requestDropMarker'), title: t('rec.markerHint'), onclick: () => setProp(scope, rp, 'requestDropMarker', Date.now()) }, '⚑ ' + t('rec.marker'))));
+    h('div', { class: 'rec' }, dot, time, h('span', { class: 'muted' }, state)),
+    h('div', { class: 'row transport' },
+      btn('record', t('rec.record'), 2, t('rec.recordHint'), 'recbtn'), btn('pause', t('rec.pause'), 1), btn('stop', t('rec.stop'), 0),
+      h('button', { class: 'btn small', type: 'button', disabled: !canWrite(rp, 'requestDropMarker'), title: t('rec.markerHint'), onclick: () => setProp(scope, rp, 'requestDropMarker', Date.now()) }, icon('flag', 'i-sm'), t('rec.marker'))));
 }
 
 export function monitorCard(scope) {

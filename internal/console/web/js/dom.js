@@ -25,6 +25,18 @@ export function h(tag, attrs, ...kids) {
   return el;
 }
 
+// icon is an icon of the shared set (ui/icons.svg, sdk/ui).
+const SVG = 'http://www.w3.org/2000/svg';
+export function icon(id, cls = '') {
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('class', 'i' + (cls ? ' ' + cls : ''));
+  svg.setAttribute('aria-hidden', 'true');
+  const use = document.createElementNS(SVG, 'use');
+  use.setAttribute('href', 'ui/icons.svg#' + id);
+  svg.append(use);
+  return svg;
+}
+
 export const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 export const pct = (x) => Math.round(clamp(x, 0, 1) * 100) + '%';
 

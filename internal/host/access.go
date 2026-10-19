@@ -308,7 +308,8 @@ func fromDevice(r *http.Request) bool {
 // open lists what a visitor who is not logged in may reach.
 func open(r *http.Request) bool {
 	switch r.URL.Path {
-	case "/login", "/api/access", "/api/login", "/api/logout", "/api/access/reset", "/favicon.ico":
+	case "/login", "/api/access", "/api/login", "/api/logout", "/api/access/reset", "/favicon.ico",
+		"/ui/rcplug.css", "/ui/icons.svg": // the login page's look
 		return true
 	}
 	return false

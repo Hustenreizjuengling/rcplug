@@ -476,6 +476,7 @@ The dashboard's API, open to plugins (`$RCPLUG_HOST_URL`) and scripts. POSTs nee
 | `POST /api/uninstall` `{"confirm": "uninstall"}` | Removes rcplug from the device: stops it and every plugin, removes the init script and the install directory with all data (only one named `rcplug` that holds `rcplugd`) |
 | `GET /api/processes?sort=cpu\|mem&limit=20&all=1` | The device's processes: `pid`, `name`, `command` (secrets masked), `cpu` (percent of one core since the previous request), `cpuTime`, `ownKB` (memory only the process holds, RssAnon), `sharedKB` (program files and shared memory, RssFile + RssShmem), `rssKB`, `threads`, `kernel`, `owner` (`rcplug` with the `plugin`, or `rode`); `all=1` includes kernel threads. Also the device's `cpu` (percent of the whole device: `total`, `user`, `system`, `irq`, `iowait`; from the second request on), `memory` as in `api/system`, `ownKB` of all processes and `kernelThreads` (`count`, `cpu`) |
 | `GET /api/diagnostics` | The diagnostics bundle |
+| `GET /ui/rcplug.css`, `GET /ui/icons.svg` | rcplug's shared look ([`sdk/ui`](plugin-guide.md#look-like-the-rest-of-rcplug)); also served without a login, for the login page |
 | `GET /api/updates`, `POST /api/updates/check`, `POST /api/updates/install?target=` | Updates, see [updates.md](updates.md) |
 | `GET /api/events`, `GET /api/events/stream`, `POST /api/events` | The event bus, see [Events](#events) |
 | `GET /api/audio`, `GET /api/audio/stream` | The shared audio taps, see [Audio](#audio) |

@@ -111,7 +111,7 @@ export function compCurve(scope, ch, meter) {
     grid.append(el('text', { x: x(db) + 3, y: H - P - 4 }, String(db)));
   }
   grid.append(el('line', { x1: x(-60), y1: y(-60), x2: x(6), y2: y(6), class: 'unity' }));
-  const thr = el('line', { class: 'mark' }), line = el('path', { class: 'line' }), dot = el('circle', { r: 6, class: 'dot' });
+  const thr = el('line', { class: 'mark' }), line = el('path', { class: 'line' }), dot = el('circle', { r: 6, class: 'level' });
   const label = el('text', { class: 'label', x: W - P - 4, y: P + 14, 'text-anchor': 'end' });
   svg.append(grid, thr, line, dot, label);
   const params = () => ({ T: SCALES.compressorThreshold(num(ch, 'compressorThreshold')), R: SCALES.compressorRatio(num(ch, 'compressorRatio')), M: SCALES.compressorGain(num(ch, 'compressorGain')), active: on(ch, 'compressorOn') && !on(ch, 'channelBypassProcessing') });

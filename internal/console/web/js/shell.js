@@ -1,7 +1,7 @@
-// The page frame: header (device, connection, control level, language),
-// navigation generated from the view registry, and mounting views with a
-// fresh scope whenever the tree is reloaded.
-import { $, $$, h, toast } from './dom.js';
+// The page frame: one bar with the device, the views as tabs (generated
+// from the view registry), the connection and the control level; mounting
+// views with a fresh scope whenever the tree is reloaded.
+import { $, $$, h, toast, icon } from './dom.js';
 import { t, getLang, setLang } from './i18n.js';
 import { store, on, single, val, isLoading } from './store.js';
 import { setCapabilities, controlLevel } from './policy.js';
@@ -57,33 +57,18 @@ export function render() {
 
 function markTab() {
   $$('#tabs a').forEach((a) => {
-    const on = a.dataset.view === current.id;
-    a.classList.toggle('on', on);
-    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    if (a.dataset.view === current.id) {
+      a.setAttribute('aria-current', 'page');
+      if (a.scrollIntoView && a.offsetParent) a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    } else a.removeAttribute('aria-current');
   });
-  // The tools fold away unless one of them is open (or the bar is a row).
-  const fold = $('#tabs details');
-  if (fold && (tools.has(current.id) || narrow.matches)) fold.open = true;
 }
 
-const narrow = window.matchMedia('(max-width: 760px)');
-const SVG = 'http://www.w3.org/2000/svg';
-function icon(id) {
-  const svg = document.createElementNS(SVG, 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('aria-hidden', 'true');
-  const p = document.createElementNS(SVG, 'path');
-  p.setAttribute('d', icons[id] || '');
-  svg.append(p);
-  return svg;
-}
-const navLink = (v) => h('a', { href: '#' + v.id, 'data-view': v.id }, icon(v.id), h('span', null, t(v.title)));
+const navLink = (v) => h('a', { href: '#' + v.id, 'data-view': v.id, class: tools.has(v.id) ? 'tool' : '', title: t(v.title) }, icon(icons[v.id]), h('span', null, t(v.title)));
 
+// The views as tabs; the tools (explorer, log) after a divider, quieter.
 function buildNav() {
-  const nav = $('#tabs');
-  const fold = h('details', null, h('summary', null, t('nav.tools')), ...views.filter((v) => tools.has(v.id)).map(navLink));
-  nav.replaceChildren(...views.filter((v) => !tools.has(v.id)).map(navLink), fold);
-  narrow.addEventListener('change', markTab);
+  $('#tabs').replaceChildren(...views.filter((v) => !tools.has(v.id)).map(navLink), h('span', { class: 'divider', 'aria-hidden': 'true' }), ...views.filter((v) => tools.has(v.id)).map(navLink));
 }
 
 function banners() {
@@ -95,10 +80,10 @@ function banners() {
   // connects; restarting the screen brings it.
   if (conn && conn.mode === 'tap' && conn.state === 'waiting') {
     out.push(h('div', { class: 'banner info' }, t('banner.tapWaiting'), ' ',
-      h('button', { class: 'btn small', type: 'button', onclick: resyncNow }, t('banner.tapResync'))));
+      h('button', { class: 'btn sm', type: 'button', onclick: resyncNow }, t('banner.tapResync'))));
   } else if (conn && conn.mode === 'tap' && conn.state === 'live' && conn.code === 'resumed') {
     out.push(h('div', { class: 'banner info' }, t('banner.tapResumed'), ' ',
-      h('button', { class: 'btn small', type: 'button', onclick: resyncNow }, t('banner.tapResync'))));
+      h('button', { class: 'btn sm', type: 'button', onclick: resyncNow }, t('banner.tapResync'))));
   } else if (conn && conn.mode === 'tap' && conn.state === 'live' && current.id !== 'system') {
     out.push(h('div', { class: 'banner info' }, conn.fullControl ? t('banner.tapFallback') : t('banner.tapLive'), ' ', h('a', { href: '#system' }, t('banner.busyLink'))));
   }
@@ -129,14 +114,14 @@ export function renderHeader() {
   const conn = st && st.connection;
   const pill = $('#conn');
   const live = liveState.open && conn && conn.state === 'live';
-  pill.className = 'conn ' + (!liveState.open ? 'bad' : !conn ? '' : live ? 'live' : conn.state === 'conflict' ? 'bad' : 'warn');
+  pill.className = 'conn pill ' + (!liveState.open ? 'danger' : !conn ? 'plain' : live ? 'ok live' : conn.state === 'conflict' ? 'danger' : 'warn');
   // The banner explains a conflict at length; the pill stays short.
   $('.txt', pill).textContent = !liveState.open ? t('header.offline') : !conn ? '…' : live ? t(conn.mode === 'tap' ? 'header.liveTap' : conn.mode === 'relay' ? 'header.liveRelay' : 'header.live', { n: (conn.changesPerSecond || 0).toFixed(0) })
     : conn.state === 'conflict' ? t('code.guard_conflict') : connText(conn);
   // Without a live connection the meters would freeze at their last levels.
   document.body.classList.toggle('notlive', !live);
   $$('button', pill).forEach((b) => b.remove());
-  if (conn && (conn.state === 'conflict' || conn.state === 'backoff')) pill.append(h('button', { class: 'btn small', type: 'button', onclick: reconnectNow }, t('conn.reconnect')));
+  if (conn && (conn.state === 'conflict' || conn.state === 'backoff')) pill.append(h('button', { class: 'btn sm', type: 'button', onclick: reconnectNow }, t('conn.reconnect')));
   if (store.loaded) {
     $('#devName').textContent = val(single('SYSTEM'), 'systemName') || store.L.modelName;
     const show = val(single('CURRENTSHOW'), 'currentShowName');
@@ -194,7 +179,7 @@ export function initShell() {
   });
   $('.ctl').setAttribute('aria-label', t('level.group'));
   const langBtn = $('#lang');
-  langBtn.textContent = getLang() === 'de' ? 'EN' : 'DE';
+  langBtn.replaceChildren(icon('globe', 'i-sm'), getLang() === 'de' ? 'English' : 'Deutsch');
   langBtn.title = t('header.language');
   langBtn.addEventListener('click', () => setLang(getLang() === 'de' ? 'en' : 'de'));
   document.title = t('page.title');

@@ -134,6 +134,38 @@ Put an `index.html` into `web/` and run `go run .`; the page is at
   served at `/plugins/onair/` behind the host and at `/` when you open the port
   directly.
 
+### Look like the rest of rcplug
+
+`sdk/ui` is the look of rcplug's dashboard and console: a stylesheet with the colours,
+type and components (cards, buttons, segmented controls, tabs, switches, sliders,
+status pills, banners, tables) and an icon set, about 24 KB together. Serve it next
+to your page and your plugin reads as part of the application, also inside the
+dashboard's frame:
+
+```go
+import "github.com/Hustenreizjuengling/rcplug/sdk/ui"
+
+mux.Handle("GET /ui/", ui.Handler("/ui/"))
+```
+
+```html
+<link rel="stylesheet" href="ui/rcplug.css">
+
+<main class="page">
+  <div class="page-head"><div><h1>On air</h1><p class="lead">Shows when the desk records.</p></div></div>
+  <section class="card">
+    <div class="card-head"><h2>Recorder</h2><span class="pill ok live">On air</span></div>
+    <button class="btn primary"><svg class="i"><use href="ui/icons.svg#record"/></svg>Start</button>
+  </section>
+</main>
+```
+
+The classes are listed at the top of each block in
+[`sdk/ui/rcplug.css`](../sdk/ui/rcplug.css), the icons' names in
+[`sdk/ui/icons.svg`](../sdk/ui/icons.svg). Inside the dashboard (an iframe) the
+dashboard already shows the plugin's name, so a plugin usually leaves out a header of
+its own there (`window.self !== window.top`).
+
 ## 5. Read the desk
 
 The console plugin offers the desk's state over HTTP; the Go client is
