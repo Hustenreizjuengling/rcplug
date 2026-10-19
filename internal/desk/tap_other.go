@@ -17,3 +17,6 @@ func (c *capture) close()                {}
 func RestartScreen() error {
 	return errors.New("restarting the device's screen is only possible on the device")
 }
+
+// RestartScreenNow: see RestartScreen.
+func RestartScreenNow() error { return RestartScreen() }

@@ -384,3 +384,15 @@ func TestTapGoesOnWithAKeptState(t *testing.T) {
 		t.Fatalf("lost track while aligning: %d", tp.stats.Desyncs)
 	}
 }
+
+// A segment exactly 2^31 bytes behind does not crash the reassembler.
+func TestTapStreamFarBehind(t *testing.T) {
+	s := &tapStream{}
+	now := time.Now()
+	s.add(1<<31, []byte("abcd"), now)
+	s.add(0, []byte("xyz"), now) // seq - next = MinInt32
+	s.add(4+1<<31, []byte("ef"), now)
+	if string(s.buf) != "abcdef" {
+		t.Fatalf("buf %q", s.buf)
+	}
+}

@@ -355,6 +355,18 @@ func maskUserConfig(raw []byte) []byte {
 			c.Env[k] = maskValue(v)
 		}
 	}
+	// Options set in the dashboard: choices, numbers and switches help to
+	// understand a problem; a secret-looking one is masked, a URL keeps
+	// only its scheme and host.
+	for k, v := range c.Options {
+		var text string
+		switch {
+		case secretKey.MatchString(k):
+			c.Options[k] = json.RawMessage(`"***"`)
+		case json.Unmarshal(v, &text) == nil:
+			c.Options[k], _ = json.Marshal(maskURLs(text))
+		}
+	}
 	out, _ := json.MarshalIndent(c, "", "  ")
 	return append(out, '\n')
 }

@@ -71,6 +71,7 @@ type Access struct {
 	data     *accessData // nil: no password
 	modTime  time.Time   // of the file when it was read
 	failures []time.Time
+	pending  int // password checks running now (they count towards the lockout)
 	locked   time.Time
 	reset    resetState
 }
@@ -100,7 +101,10 @@ func (a *Access) refreshLocked() {
 	}
 	var d accessData
 	if err := sdk.LoadJSON(a.path, &d); err != nil || d.Hash == "" || d.Key == "" {
-		a.data = nil
+		// A password file that cannot be read keeps the dashboard closed:
+		// no password matches and no session is valid until it is removed
+		// at the device (StartReset) or with the toolkit.
+		a.data, a.modTime = &accessData{}, fi.ModTime()
 		return
 	}
 	a.data, a.modTime = &d, fi.ModTime()
@@ -171,23 +175,28 @@ func validPassword(pw string) error {
 // hashing.
 func (a *Access) verifyLocked(pw string) error {
 	now := time.Now()
-	if now.Before(a.locked) {
-		return errLoginLocked
-	}
-	hash := a.data.Hash
-	a.mu.Unlock()
-	ok := checkPassword(hash, pw)
-	a.mu.Lock()
-	if ok {
-		return nil
-	}
 	keep := a.failures[:0]
 	for _, t := range a.failures {
 		if now.Sub(t) < loginWindow {
 			keep = append(keep, t)
 		}
 	}
-	a.failures = append(keep, now)
+	a.failures = keep
+	// Checks still running count as failures-to-be, so a burst of parallel
+	// guesses gets no more tries than one after the other.
+	if now.Before(a.locked) || len(a.failures)+a.pending >= loginFailures {
+		return errLoginLocked
+	}
+	hash := a.data.Hash
+	a.pending++
+	a.mu.Unlock()
+	ok := checkPassword(hash, pw)
+	a.mu.Lock()
+	a.pending--
+	if ok {
+		return nil
+	}
+	a.failures = append(a.failures, now)
 	if len(a.failures) >= loginFailures {
 		a.locked, a.failures = now.Add(loginLockout), nil
 		return errLoginLocked
@@ -286,6 +295,9 @@ func (a *Access) session(v string) bool {
 	if time.Now().After(t) {
 		return false
 	}
+	if key, err := base64.RawStdEncoding.DecodeString(a.data.Key); err != nil || len(key) < 16 {
+		return false // no usable key (an unreadable password file): no session is valid
+	}
 	return hmac.Equal([]byte(a.signLocked(t)), []byte(v))
 }
 
@@ -295,14 +307,32 @@ func (a *Access) LoggedIn(r *http.Request) bool {
 	return err == nil && a.session(c.Value)
 }
 
-// fromDevice: a request from the device itself (a plugin), not proxied.
+// fromDevice: a request from the device itself (a plugin), not proxied:
+// from loopback, or from the address it was sent to (a plugin calling
+// rcplugd at the device's own LAN address, when rcplugd listens only there).
 func fromDevice(r *http.Request) bool {
+	if r.Header.Get("X-Forwarded-For") != "" {
+		return false
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return false
 	}
 	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback() && r.Header.Get("X-Forwarded-For") == ""
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() {
+		return true
+	}
+	if la, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
+		if lh, _, err := net.SplitHostPort(la.String()); err == nil {
+			if lip := net.ParseIP(lh); lip != nil && lip.Equal(ip) && !lip.IsUnspecified() {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // open lists what a visitor who is not logged in may reach.

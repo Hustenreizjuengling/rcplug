@@ -105,6 +105,9 @@ async function post(path, body, okMsg) {
 }
 
 export const press = (scope, path, name, ms) => post('api/press', { epoch: scope.epoch, path, name, ms: ms || 150 });
+// release ends a hold of press: it always goes through, also if the level or
+// write protection changed meanwhile (epoch: the one the press had).
+export const release = (epoch, path, name) => post('api/release', { epoch, path, name });
 export const record = (scope, value) => post('api/record', { epoch: scope.epoch, value });
 export const link = (scope, source, output, on, okMsg) => post('api/link', { epoch: scope.epoch, source, output, link: on }, okMsg);
 export const setControl = (level) => post('api/control', { level });

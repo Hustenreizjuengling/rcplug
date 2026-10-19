@@ -63,7 +63,7 @@ const T = {
     tapNoJack: 'JACK is not reachable here: {err}', tapPorts: '{n} ports can be tapped.',
     evTitle: 'Events', evDesc: 'What the desk, the host and the plugins report on the event bus, live (the last 30).', evNone: 'No events yet.',
     accTitle: 'Access', accDesc: 'An optional password for the dashboard and every plugin page. Without one, everyone on the network can use them.',
-    accOn: 'A password is set.', accOff: 'No password: everyone on the network can use the dashboard.', accCurrent: 'Current password', accNew: 'New password', accRepeat: 'Repeat',
+    accOn: 'Protected', accOff: 'No password', accCurrent: 'Current password', accNew: 'New password', accRepeat: 'Repeat',
     accSet: 'Set password', accChange: 'Change password', accRemove: 'Remove password', accLogout: 'Log out', accMismatch: 'The two new passwords differ.',
     accRemoveConfirm: 'Remove the password? Everyone on the network can then use the dashboard again.',
     accNote: 'At least 6 characters. Plugins on the device itself are not asked for it. Forgotten? “Forgot the password?” on the login page removes it with four presses of Listen 1 at the device.',
@@ -136,7 +136,7 @@ const T = {
     tapNoJack: 'JACK ist hier nicht erreichbar: {err}', tapPorts: '{n} Ports können abgegriffen werden.',
     evTitle: 'Ereignisse', evDesc: 'Was Pult, Host und Plugins auf dem Ereignis-Bus melden, live (die letzten 30).', evNone: 'Noch keine Ereignisse.',
     accTitle: 'Zugang', accDesc: 'Ein optionales Passwort für das Dashboard und alle Plugin-Seiten. Ohne Passwort kann jeder im Netzwerk sie benutzen.',
-    accOn: 'Ein Passwort ist gesetzt.', accOff: 'Kein Passwort: Jeder im Netzwerk kann das Dashboard benutzen.', accCurrent: 'Aktuelles Passwort', accNew: 'Neues Passwort', accRepeat: 'Wiederholen',
+    accOn: 'Geschützt', accOff: 'Kein Passwort', accCurrent: 'Aktuelles Passwort', accNew: 'Neues Passwort', accRepeat: 'Wiederholen',
     accSet: 'Passwort setzen', accChange: 'Passwort ändern', accRemove: 'Passwort entfernen', accLogout: 'Abmelden', accMismatch: 'Die beiden neuen Passwörter sind verschieden.',
     accRemoveConfirm: 'Passwort entfernen? Dann kann wieder jeder im Netzwerk das Dashboard benutzen.',
     accNote: 'Mindestens 6 Zeichen. Plugins auf dem Gerät selbst werden nicht gefragt. Vergessen? „Passwort vergessen?“ auf der Anmeldeseite entfernt es mit viermal Listen 1 am Gerät.',
@@ -194,6 +194,7 @@ const openLogs = {};
 const openOpts = {}; // plugin → the values being edited (kept across re-renders)
 const openRemove = {}; // plugin → {purge} while its remove box is open
 let cat = null, catSig = '', catLoading = false, catSourcesOpen = false, navSig = '';
+const catDraft = { repo: '', key: '' }; // what is typed into the source form survives its rebuilds
 
 function fmtUptime(s) {
   const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
@@ -217,7 +218,11 @@ async function refresh() {
   await loadUpdates(); // local; also for the update badges in the side bar
   renderNav();
   if (!route) go();
-  else if (route === 'plugins') { await loadCatalog(); renderPlugins(); renderCatalog(); updateProgress(); }
+  else if (route === 'plugins') {
+    await loadCatalog();
+    if (route !== 'plugins') return; // moved on meanwhile
+    renderPlugins(); renderCatalog(); updateProgress();
+  }
   else if (route.startsWith('system')) renderSystem();
   else if (route.startsWith('p/')) checkFrame();
 }
@@ -289,10 +294,20 @@ function renderNav() {
   $('#mtitle').textContent = p ? tr(p, 'title') : route === 'plugins' ? t('plugins') : route.startsWith('system') ? t('system') : 'rcplug';
 }
 
+// On a phone the side bar slides in over the page; closed, it is out of
+// reach for the keyboard and screen readers too.
+const phone = matchMedia('(max-width: 860px)');
 function setNav(open) {
   document.body.classList.toggle('nav-open', open);
   $('#scrim').hidden = !open;
+  $('#sidebar').inert = phone.matches && !open;
+  $('#navOpen').setAttribute('aria-expanded', String(open));
+  if (open) ($('#nav a[aria-current]') || $('#navClose')).focus();
 }
+phone.addEventListener('change', () => setNav(false));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.body.classList.contains('nav-open')) { setNav(false); $('#navOpen').focus(); }
+});
 
 function go() {
   route = location.hash.replace(/^#\/?/, '');
@@ -308,7 +323,13 @@ function go() {
   if (route.startsWith('p/')) { const f = frameRoute(); renderFrame(f.name, f.sub); }
   else if (route.startsWith('system')) renderSystem();
   else renderPlugins();
-  if ((route.startsWith('system') || route === 'plugins') && !upd) loadUpdates().then(() => (route.startsWith('system') ? renderSystem() : renderPlugins()));
+  const at = route;
+  if ((route.startsWith('system') || route === 'plugins') && !upd) {
+    loadUpdates().then(() => {
+      if (route !== at) return; // moved on meanwhile
+      if (route.startsWith('system')) renderSystem(); else renderPlugins();
+    });
+  }
 }
 window.addEventListener('hashchange', go);
 
@@ -446,6 +467,7 @@ function renderPlugins() {
     }));
   });
   refreshLogs();
+  renderCatalog(); // into the new container, not only at the next poll
 }
 
 // ---- plugin options (manifest "options", stored by the host in
@@ -556,7 +578,6 @@ function renderCatalog() {
   const sig = JSON.stringify([cat, catLoading, lang, upd && upd.job, plugins.map((p) => p.name + '@' + p.version)]);
   if (sig === catSig) return;
   catSig = sig;
-  const keep = { repo: $('#catRepo') && $('#catRepo').value, key: $('#catKey') && $('#catKey').value };
   const loadLabel = catLoading ? t('catLoading') : cat && cat.checkedAt ? t('catReload') : t('catLoad');
   let h = `<div class="section-head"><h2>${esc(t('catTitle'))}</h2><span class="spacer"></span>`
     + `${cat && cat.enabled ? `<button class="btn sm" id="catLoad"${catLoading ? ' disabled' : ''}>${ico('refresh', 'i-sm')}${esc(loadLabel)}</button>` : ''}</div>`;
@@ -592,8 +613,11 @@ function renderCatalog() {
   h += `</div><div class="cluster" style="margin-top:12px"><input class="input" id="catRepo" placeholder="${esc(t('catRepo'))}" aria-label="${esc(t('catRepo'))}" style="flex:1 1 200px" autocomplete="off">`
     + `<input class="input" id="catKey" placeholder="${esc(t('catKey'))}" aria-label="${esc(t('catKey'))}" style="flex:2 1 260px" autocomplete="off"><button class="btn" id="catAdd">${ico('plus', 'i-sm')}${esc(t('catAdd'))}</button></div><p class="error" id="catSrcErr"></p></details>`;
   el.innerHTML = h;
-  if (keep.repo) $('#catRepo').value = keep.repo;
-  if (keep.key) $('#catKey').value = keep.key;
+  for (const [id, k] of [['#catRepo', 'repo'], ['#catKey', 'key']]) {
+    const input = $(id);
+    input.value = catDraft[k];
+    input.oninput = () => { catDraft[k] = input.value; };
+  }
   if ($('#catLoad')) $('#catLoad').onclick = refreshCatalog;
   $('#catSources').ontoggle = (e) => { catSourcesOpen = e.target.open; };
   el.querySelectorAll('[data-install]').forEach((b) => (b.onclick = () => installFromCatalog(cat.plugins[+b.closest('[data-cat]').dataset.cat], b)));
@@ -616,7 +640,7 @@ async function changeSource(body, btn) {
   catLoading = true;
   try {
     cat = await jpost('api/catalog/sources', body);
-    if (!body.remove) { $('#catRepo').value = ''; $('#catKey').value = ''; }
+    if (!body.remove) { catDraft.repo = ''; catDraft.key = ''; }
     catLoading = false;
     renderCatalog();
   } catch (e) {
@@ -793,7 +817,7 @@ async function renderAccess() {
   let st;
   try { st = await jget('api/access'); } catch (e) { return; }
   const fld = (id, ph, ac) => `<input class="input" type="password" id="${id}" placeholder="${esc(ph)}" aria-label="${esc(ph)}" autocomplete="${ac}" style="max-width:240px">`;
-  card.innerHTML = `<div class="card-head"><h2>${esc(t('accTitle'))}</h2><span class="pill ${st.protected ? 'ok' : 'warn'}" style="margin-left:auto">${ico('lock', 'i-sm')}${esc(t(st.protected ? 'accOn' : 'accOff'))}</span></div>
+  card.innerHTML = `<div class="card-head"><h2>${esc(t('accTitle'))}</h2><span class="pill ${st.protected ? 'ok' : 'warn'}" style="margin-left:auto">${ico('lock', 'i-sm')}<span>${esc(t(st.protected ? 'accOn' : 'accOff'))}</span></span></div>
     <p class="lead">${esc(t('accDesc'))}</p>
     <div class="cluster" style="margin:6px 0 12px">${st.protected ? fld('accCur', t('accCurrent'), 'current-password') : ''}${fld('accNew', t('accNew'), 'new-password')}${fld('accNew2', t('accRepeat'), 'new-password')}
       <button class="btn primary" id="accSave">${esc(t(st.protected ? 'accChange' : 'accSet'))}</button></div>
@@ -877,7 +901,7 @@ function renderUpdates() {
       const state = x.error ? `<span class="error">${esc(x.error)}</span>`
         : x.available ? `<span class="pill info">${esc(t('updAvail'))}</span>` : `<span class="pill ok">${esc(t('updCurrent'))}</span>`;
       h += `<div class="upd"><span class="name">${esc(x.name)}</span><span class="dim num">${esc(x.current || '?')}${x.latest && x.latest !== x.current ? ' → ' + esc(x.latest) : ''}</span>${state}
-        <span class="spacer"></span>${x.url ? `<a class="small" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(t('updRelease'))} ${ico('external', 'i-sm')}</a>` : ''}
+        <span class="spacer"></span>${httpsURL(x.url) ? `<a class="small" href="${esc(httpsURL(x.url))}" target="_blank" rel="noopener">${esc(t('updRelease'))} ${ico('external', 'i-sm')}</a>` : ''}
         ${x.available ? `<button class="btn primary sm" data-target="${esc(x.target)}"${busy ? ' disabled' : ''}>${esc(t('updInstall', { v: x.latest }))}</button>` : ''}
         ${x.available && x.notes ? `<details class="notes"><summary>${esc(t('updNotes'))}</summary><pre class="logs" style="margin-top:8px">${esc(x.notes)}</pre></details>` : ''}</div>`;
     }
@@ -923,7 +947,11 @@ $('#navClose').setAttribute('aria-label', t('closeMenu'));
 $('#navOpen').onclick = () => setNav(true);
 $('#navClose').onclick = () => setNav(false);
 $('#scrim').onclick = () => setNav(false);
+setNav(false);
 $('#boot').textContent = t('connecting');
 // Every 4 s; every second while an update is being installed, so its
 // progress (and rcplug's restart) shows without delay.
-(async function loop() { await refresh(); setTimeout(loop, jobActive() ? 1000 : 4000); })();
+(async function loop() {
+  try { await refresh(); } catch (e) { console.error(e); } // a broken render must not end the polling
+  finally { setTimeout(loop, jobActive() ? 1000 : 4000); }
+})();

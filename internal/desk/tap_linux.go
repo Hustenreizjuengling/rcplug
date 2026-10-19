@@ -116,13 +116,40 @@ func (c *capture) close() { syscall.Close(c.fd) }
 // RØDE's own audio-start.sh does the same whenever the mixer restarts; audio
 // is not affected.
 func RestartScreen() error {
+	pids, err := signalScreen()
+	if err != nil {
+		return err
+	}
+	awaitScreen(pids)
+	return nil
+}
+
+// RestartScreenNow asks the screen app to end and returns at once; the
+// fallback (SIGKILL after three seconds) runs in the background. For a
+// console that is stopping: the request must leave before it exits.
+func RestartScreenNow() error {
+	pids, err := signalScreen()
+	if err != nil {
+		return err
+	}
+	go awaitScreen(pids)
+	return nil
+}
+
+func signalScreen() ([]int, error) {
 	pids := pidsNamed("rc_gui_juce")
 	if len(pids) == 0 {
-		return errors.New("the device's screen app (rc_gui_juce) is not running")
+		return nil, errors.New("the device's screen app (rc_gui_juce) is not running")
 	}
 	for _, pid := range pids {
 		_ = syscall.Kill(pid, syscall.SIGTERM)
 	}
+	return pids, nil
+}
+
+// awaitScreen waits up to three seconds for the screen app to end, then
+// kills it.
+func awaitScreen(pids []int) {
 	for i := 0; i < 30; i++ {
 		time.Sleep(100 * time.Millisecond)
 		alive := false
@@ -132,13 +159,12 @@ func RestartScreen() error {
 			}
 		}
 		if !alive {
-			return nil
+			return
 		}
 	}
 	for _, pid := range pids {
 		_ = syscall.Kill(pid, syscall.SIGKILL)
 	}
-	return nil
 }
 
 // pidsNamed lists the processes whose command name is name.

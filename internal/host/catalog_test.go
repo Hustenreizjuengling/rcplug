@@ -202,3 +202,28 @@ func TestCatalogInstallAndRemove(t *testing.T) {
 		t.Fatalf("second install: %s %s", j.State, j.Error)
 	}
 }
+
+// Leftovers of an interrupted update or removal go at the next start, but
+// not while an installer may still use them.
+func TestCleanLeftovers(t *testing.T) {
+	root := t.TempDir()
+	m := NewManager(root, 9690)
+	old := time.Now().Add(-time.Hour)
+	for _, d := range []string{".update/payload", ".removed-sonar-1", ".removed-fresh-2"} {
+		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, d := range []string{".update", ".removed-sonar-1"} {
+		if err := os.Chtimes(filepath.Join(root, d), old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gone := m.CleanLeftovers()
+	if len(gone) != 2 {
+		t.Fatalf("removed %v", gone)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".removed-fresh-2")); err != nil {
+		t.Fatal("a fresh leftover was removed")
+	}
+}

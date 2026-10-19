@@ -274,19 +274,15 @@ func expand(s string, port int, dir string) string {
 }
 
 // maskArgs hides values that follow secret-looking flags (--pin, --password,
-// --token, --secret, --key…) and the paths and queries of URLs, which often
-// carry tokens, so command lines can be logged safely.
+// --api-token, --secret, --key…: the name holds one of secretKey's words)
+// and the paths and queries of URLs, which often carry tokens, so command
+// lines can be logged safely.
 func maskArgs(args []string) []string {
 	out := make([]string, len(args))
 	copy(out, args)
 	secret := func(a string) bool {
-		a = strings.ToLower(strings.TrimLeft(a, "-"))
-		for _, s := range []string{"pin", "pass", "token", "secret", "key"} {
-			if strings.HasPrefix(a, s) {
-				return true
-			}
-		}
-		return false
+		name, _, _ := strings.Cut(strings.TrimLeft(a, "-"), "=")
+		return secretKey.MatchString(name)
 	}
 	for i := 0; i < len(out); i++ {
 		a := out[i]
@@ -296,8 +292,8 @@ func maskArgs(args []string) []string {
 		}
 		if j := strings.IndexByte(a, '='); j >= 0 {
 			out[i] = a[:j+1] + "***"
-		} else if i+1 < len(out) {
-			out[i+1] = "***"
+		} else if i+1 < len(out) && !strings.HasPrefix(out[i+1], "-") {
+			out[i+1] = "***" // the flag's value; a following flag is shown
 			i++
 		}
 	}

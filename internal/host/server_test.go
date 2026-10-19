@@ -319,8 +319,10 @@ func TestStopStartDoNotOverlap(t *testing.T) {
 
 func TestMaskArgs(t *testing.T) {
 	got := strings.Join(maskArgs([]string{"./x", "--pin", "1", "--token=abc", "--addr", "a", "-password", "p",
-		"--hook", "https://u:pw@hooks.example/abc?t=1", "--api=http://127.0.0.1:8080", "--x=https://h.example/p"}), " ")
-	want := "./x --pin *** --token=*** --addr a -password *** --hook https://hooks.example/*** --api=http://127.0.0.1:8080 --x=https://h.example/***"
+		"--hook", "https://u:pw@hooks.example/abc?t=1", "--api=http://127.0.0.1:8080", "--x=https://h.example/p",
+		"--api-token=s3cret", "--stream-key", "k", "--passive", "--meters=off"}), " ")
+	want := "./x --pin *** --token=*** --addr a -password *** --hook https://hooks.example/*** --api=http://127.0.0.1:8080 --x=https://h.example/***" +
+		" --api-token=*** --stream-key *** --passive --meters=off"
 	if got != want {
 		t.Fatalf("\n got %s\nwant %s", got, want)
 	}
@@ -557,5 +559,21 @@ func TestScanProblemsIgnoresPolicyRefusals(t *testing.T) {
 	got := scanProblems("console.log", []byte(log))
 	if strings.Contains(got, "control is off") || !strings.Contains(got, "restarting in") {
 		t.Fatal(got)
+	}
+}
+
+// Options set in the dashboard reach the diagnostics bundle masked where
+// they look like secrets or URLs, and as they are otherwise.
+func TestMaskUserConfigOptions(t *testing.T) {
+	out := string(maskUserConfig([]byte(`{"options":{"apiToken":"s3cret","deskMode":"tap","fps":2,"hook":"https://hooks.example/abc?t=1","pin":1234}}`)))
+	for _, bad := range []string{"s3cret", "abc?t=1", "1234"} {
+		if strings.Contains(out, bad) {
+			t.Fatalf("%q in %s", bad, out)
+		}
+	}
+	for _, good := range []string{`"deskMode": "tap"`, `"fps": 2`, `"https://hooks.example/***"`} {
+		if !strings.Contains(out, good) {
+			t.Fatalf("missing %s in %s", good, out)
+		}
 	}
 }

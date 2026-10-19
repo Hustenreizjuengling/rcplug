@@ -45,10 +45,11 @@ type ChangeEntry struct {
 }
 
 type rawChange struct {
-	at       time.Time
-	path     []int
-	name     string
-	old, new rcproto.Value
+	at         time.Time
+	path       []int
+	name, node string
+	index      int
+	old, new   rcproto.Value
 }
 
 type changeLog struct {
@@ -61,12 +62,12 @@ type changeLog struct {
 func newChangeLog() *changeLog { return &changeLog{ch: make(chan rawChange, 256)} }
 
 // watchChanges runs under the mirror lock: it only filters and queues.
-func (c *Console) watchChanges(path []int, name string, old, v rcproto.Value) {
-	if noisyProps[name] || old.Kind == rcproto.KindUnknown && v.Kind == rcproto.KindUnknown {
+func (c *Console) watchChanges(ev desk.ChangeEvent) {
+	if noisyProps[ev.Name] || ev.Node == "METER" || ev.Old.Kind == rcproto.KindUnknown && ev.New.Kind == rcproto.KindUnknown {
 		return
 	}
 	select {
-	case c.changes.ch <- rawChange{at: time.Now(), path: append([]int(nil), path...), name: name, old: old, new: v}:
+	case c.changes.ch <- rawChange{at: time.Now(), path: append([]int(nil), ev.Path...), name: ev.Name, node: ev.Node, index: ev.Index, old: ev.Old, new: ev.New}:
 	default:
 		c.changes.mu.Lock()
 		c.changes.dropped++
@@ -74,30 +75,14 @@ func (c *Console) watchChanges(path []int, name string, old, v rcproto.Value) {
 	}
 }
 
-// runChangeLog names the queued changes' nodes and keeps them.
+// runChangeLog keeps the queued changes.
 func (c *Console) runChangeLog(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case rc := <-c.changes.ch:
-			e := ChangeEntry{Time: rc.at.Format("15:04:05.000"), Path: rc.path, Name: rc.name, Index: -1, Node: "?"}
-			c.mirror.View(func(s desk.Snapshot) {
-				if s.Root == nil {
-					return
-				}
-				if n := s.Root.At(rc.path); n != nil {
-					e.Node = n.Type
-				}
-				if s.Layout != nil {
-					if r, ok := s.Layout.Runs[e.Node]; ok {
-						e.Index = r.IndexOf(rc.path)
-					}
-				}
-			})
-			if e.Node == "METER" {
-				continue
-			}
+			e := ChangeEntry{Time: rc.at.Format("15:04:05.000"), Path: rc.path, Name: rc.name, Index: rc.index, Node: rc.node}
 			secret := Secret(e.Node, rc.name)
 			e.Old, e.New = encodeValue(rc.old, secret), encodeValue(rc.new, secret)
 			e.Text = rc.old.Kind == rcproto.KindString || rc.new.Kind == rcproto.KindString

@@ -55,11 +55,14 @@ export function render() {
   markTab();
 }
 
+let shownTab = '';
 function markTab() {
+  const moved = shownTab !== current.id; // a strip swiped by hand stays where it is otherwise
+  shownTab = current.id;
   $$('#tabs a').forEach((a) => {
     if (a.dataset.view === current.id) {
       a.setAttribute('aria-current', 'page');
-      if (a.scrollIntoView && a.offsetParent) a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      if (moved && a.scrollIntoView && a.offsetParent) a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     } else a.removeAttribute('aria-current');
   });
 }
@@ -178,8 +181,10 @@ export function initShell() {
     b.addEventListener('click', () => chooseLevel(b.dataset.level));
   });
   $('.ctl').setAttribute('aria-label', t('level.group'));
+  $('#tabs').setAttribute('aria-label', t('header.views'));
+  $('#drawerClose').setAttribute('aria-label', t('close'));
   const langBtn = $('#lang');
-  langBtn.replaceChildren(icon('globe', 'i-sm'), getLang() === 'de' ? 'English' : 'Deutsch');
+  langBtn.replaceChildren(icon('globe', 'i-sm'), h('span', null, getLang() === 'de' ? 'English' : 'Deutsch'));
   langBtn.title = t('header.language');
   langBtn.addEventListener('click', () => setLang(getLang() === 'de' ? 'en' : 'de'));
   document.title = t('page.title');

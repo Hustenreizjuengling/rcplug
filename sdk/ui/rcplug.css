@@ -60,6 +60,8 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
 button, input, select, textarea { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
 :focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--radius-sm); }
+.btn:has(input[type="file"]:focus-visible) { box-shadow: var(--ring); } /* a file button around a hidden input */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 ::selection { background: rgba(52, 211, 153, .3); }
 * { scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -101,7 +103,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; min-width: 0; }
 .card.flat { background: transparent; }
 .card.tight { padding: 14px 16px; }
-.card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; min-height: 28px; }
+.card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 12px; min-height: 28px; }
 .card-head h2, .card-head h3 { font-size: 15px; }
 .card-head .actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .card .lead { color: var(--text-2); font-size: 13px; margin: -4px 0 14px; }
@@ -116,15 +118,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-weight: 550; font-size: 13.5px; white-space: nowrap; cursor: pointer; text-decoration: none;
   transition: background .15s var(--ease), border-color .15s var(--ease), color .15s var(--ease);
 }
-.btn:hover { background: var(--surface-3); border-color: #3a4552; text-decoration: none; }
-.btn:active { transform: translateY(.5px); }
-.btn:disabled, .btn[aria-disabled="true"] { opacity: .45; cursor: default; pointer-events: none; }
+.btn:not(:disabled):hover { background: var(--surface-3); border-color: #3a4552; text-decoration: none; }
+.btn:not(:disabled):active { transform: translateY(.5px); }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; } /* still hoverable: their titles say why */
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.btn.primary:hover { background: #4be0a8; border-color: #4be0a8; }
+.btn.primary:not(:disabled):hover { background: #4be0a8; border-color: #4be0a8; }
 .btn.ghost { background: transparent; border-color: transparent; color: var(--text-2); }
-.btn.ghost:hover { background: var(--surface-2); color: var(--text); }
+.btn.ghost:not(:disabled):hover { background: var(--surface-2); color: var(--text); }
 .btn.danger { color: #ffb4b0; border-color: rgba(242, 96, 92, .45); background: transparent; }
-.btn.danger:hover { background: var(--danger-soft); border-color: var(--danger); }
+.btn.danger:not(:disabled):hover { background: var(--danger-soft); border-color: var(--danger); }
 .btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; border-radius: 7px; }
 .btn.lg { height: 40px; padding: 0 18px; font-size: 14.5px; }
 .btn.icon { width: 34px; padding: 0; }
@@ -181,8 +183,10 @@ input[type="range"]:focus-visible { box-shadow: none; }
 input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: var(--ring); }
 
 /* ---- status */
-.pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 20px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--text-2); white-space: nowrap; }
-.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .9; }
+.pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; max-width: 100%; min-width: 0; padding: 0 10px; border-radius: 20px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--text-2); white-space: nowrap; overflow: hidden; }
+.pill > span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pill::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .9; }
+.pill > .i { flex: none; }
 .pill.plain::before { display: none; }
 .pill.ok { background: var(--accent-soft); color: var(--accent); }
 .pill.warn { background: var(--warn-soft); color: var(--warn); }

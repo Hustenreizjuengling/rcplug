@@ -3,6 +3,7 @@ package console
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -35,6 +36,7 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/trigger", c.withPIN(c.handleTrigger))
 	mux.HandleFunc("POST /api/link", c.withPIN(c.handleLink))
 	mux.HandleFunc("POST /api/record", c.withPIN(c.handleRecord))
+	mux.HandleFunc("POST /api/release", c.handleRelease) // only presses the console holds, see heldPress
 	mux.HandleFunc("POST /api/control", c.forPeople(c.withPIN(c.handleControl)))
 	mux.HandleFunc("POST /api/settings", c.forPeople(c.withPIN(c.handleSettings)))
 	mux.HandleFunc("POST /api/reconnect", c.forPeople(c.withPIN(c.handleReconnect)))
@@ -261,15 +263,24 @@ var errUntestedModel = sdk.NewError(http.StatusForbidden, "untested_model",
 	"control is not available for this model yet (start the console with --allow-untested-model to try it)")
 
 func (c *Console) write(by who, epoch uint64, path []int, name string, value interface{}) (*rcproto.Change, error) {
+	return c.writeAs(by, epoch, path, name, value, false)
+}
+
+// writeAs is write; release lets go of a button the console holds (see
+// heldPress), whatever the level and write protection are by now.
+func (c *Console) writeAs(by who, epoch uint64, path []int, name string, value interface{}, release bool) (*rcproto.Change, error) {
 	level, limit := c.Level() // outside the mirror lock taken by Write
 	remote := by.label()
 	if by.plugin != "" && limit == "" {
 		level = LevelBasic // a plugin's permission, whatever level the browser has set
 	}
+	if release {
+		level, limit = LevelExpert, ""
+	}
 	nodeType := "?"
 	var ch *rcproto.Change
 	var err error
-	if by.plugin != "" && !by.can("desk:write") {
+	if !release && by.plugin != "" && !by.can("desk:write") {
 		err = errNoDeskWrite(by.plugin)
 	} else if limit == "untested_model" {
 		err = errUntestedModel
@@ -316,9 +327,9 @@ func (c *Console) write(by who, epoch uint64, path []int, name string, value int
 		if ae, ok := err.(*sdk.APIError); ok {
 			e.Code = ae.Code
 		}
-		c.opts.Logf("console: write %s%v.%s=%v refused: %v", nodeType, path, name, value, err)
+		c.opts.Logf("console: write %s%v.%s=%s refused: %v", nodeType, path, name, plainValue(fmt.Sprint(value)), err)
 	} else {
-		c.opts.Logf("console: write %s%v.%s=%s (from %s)", nodeType, path, name, e.Value, remote)
+		c.opts.Logf("console: write %s%v.%s=%s (from %s)", nodeType, path, name, plainValue(e.Value), remote)
 	}
 	c.appendAudit(e)
 	return ch, err
@@ -343,6 +354,7 @@ func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name strin
 	nodeType, button := "?", ""
 	var want, cur rcproto.Value
 	var err error
+	stale := false
 	c.mirror.View(func(s desk.Snapshot) {
 		if s.Root == nil {
 			err = desk.ErrNotSynced
@@ -352,6 +364,7 @@ func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name strin
 			err = desk.ErrStaleEpoch
 			return
 		}
+		stale = s.Stale
 		n := s.Root.At(path)
 		if n == nil {
 			err = errBadRequest("no node at this path")
@@ -402,6 +415,11 @@ func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name strin
 		if !want.Truth() {
 			return ch, nodeType, nil // the press on the panel released the pad already
 		}
+	case stale:
+		// Mute and listen are toggles chosen from the copy of the desk: a
+		// copy that is not current could make a press do the opposite
+		// (unmute a live microphone).
+		return nil, nodeType, errStaleToggle
 	case cur.Truth() == want.Truth():
 		return ch, nodeType, nil // already so: pressing would toggle it back
 	}
@@ -410,6 +428,9 @@ func (c *Console) writeByPanel(level Level, epoch uint64, path []int, name strin
 	}
 	return ch, nodeType, nil
 }
+
+var errStaleToggle = sdk.NewError(http.StatusConflict, "stale_state",
+	"the console's copy of the desk is not current, so pressing this button could do the opposite; wait until the state is read again")
 
 // physicalFader reports whether path is the FADER node of a physical fader.
 func (c *Console) physicalFader(path []int) (ok bool) {
@@ -502,45 +523,152 @@ func (c *Console) handlePress(w http.ResponseWriter, r *http.Request) {
 		sdk.WriteError(w, err)
 		return
 	}
-	key := fmt.Sprint(down.Path, req.Name)
-	c.mu.Lock()
-	if c.presses == nil {
-		c.presses = map[string]uint64{}
-	}
-	c.presses[key]++
-	gen := c.presses[key]
-	c.mu.Unlock()
-	nodeType := ""
+	h := &heldPress{name: req.Name, path: down.Path, by: remote}
+	var key string
 	c.mirror.View(func(s desk.Snapshot) {
-		if n := s.Root.At(down.Path); n != nil {
-			nodeType = n.Type
-		}
+		h.epoch = s.Epoch
+		key, h.family, h.index = heldKey(s, down.Path, req.Name)
 	})
+	c.mu.Lock()
+	if c.held == nil {
+		c.held = map[string]*heldPress{}
+	}
+	c.pressGen++
+	h.gen = c.pressGen
+	c.held[key] = h // a newer press of the same button: its own release counts
+	c.mu.Unlock()
 	go func() {
 		time.Sleep(time.Duration(ms) * time.Millisecond)
-		c.mu.Lock()
-		newer := c.presses[key] != gen
-		c.mu.Unlock()
-		if newer {
-			return // pressed again since: that press's own release counts
-		}
-		// Always try to release, even if the tree moved meanwhile — but only
-		// on the same kind of node at the same path.
-		var epoch uint64
-		same := false
-		c.mirror.View(func(s desk.Snapshot) {
-			epoch = s.Epoch
-			if n := s.Root.At(down.Path); n != nil && n.Type == nodeType {
-				same = true
-			}
-		})
-		if !same {
-			c.opts.Logf("console: release of %s%v.%s skipped: tree changed", nodeType, down.Path, req.Name)
-			return
-		}
-		_, _ = c.write(remote, epoch, down.Path, req.Name, false)
+		c.release(key, h.gen)
 	}()
 	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// handleRelease ends a hold of api/press: {"epoch", "path", "name"} as the
+// press had them. It needs no PIN and no level: it only lets go of a button
+// the console pressed, and one left pressed is worse.
+func (c *Console) handleRelease(w http.ResponseWriter, r *http.Request) {
+	req, ok := decode(w, r)
+	if !ok {
+		return
+	}
+	released := false
+	if key := c.heldAt(req.Epoch, req.Path, req.Name); key != "" {
+		released = c.release(key, 0)
+	}
+	sdk.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true, "released": released})
+}
+
+// heldPress is a button press of api/press not released yet. Its release
+// always goes through (write protection, the level or the PIN may have
+// changed during a hold), and to the same button: after a structural change
+// it is found again by its place in its family (a node in none only while
+// the tree stays as it was).
+type heldPress struct {
+	gen    uint64
+	family string // the node's type
+	index  int    // its place in the family's run, or -1
+	path   []int  // where it was pressed, in epoch
+	epoch  uint64
+	name   string
+	by     who
+}
+
+// heldKey names a button among the held presses: by family and place, or
+// by path and epoch for a node in no family.
+func heldKey(s desk.Snapshot, path []int, name string) (key, family string, index int) {
+	index = -1
+	if s.Root != nil {
+		if n := s.Root.At(path); n != nil {
+			family = n.Type
+		}
+	}
+	if s.Layout != nil {
+		if r, ok := s.Layout.Runs[family]; ok {
+			index = r.IndexOf(path)
+		}
+	}
+	if index >= 0 {
+		return fmt.Sprintf("%s#%d.%s", family, index, name), family, index
+	}
+	return fmt.Sprintf("%v@%d.%s", path, s.Epoch, name), family, -1
+}
+
+// at is where the held button is in s, or nil if it is gone.
+func (h *heldPress) at(s desk.Snapshot) []int {
+	p := h.path
+	if h.index >= 0 && s.Layout != nil {
+		p = s.Layout.Path(h.family, h.index)
+	} else if s.Epoch != h.epoch {
+		return nil
+	}
+	if p == nil || s.Root == nil {
+		return nil
+	}
+	if n := s.Root.At(p); n == nil || n.Type != h.family {
+		return nil
+	}
+	return p
+}
+
+// heldAt finds the held press of the button at path: as it was pressed
+// (epoch and path of the press) or where it is now.
+func (c *Console) heldAt(epoch uint64, path []int, name string) string {
+	c.mu.Lock()
+	held := make(map[string]*heldPress, len(c.held))
+	for k, h := range c.held {
+		if h.name == name {
+			held[k] = h
+		}
+	}
+	c.mu.Unlock() // the mirror's lock is never taken under c.mu
+	key := ""
+	c.mirror.View(func(s desk.Snapshot) {
+		for k, h := range held {
+			if (h.epoch == epoch && slices.Equal(h.path, path)) || (s.Epoch == epoch && slices.Equal(h.at(s), path)) {
+				key = k
+				return
+			}
+		}
+	})
+	return key
+}
+
+// release lets go of a held press; gen 0 whichever it is, otherwise only
+// that press (a newer one of the same button has its own release).
+func (c *Console) release(key string, gen uint64) bool {
+	c.mu.Lock()
+	h := c.held[key]
+	if h == nil || (gen != 0 && h.gen != gen) {
+		c.mu.Unlock()
+		return false
+	}
+	delete(c.held, key)
+	c.mu.Unlock()
+	for try := 0; try < 2; try++ { // a structural change between the look and the write
+		var path []int
+		var epoch uint64
+		down := false
+		c.mirror.View(func(s desk.Snapshot) {
+			epoch, path = s.Epoch, h.at(s)
+			if path != nil {
+				v, _ := s.Root.At(path).Get(h.name)
+				down = v.Truth()
+			}
+		})
+		if path == nil {
+			c.opts.Logf("console: release of %s%v.%s skipped: the button is gone", h.family, h.path, h.name)
+			return false
+		}
+		if !down {
+			return true // let go of already (the panel's press, or the desk)
+		}
+		_, err := c.writeAs(h.by, epoch, path, h.name, false, true)
+		if !errors.Is(err, desk.ErrStaleEpoch) {
+			return err == nil
+		}
+	}
+	return false
 }
 
 // handleTrigger fires a binary trigger property (e.g. mixLinkRequest).

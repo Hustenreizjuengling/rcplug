@@ -38,7 +38,8 @@ type Manager struct {
 	order    []string
 	nextPort int
 	saveMu   sync.Mutex
-	groups   *groupLog // process groups of running plugins (groups.go)
+	opMu     sync.Mutex // one change to a plugin's state or options at a time
+	groups   *groupLog  // process groups of running plugins (groups.go)
 }
 
 type persistState struct {
@@ -239,6 +240,8 @@ func (m *Manager) List() []Status {
 
 // Enable starts a plugin and persists the choice.
 func (m *Manager) Enable(name string) bool {
+	m.opMu.Lock()
+	defer m.opMu.Unlock()
 	p := m.get(name)
 	if p == nil {
 		return false
@@ -250,6 +253,8 @@ func (m *Manager) Enable(name string) bool {
 
 // Disable stops a plugin and persists the choice.
 func (m *Manager) Disable(name string) bool {
+	m.opMu.Lock()
+	defer m.opMu.Unlock()
 	p := m.get(name)
 	if p == nil {
 		return false
@@ -262,6 +267,8 @@ func (m *Manager) Disable(name string) bool {
 // Restart stops and starts an enabled plugin without changing its persisted
 // state. A disabled plugin is left alone (use Enable).
 func (m *Manager) Restart(name string) bool {
+	m.opMu.Lock()
+	defer m.opMu.Unlock()
 	p := m.get(name)
 	if p == nil {
 		return false
@@ -293,6 +300,8 @@ func (m *Manager) Options(name string) (map[string]json.RawMessage, bool, error)
 // SetOptions stores option values for a plugin and restarts it if it runs,
 // so they take effect.
 func (m *Manager) SetOptions(name string, values map[string]json.RawMessage) (found, restarted bool, err error) {
+	m.opMu.Lock() // the file is read and written whole: no two changes at once
+	defer m.opMu.Unlock()
 	p := m.get(name)
 	if p == nil {
 		return false, false, nil

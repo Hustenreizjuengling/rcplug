@@ -84,7 +84,8 @@ type Console struct {
 	presence      presenceState
 	desk          *deskEvents
 	changes       *changeLog
-	presses       map[string]uint64 // button presses per path, for their releases (api/press)
+	held          map[string]*heldPress // button presses of api/press not released yet
+	pressGen      uint64
 }
 
 // New creates the console and loads persisted settings.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -63,6 +64,9 @@ var (
 // again within about three seconds); tests replace it.
 var restartScreen = RestartScreen
 
+// restartScreenNow sends the request without waiting (a stopping console).
+var restartScreenNow = RestartScreenNow
+
 // booting reports whether the device started less than relayBoot ago, when
 // its screen app is still coming up; tests replace it (a CI machine may
 // have just started too).
@@ -100,9 +104,33 @@ type relay struct {
 
 type screenConn struct {
 	conn net.Conn
+	comm string // the connecting process ("" when unknown)
 	out  chan []byte
 	done chan struct{}
 	once sync.Once
+}
+
+// screenApp is the device's screen app, the one client full control serves.
+const screenApp = "rc_gui_juce"
+
+// peerComm names the local process on the other end of conn ("" when it
+// cannot be found, e.g. without root); tests replace it.
+var peerComm = func(conn net.Conn) string {
+	_, port, err := net.SplitHostPort(conn.LocalAddr().String())
+	if err != nil {
+		return ""
+	}
+	n, _ := strconv.Atoi(port)
+	peers, err := ClientsOf(n)
+	if err != nil {
+		return ""
+	}
+	for _, p := range peers {
+		if p.Remote == conn.RemoteAddr().String() {
+			return p.Comm
+		}
+	}
+	return ""
 }
 
 func (s *screenConn) close() {
@@ -209,9 +237,14 @@ func (c *Client) runRelay(ctx context.Context, takeover bool, wait time.Duration
 		c.mirror.SetStale(true)
 		// Whatever the screen app does when its connection ends, a restart
 		// (as RØDE's scripts and "Read the state again" do it) connects it to
-		// the mixer afresh. Not waited for: the console may be stopping.
-		restart := restartScreen
-		go func() { _ = restart() }()
+		// the mixer afresh. A stopping console sends the request before it
+		// returns (it exits right after); otherwise it is not waited for.
+		if ctx.Err() != nil {
+			_ = restartScreenNow()
+		} else {
+			restart := restartScreen
+			go func() { _ = restart() }()
+		}
 		c.cfg.Logf("desk: full control ended; the device's screen restarts and connects to the mixer")
 	}()
 	c.setState(StateSyncing, "relay_syncing", "")
@@ -320,8 +353,16 @@ func (r *relay) fromMixer() {
 		c.stats.FramesIn++
 		c.stats.BytesIn += uint64(len(body)) + 8
 		c.mu.Unlock()
+		if synced && fr.Resyncs > 0 {
+			r.desync("lost frame boundary (%d bytes skipped)", fr.Resyncs)
+			return
+		}
 		frame := rcproto.Frame(body)
-		ch, mine := decodeTwice(body)
+		ch, mine, bad := decodeTwice(body)
+		if bad && synced {
+			r.desync("an undecodable message from the mixer")
+			return
+		}
 		r.mu.Lock()
 		if ch != nil {
 			if root, err := rcproto.Apply(r.tree, ch); err == nil {
@@ -342,6 +383,10 @@ func (r *relay) fromMixer() {
 			c.mu.Lock()
 			c.stats.ApplyErrors++
 			c.mu.Unlock()
+			if synced {
+				r.desync("a change from the mixer does not apply: %v", err)
+				return
+			}
 			continue
 		}
 		if mine.Type == rcproto.FullSync {
@@ -363,16 +408,26 @@ func (r *relay) fromMixer() {
 // decodeTwice decodes a ValueTreeSynchroniser message into two independent
 // changes, one for the relay's own tree and one for the mirror (applying a
 // change hands its subtree to the tree). nil for anything else (pings).
-func decodeTwice(body []byte) (*rcproto.Change, *rcproto.Change) {
+func decodeTwice(body []byte) (a, b *rcproto.Change, bad bool) {
 	if len(body) == 0 || body[0] < byte(rcproto.PropertyChanged) || body[0] > byte(rcproto.PropertyRemoved) {
-		return nil, nil
+		return nil, nil, false // not a tree message (a ping): nothing to apply
 	}
 	a, err := rcproto.DecodeChange(body)
 	if err != nil {
-		return nil, nil
+		return nil, nil, true
 	}
-	b, _ := rcproto.DecodeChange(body)
-	return a, b
+	b, _ = rcproto.DecodeChange(body)
+	return a, b, false
+}
+
+// desync ends a session whose copy of the desk no longer follows the mixer
+// (as the direct connection does, client.go): the copy goes stale, writes
+// stop, and full control is taken again later with a fresh full sync.
+func (r *relay) desync(format string, args ...interface{}) {
+	r.c.mu.Lock()
+	r.c.stats.Desyncs++
+	r.c.mu.Unlock()
+	r.failWith(sessionErr("relay_desync", "the copy of the desk lost track: "+format, args...))
 }
 
 // queueLocked hands a frame to the screen's writer; a screen that does not
@@ -421,9 +476,18 @@ func (r *relay) attach(conn net.Conn) {
 	if tc, ok := conn.(*net.TCPConn); ok {
 		_ = tc.SetNoDelay(true)
 	}
-	s := &screenConn{conn: conn, out: make(chan []byte, relayQueue), done: make(chan struct{})}
+	s := &screenConn{conn: conn, comm: peerComm(conn), out: make(chan []byte, relayQueue), done: make(chan struct{})}
 	r.mu.Lock()
 	if r.screen != nil {
+		// The device's screen app is replaced only by itself (it reconnects
+		// after a restart); another local program (a capture tool, a second
+		// console) is turned away instead of cutting the screen off.
+		if r.screen.comm == screenApp && s.comm != "" && s.comm != screenApp {
+			r.mu.Unlock()
+			r.c.cfg.Logf("desk: full control: refused a connection from %s; the device's screen keeps the mixer", s.comm)
+			_ = conn.Close()
+			return
+		}
 		r.c.cfg.Logf("desk: full control: a new connection from the device's screen replaces the old one")
 		r.dropScreenLocked(r.screen)
 	}
@@ -476,7 +540,7 @@ func (r *relay) fromScreen(s *screenConn) {
 		c.mu.Lock()
 		c.relayFrames++
 		c.mu.Unlock()
-		ch, mine := decodeTwice(body)
+		ch, mine, _ := decodeTwice(body)
 		if ch == nil || ch.Type == rcproto.FullSync {
 			continue
 		}
@@ -489,6 +553,10 @@ func (r *relay) fromScreen(s *screenConn) {
 			c.mu.Lock()
 			c.stats.ApplyErrors++
 			c.mu.Unlock()
+			// The mixer applied what the screen sent (it does not echo it),
+			// the copy did not: it no longer matches.
+			r.desync("a change from the screen does not apply: %v", err)
+			return
 		}
 	}
 }
@@ -503,7 +571,7 @@ func (r *relay) send(ch *rcproto.Change) error {
 	if err := r.toMixer(frame); err != nil {
 		return sdk.NewError(http.StatusServiceUnavailable, "send_failed", "sending to the desk failed: "+err.Error())
 	}
-	own, _ := decodeTwice(body)
+	own, _, _ := decodeTwice(body)
 	r.mu.Lock()
 	if own != nil {
 		if root, err := rcproto.Apply(r.tree, own); err == nil {
@@ -650,11 +718,11 @@ func (c *Client) runDevice(ctx context.Context) {
 			}
 			retryAt = time.Time{}
 			switch {
-			case (code == "relay_no_screen" || code == "relay_race") && retries < relayRetries:
+			case (code == "relay_no_screen" || code == "relay_race" || code == "relay_desync") && retries < relayRetries:
 				retries++
 				retryAt = time.Now().Add(relayRetry)
 				c.cfg.Logf("desk: full control: trying again at %s (%d of %d)", retryAt.Format("15:04:05"), retries, relayRetries)
-			case code != "relay_no_screen" && code != "relay_race":
+			case code != "relay_no_screen" && code != "relay_race" && code != "relay_desync":
 				retries = 0
 			}
 			c.mu.Lock()

@@ -541,6 +541,13 @@ func TestReadingAlongWritesThroughTheFrontPanel(t *testing.T) {
 	if strings.Join(fp.pressed, ",") != "mute1,listen1" {
 		t.Fatalf("pressed %v", fp.pressed)
 	}
+	// A copy of the desk that is not current presses no toggle: it could do
+	// the opposite (unmute a live microphone).
+	mirror.SetStale(true)
+	if res := set(ch0, "channelOutputMute", !muted); res.code != 409 || res.body["code"] != "stale_state" || len(fp.pressed) != 2 {
+		t.Fatalf("mute on a stale copy: %d %s (pressed %v)", res.code, res.raw, fp.pressed)
+	}
+	mirror.SetStale(false)
 	if res := set(ch5, "channelOutputMute", true); res.code != 403 || res.body["code"] != "passive" {
 		t.Fatalf("virtual channel: %d %s", res.code, res.raw)
 	}
@@ -1211,7 +1218,7 @@ func TestHeldPressIsReleasedByTheNewestOnly(t *testing.T) {
 		}
 	}
 	release := func() {
-		if res := r.post(t, "/api/set", map[string]interface{}{"epoch": epoch, "path": pad, "name": "padButtonPressed", "value": false}); res.code != 200 {
+		if res := r.post(t, "/api/release", map[string]interface{}{"epoch": epoch, "path": pad, "name": "padButtonPressed"}); res.code != 200 || !strings.Contains(string(res.raw), `"released":true`) {
 			t.Fatalf("release: %d %s", res.code, res.raw)
 		}
 	}
@@ -1226,4 +1233,49 @@ func TestHeldPressIsReleasedByTheNewestOnly(t *testing.T) {
 	}
 	release()
 	eventually(t, func() bool { return !value() })
+}
+
+// A hold is let go of whatever happens meanwhile: control turned off, or a
+// structural change that moves the button (the release follows it and
+// leaves the node now at its old place alone).
+func TestHeldPressIsAlwaysReleased(t *testing.T) {
+	r := newRig(t, rcsim.Options{})
+	r.control(t, "basic")
+	l, epoch := r.snap()
+	pad := l.Path("PADBUTTON", 0)
+	pressed := func(p []int) bool { v, _ := r.sim.Snapshot().At(p).Get("padButtonPressed"); return v.Truth() }
+	req := map[string]interface{}{"epoch": epoch, "path": pad, "name": "padButtonPressed"}
+	if res := r.post(t, "/api/release", req); res.code != 200 || !strings.Contains(string(res.raw), `"released":false`) {
+		t.Fatalf("release of nothing: %d %s", res.code, res.raw)
+	}
+	hold := func() {
+		if res := r.post(t, "/api/press", map[string]interface{}{"epoch": epoch, "path": pad, "name": "padButtonPressed", "ms": 20000}); res.code != 200 {
+			t.Fatalf("press: %d %s", res.code, res.raw)
+		}
+		eventually(t, func() bool { return pressed(pad) })
+	}
+
+	hold()
+	r.control(t, "off")
+	if res := r.post(t, "/api/release", req); res.code != 200 || !strings.Contains(string(res.raw), `"released":true`) {
+		t.Fatalf("release with control off: %d %s", res.code, res.raw)
+	}
+	eventually(t, func() bool { return !pressed(pad) })
+
+	r.control(t, "basic")
+	hold()
+	run := l.Runs["PADBUTTON"]
+	if err := r.sim.Inject(&rcproto.Change{Type: rcproto.ChildAdded, Path: run.Parent, Index: run.First,
+		Tree: &rcproto.Node{Type: "SPACER", Props: []rcproto.Property{{Name: "padButtonPressed", Value: rcproto.Bool(true)}}}}); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, func() bool { _, e := r.snap(); return e != epoch })
+	moved := run.Path(1)
+	if res := r.post(t, "/api/release", req); res.code != 200 || !strings.Contains(string(res.raw), `"released":true`) {
+		t.Fatalf("release after the tree changed: %d %s", res.code, res.raw)
+	}
+	eventually(t, func() bool { return !pressed(moved) })
+	if !pressed(pad) {
+		t.Fatal("the release went to the node now at the old place")
+	}
 }

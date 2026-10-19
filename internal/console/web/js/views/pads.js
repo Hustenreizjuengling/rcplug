@@ -4,7 +4,7 @@ import { t } from '../i18n.js';
 import { store, single, run, runPath, famPath, val, nodeAt } from '../store.js';
 import { canWrite } from '../policy.js';
 import { slider } from '../controls.js';
-import { setProp, press, report } from '../api.js';
+import { setProp, press, release, report } from '../api.js';
 import { openDrawer } from '../dialogs.js';
 import { PAD_COLOURS, padTypeText } from '../device.js';
 import { propsTable } from './parts.js';
@@ -41,12 +41,12 @@ function padEl(scope, bank, slot, p, rerender) {
       el.classList.add('down');
       pressing = (async () => {
         if (bank !== Number(val(gui, 'selectedBank'))) {
-          if (!canWrite(gui, 'selectedBank')) { report({ message: t(store.meta.passive ? 'pads.bankOnDevice' : 'pads.bankDenied', { n: bank + 1 }) }); return false; }
-          if (!(await setProp(scope, gui, 'selectedBank', bank))) return false;
+          if (!canWrite(gui, 'selectedBank')) { report({ message: t(store.meta.passive ? 'pads.bankOnDevice' : 'pads.bankDenied', { n: bank + 1 }) }); return null; }
+          if (!(await setProp(scope, gui, 'selectedBank', bank))) return null;
           await new Promise((r) => setTimeout(r, 120));
         }
-        await press(scope, btnPath, 'padButtonPressed', 30000);
-        return true;
+        const epoch = scope.epoch; // the release names the button as the press did
+        return (await press(scope, btnPath, 'padButtonPressed', 30000)) ? { epoch } : null;
       })();
     };
     const up = async (e) => {
@@ -54,7 +54,8 @@ function padEl(scope, bank, slot, p, rerender) {
       const p = pressing;
       pressing = null;
       el.classList.remove('down');
-      if (p && (await p)) setProp(scope, btnPath, 'padButtonPressed', false);
+      const held = p && (await p);
+      if (held) release(held.epoch, btnPath, 'padButtonPressed');
     };
     for (const ev of ['pointerdown', 'keydown']) el.addEventListener(ev, down);
     for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture', 'keyup', 'blur']) el.addEventListener(ev, up);

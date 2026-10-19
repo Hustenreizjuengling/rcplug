@@ -141,6 +141,10 @@ func main() {
 		log.Fatalf("listen %s: %v", *addr, err)
 	}
 
+	if gone := m.CleanLeftovers(); len(gone) > 0 {
+		log.Printf("removed leftovers of an interrupted update or removal: %s", strings.Join(gone, ", "))
+	}
+
 	// reload (re)scans the plugins: at start, on SIGHUP and from the API.
 	reload := func() ([]string, error) {
 		invalid, err := m.Load()

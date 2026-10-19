@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -197,5 +200,92 @@ func TestDashboardPasswordResetAtTheDevice(t *testing.T) {
 	waitFor(t, "password removed", 3*time.Second, func() bool { return !r.srv.Access.Protected() })
 	if rec := r.do("GET", "/api/plugins", "", lan, ""); rec.Code != 200 {
 		t.Fatalf("open again: %d", rec.Code)
+	}
+}
+
+// A burst of parallel guesses gets no more full checks than the lockout
+// allows (checks still running count as failures).
+func TestParallelGuessesAreThrottled(t *testing.T) {
+	a := NewAccess(t.TempDir())
+	if err := a.SetPassword("", "richtig123"); err != nil {
+		t.Fatal(err)
+	}
+	var wrong, locked atomic.Int32
+	var wg sync.WaitGroup
+	for i := 0; i < 30; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			a.mu.Lock()
+			err := a.verifyLocked("falsch-123")
+			a.mu.Unlock()
+			switch err {
+			case errWrongPass:
+				wrong.Add(1)
+			case errLoginLocked:
+				locked.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if wrong.Load() > loginFailures-1 || wrong.Load()+locked.Load() != 30 {
+		t.Fatalf("%d wrong, %d locked: more full checks than the lockout allows", wrong.Load(), locked.Load())
+	}
+}
+
+// A password file that cannot be read keeps the dashboard closed.
+func TestBrokenPasswordFileFailsClosed(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", accessFile), []byte("{broken"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a := NewAccess(root)
+	if !a.Protected() {
+		t.Fatal("a broken password file opened the dashboard")
+	}
+	a.mu.Lock()
+	a.refreshLocked()
+	forged := a.signLocked(time.Now().Add(time.Hour)) // signed with an empty key
+	a.mu.Unlock()
+	if a.session(forged) {
+		t.Fatal("a session signed with an empty key was accepted")
+	}
+	a.mu.Lock()
+	err := a.verifyLocked("anything-goes")
+	a.mu.Unlock()
+	if err == nil {
+		t.Fatal("a password matched a broken file")
+	}
+}
+
+// A plugin calling rcplugd at the device's own LAN address comes from that
+// address: it is the device, not the network.
+func TestFromDeviceAtItsOwnAddress(t *testing.T) {
+	req := func(remote, local string) *http.Request {
+		r := httptest.NewRequest(http.MethodGet, "/api/plugins", nil)
+		r.RemoteAddr = remote
+		la, _ := net.ResolveTCPAddr("tcp", local)
+		return r.WithContext(context.WithValue(r.Context(), http.LocalAddrContextKey, la))
+	}
+	for _, c := range []struct {
+		remote, local string
+		want          bool
+	}{
+		{"127.0.0.1:5000", "127.0.0.1:8080", true},
+		{"192.168.1.50:5000", "192.168.1.50:8080", true},
+		{"192.168.1.77:5000", "192.168.1.50:8080", false},
+		{"[::1]:5000", "[::1]:8080", true},
+	} {
+		if got := fromDevice(req(c.remote, c.local)); got != c.want {
+			t.Errorf("%s → %s: %v, want %v", c.remote, c.local, got, c.want)
+		}
+	}
+	r := req("192.168.1.50:5000", "192.168.1.50:8080")
+	r.Header.Set("X-Forwarded-For", "10.0.0.1")
+	if fromDevice(r) {
+		t.Error("a proxied request counted as the device")
 	}
 }

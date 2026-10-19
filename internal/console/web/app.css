@@ -29,7 +29,8 @@ select:disabled, input[type="text"]:disabled, input[type="number"]:disabled { op
 .views a .i { width: 17px; height: 17px; }
 .views a[aria-current="page"] .i { color: var(--accent); }
 .views a.tool { color: var(--text-3); padding: 0 9px; }
-.views a.tool span { display: none; }
+.views a.tool span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } /* named for screen readers, and in the title */
+@media (hover: none) { .views a.tool span { position: static; width: auto; height: auto; clip: auto; } } /* no titles on touch screens */
 .views .divider { width: 1px; background: var(--border); margin: 16px 6px; flex: none; }
 .status { grid-area: status; display: flex; align-items: center; gap: 10px; }
 .conn { max-width: 280px; overflow: hidden; }
@@ -46,10 +47,18 @@ body.embedded .brand .logo, body.embedded #lang { display: none; }
 @media (max-width: 640px) {
   .top { padding: 8px 12px 0; column-gap: 10px; }
   .views { margin: 6px -12px 0; }
-  .sub, .conn .txt { display: none; }
+  .sub { display: none; }
+  .conn .txt, #lang span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } /* still read out */
   .conn { padding: 0 8px; }
+  #lang { padding: 0 7px; }
+  .status { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; gap: 8px; min-width: 0; }
   .ctl button { padding: 0 9px; font-size: 12px; }
 }
+@media (max-width: 420px) {
+  .brand .logo { display: none; }
+  .ctl button { padding: 0 7px; font-size: 11.5px; }
+}
+@media (max-width: 340px) { .brand { display: none; } } /* the name is on the page, under Device & show */
 
 /* ---- pages */
 main { padding: 24px 24px 56px; max-width: 1560px; margin: 0 auto; }

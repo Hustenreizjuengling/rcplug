@@ -138,6 +138,13 @@ func (t *Taps) Open(ctx context.Context, plugin string, ports []string) (*tapSub
 		t.idle.Stop()
 		t.idle = nil
 	}
+	ok := false
+	defer func() {
+		// Whatever failed, a bridge nobody listens to stops after a while.
+		if !ok && len(t.subs) == 0 && t.running && t.idle == nil {
+			t.idle = time.AfterFunc(tapIdleStop, t.stopIfIdle)
+		}
+	}()
 	// Channels in use afterwards: those now plus the ports not tapped yet.
 	need := 0
 	for i := range t.ports {
@@ -196,6 +203,7 @@ func (t *Taps) Open(ctx context.Context, plugin string, ports []string) (*tapSub
 	sub.channels = added
 	t.subs[sub] = struct{}{}
 	t.publishLocked()
+	ok = true
 	return sub, nil
 }
 
@@ -229,7 +237,7 @@ func (t *Taps) growLocked(width int) error {
 	t.bridge.Stop()
 	t.running = false
 	if err := t.startLocked(width); err != nil {
-		t.stopLocked()
+		t.stopLocked() // ends the streams and forgets the channels
 		return err
 	}
 	for i, p := range t.ports {
@@ -280,14 +288,15 @@ func (t *Taps) stopIfIdle() {
 	}
 }
 
+// stopLocked stops the bridge if it runs, ends every stream and forgets
+// the channels (also after a failed restart, when the bridge is down).
 func (t *Taps) stopLocked() {
-	if !t.running {
-		return
+	if t.running {
+		t.running = false
+		t.stopRead()
+		_ = t.reader.Close()
+		t.bridge.Stop()
 	}
-	t.running = false
-	t.stopRead()
-	_ = t.reader.Close()
-	t.bridge.Stop()
 	for i := range t.ports {
 		t.ports[i], t.refs[i] = "", 0
 	}

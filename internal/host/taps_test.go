@@ -25,6 +25,8 @@ type fakeBridge struct {
 	widths    []int
 	slow      time.Duration // Connect takes this long (jack_connect on a busy device)
 	pw        *io.PipeWriter
+	failConn  string // Connect of this port fails
+	failStart bool   // the next Start fails
 }
 
 func newFakeBridge() *fakeBridge {
@@ -34,6 +36,13 @@ func newFakeBridge() *fakeBridge {
 func (f *fakeBridge) Ports(ctx context.Context) ([]string, error) { return f.ports, nil }
 
 func (f *fakeBridge) Start(ctx context.Context, channels int) (io.ReadCloser, error) {
+	f.mu.Lock()
+	if f.failStart {
+		f.failStart = false
+		f.mu.Unlock()
+		return nil, errors.New("alsa_out failed")
+	}
+	f.mu.Unlock()
 	pr, pw := io.Pipe()
 	f.mu.Lock()
 	f.starts++
@@ -68,6 +77,9 @@ func (f *fakeBridge) Connect(port string, ch int) error {
 	time.Sleep(slow)
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if port == f.failConn {
+		return errors.New("jack_connect failed")
+	}
 	f.connected[ch] = port
 	return nil
 }
@@ -259,4 +271,64 @@ func TestTapsReadOnWhileConnecting(t *testing.T) {
 		t.Fatal(err)
 	}
 	taps.Disable()
+}
+
+// A failed request leaves no bridge running for nobody, and a failed restart
+// ends the streams and forgets their channels.
+func TestTapsCleanUpAfterFailures(t *testing.T) {
+	old := tapIdleStop
+	tapIdleStop = 50 * time.Millisecond
+	t.Cleanup(func() { tapIdleStop = old })
+	fb := newFakeBridge()
+	fb.failConn = "JUCEJack:out_1"
+	taps := NewTaps(fb)
+	if _, err := taps.Open(context.Background(), "p", []string{"JUCEJack:out_1"}); err == nil {
+		t.Fatal("open succeeded")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		fb.mu.Lock()
+		running := fb.running
+		fb.mu.Unlock()
+		if !running {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the bridge runs on for nobody after a failed open")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	fb.failConn = ""
+	sub, err := taps.Open(context.Background(), "p", []string{"system:capture_1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fb.mu.Lock()
+	fb.failStart = true // the restart for a wider bridge fails
+	fb.mu.Unlock()
+	if _, err := taps.Open(context.Background(), "q", []string{"system:capture_2", "JUCEJack:out_1", "JUCEJack:out_2"}); err == nil {
+		t.Fatal("widening succeeded")
+	}
+	select {
+	case <-sub.done:
+	case <-time.After(time.Second):
+		t.Fatal("the first stream hangs after the failed restart")
+	}
+	taps.mu.Lock()
+	stale := taps.ports[0] != "" || taps.refs[0] != 0
+	taps.mu.Unlock()
+	if stale {
+		t.Fatal("the channel table kept a port of the stopped bridge")
+	}
+	// The next stream works again from scratch.
+	sub2, err := taps.Open(context.Background(), "p", []string{"system:capture_1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, conn := fb.state()
+	if conn[1] != "system:capture_1" {
+		t.Fatalf("not wired again: %v", conn)
+	}
+	taps.Close(sub2)
 }

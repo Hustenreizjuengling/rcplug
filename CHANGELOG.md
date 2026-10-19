@@ -6,6 +6,58 @@ may break compatibility).
 
 ## 0.8.9 - Unreleased
 
+### Fixed
+- **Guessing the dashboard password in parallel:** checks still running count towards
+  the lockout (5 wrong passwords a minute), so a burst of simultaneous guesses gets no
+  more tries than one after the other. A password file that cannot be read keeps the
+  dashboard closed instead of opening it (removing the password at the device still
+  works), and a session needs a usable signing key.
+- **Plugins calling rcplugd at the device's own address** (when rcplugd listens only
+  on the LAN address, `--addr`) count as the device again: with a password they are
+  no longer asked to log in, and the console sees which plugin writes.
+- **The audio bridge** stops again after a request that failed (it ran on for nobody),
+  and a failed restart for more channels ends the streams cleanly instead of leaving
+  them hanging with a stale channel table.
+- **Diagnostics:** plugin options that look like secrets (`apiToken`, `pin`, …) are
+  masked in the bundle, URLs keep only scheme and host; command lines mask flags such
+  as `--api-token` too.
+- **A failed update of rcplug** no longer leaves the dashboard at “restarting”
+  forever, refusing every later update and install: when the installer reports a
+  failure, or rcplug is not replaced within 15 minutes, the update shows as failed.
+- **Leftovers** of an update or removal interrupted by a power loss are removed at
+  the next start; changes to a plugin's state and options happen one at a time.
+- **Full control ends when the console's copy loses track** of the conversation
+  between mixer and screen (a damaged frame, a change that does not fit): the console
+  steps out and starts again with a full read, instead of showing and writing values
+  that may be wrong. When the console stops, the screen gets the mixer back at once.
+  Another program on the control port no longer takes the device's screen's place.
+- **Mute and listen while the state is not current** are refused (409 `stale_state`)
+  also when reading along, as with full control: a press could have done the
+  opposite.
+- **Held SMART pads are always let go:** the release (new `api/release`) needs no PIN
+  and no level, so a hold ends even if control was turned off meanwhile, and after a
+  change of the tree it finds the pad again instead of the node now at its old place.
+- **The console's diagnostics** leave out the device's, the show's and the pads'
+  names, text values in the write log, and the browsers' addresses.
+- **On phones** no page is wider than the screen any more: the password card's state
+  (now a short “No password”), the console's top bar (at 320–390 px, also with
+  *Reconnect* showing) and long states in pills.
+- **After an update** pages no longer run on the cached stylesheet and icons of the
+  version before (`sdk/ui` files are checked again on every load, 304 while unchanged).
+- **Dashboard:** an error while drawing no longer stops its updates until a reload; a
+  page you switch to is not overwritten by the one you left; the plugin catalog shows
+  at once with the *Plugins* page and keeps what you typed into its form.
+- **Accessibility:** the closed phone menu is out of reach for the keyboard and screen
+  readers and closes with Escape; the side bar's figures are no longer read out every
+  few seconds; the console's connection state and its tool tabs keep their names on
+  small screens (tool tabs show them on touch screens); disabled buttons show why on
+  hover; the console's labels follow the language. The console's tab strip no longer
+  jumps back while you swipe it.
+- **Hostile data on the control port** (deeply nested or huge arrays) is refused
+  before it uses up memory, and a TCP segment from far behind no longer crashes reading
+  along. The change log names the node a change was made to, also when the tree
+  changed before it was written down.
+
 ## 0.8.8 - 2026-10-19
 
 ### Changed

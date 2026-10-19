@@ -446,15 +446,16 @@ func checkValue(level Level, n *rcproto.Node, l *rcproto.Layout, path []int, nam
 
 func fmtNum(f float64) string { return strconv.FormatFloat(f, 'f', -1, 64) }
 
+// intBounds keeps v within the node's own min and max (0 … 127 without them).
 func intBounds(n *rcproto.Node, v *rcproto.Value, minName, maxName string) error {
-	lo, hi := int64(0), int64(127)
+	lo, hi := 0.0, 127.0
 	if mn, ok := n.Get(minName); ok && mn.IsNumber() {
-		if mx, ok := n.Get(maxName); ok && mx.IsNumber() && mx.I > mn.I {
-			lo, hi = mn.I, mx.I
+		if mx, ok := n.Get(maxName); ok && mx.IsNumber() && mx.Num() > mn.Num() {
+			lo, hi = mn.Num(), mx.Num()
 		}
 	}
-	if v.I < lo || v.I > hi {
-		return fmt.Errorf("must be between %d and %d", lo, hi)
+	if x := v.Num(); !v.IsNumber() || x < lo || x > hi { // ints today, doubles alike if the firmware ever sends them
+		return fmt.Errorf("must be between %s and %s", fmtNum(lo), fmtNum(hi))
 	}
 	return nil
 }

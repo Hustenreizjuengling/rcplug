@@ -11,7 +11,7 @@ export default {
   'tab.mixer': 'Mixer', 'tab.routing': 'Routing', 'tab.inputs': 'Eingänge', 'tab.outputs': 'Ausgänge', 'nav.tools': 'Werkzeuge', 'tab.effects': 'Effekte',
   'tab.pads': 'SMART Pads', 'tab.recorder': 'Aufnahme', 'tab.system': 'Gerät', 'tab.explorer': 'Explorer', 'tab.audit': 'Protokoll',
   'header.live': 'Live · {n}/s', 'header.liveTap': 'Live (liest mit) · {n}/s', 'header.offline': 'Konsole nicht erreichbar – verbinde neu…', 'header.firmware': 'Firmware {v}',
-  'header.show': 'Show „{name}“', 'header.language': 'Sprache wechseln',
+  'header.show': 'Show „{name}“', 'header.language': 'Sprache wechseln', 'header.views': 'Ansichten', close: 'Schließen',
   'level.group': 'Steuerung', 'level.off': 'Nur lesen', 'level.basic': 'Steuern', 'level.expert': 'Experte',
   'level.offHint': 'Nur anzeigen, nichts verändern', 'level.basicHint': 'Alltägliche Bedienung freigeben', 'level.expertHint': 'Alle nicht gesperrten Eigenschaften',
   'level.basicTitle': 'Steuerung aktivieren?',

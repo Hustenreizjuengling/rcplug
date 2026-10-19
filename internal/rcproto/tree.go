@@ -132,7 +132,7 @@ func (r *reader) node(depth int) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	n.Props = make([]Property, 0, np)
+	n.Props = make([]Property, 0, capHint(np))
 	for i := 0; i < np; i++ {
 		name, err := r.cstring()
 		if err != nil {
@@ -148,7 +148,7 @@ func (r *reader) node(depth int) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	n.Children = make([]*Node, 0, nc)
+	n.Children = make([]*Node, 0, capHint(nc))
 	for i := 0; i < nc; i++ {
 		c, err := r.node(depth + 1)
 		if err != nil {

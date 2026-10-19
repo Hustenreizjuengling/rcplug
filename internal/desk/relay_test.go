@@ -311,8 +311,9 @@ func TestFullControlTakesThePlaceOfTheScreen(t *testing.T) {
 	screen := startScreen(t, sim.Addr())
 	waitFor(t, "screen at the mixer", func() bool { return screen.connected() && !sim.Listening() })
 	old := restartScreen
-	restartScreen = screen.restart
-	t.Cleanup(func() { restartScreen = old })
+	oldNow := restartScreenNow
+	restartScreen, restartScreenNow = screen.restart, screen.restart
+	t.Cleanup(func() { restartScreen, restartScreenNow = old, oldNow })
 
 	c, start, stop := relayClient(t, sim.Addr())
 	start()
@@ -483,5 +484,61 @@ func TestFullControlTriesAgainAfterSteppingBack(t *testing.T) {
 	c.mu.Unlock()
 	if sessions != uint64(1+relayRetries) {
 		t.Fatalf("%d sessions, want %d", sessions, 1+relayRetries)
+	}
+}
+
+// A copy that no longer follows the mixer (here: a screen change it cannot
+// apply) ends the session: the copy goes stale and full control is tried
+// again later.
+func TestFullControlEndsWhenTheCopyLosesTrack(t *testing.T) {
+	fastRelay(t)
+	sim := oneClientSim(t, rcsim.Options{OneClient: true, Ping: 50 * time.Millisecond})
+	c, start, _ := relayClient(t, sim.Addr())
+	c.SetFullControl(true)
+	start()
+	waitFor(t, "relay live", func() bool { st := c.Status(); return st.Mode == "relay" && st.State == StateLive })
+	screen := startScreen(t, sim.Addr())
+	waitFor(t, "screen through the relay", func() bool { return screen.connected() && c.Status().Relay.Screen })
+	screen.send(t, &rcproto.Change{Type: rcproto.PropertyChanged, Path: []int{9999}, Name: "x", Value: rcproto.Bool(true)})
+	waitFor(t, "session ended as desync", func() bool { st := c.Status(); return st.RelayCode == "relay_desync" && st.RelayRetry != "" })
+	stale := false
+	c.mirror.View(func(s Snapshot) { stale = s.Stale })
+	if !stale && c.Status().Mode == "relay" {
+		t.Fatal("the copy that lost track is still trusted")
+	}
+}
+
+// Another local program connecting to the mixer's port does not cut the
+// device's screen off.
+func TestFullControlKeepsTheScreenForOtherClients(t *testing.T) {
+	fastRelay(t)
+	n := 0
+	old := peerComm
+	peerComm = func(net.Conn) string {
+		n++
+		if n == 1 {
+			return screenApp
+		}
+		return "rccapture"
+	}
+	t.Cleanup(func() { peerComm = old })
+	sim := oneClientSim(t, rcsim.Options{OneClient: true, Ping: 50 * time.Millisecond})
+	c, start, _ := relayClient(t, sim.Addr())
+	c.SetFullControl(true)
+	start()
+	waitFor(t, "relay live", func() bool { st := c.Status(); return st.Mode == "relay" && st.State == StateLive })
+	screen := startScreen(t, sim.Addr())
+	waitFor(t, "screen through the relay", func() bool { return screen.connected() && c.Status().Relay.Screen })
+	other, err := net.Dial("tcp", sim.Addr())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	_ = other.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if _, err := other.Read(make([]byte, 16)); err == nil {
+		t.Fatal("the other client was served")
+	}
+	if !screen.connected() || !c.Status().Relay.Screen {
+		t.Fatal("the screen was cut off")
 	}
 }

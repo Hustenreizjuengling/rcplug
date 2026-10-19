@@ -156,6 +156,45 @@ type updateJob struct {
 	phaseStart time.Time
 }
 
+// restartGrace is how long a running rcplug waits to be replaced by the
+// installer of its own update.
+var restartGrace = 15 * time.Minute
+
+// settle ends an rcplug update that is "restarting" while this process
+// lives on: the installer recorded a failure (and kept or brought back this
+// version), or nothing replaced rcplug in time. Otherwise every later
+// update and catalog install would be refused as busy.
+func (j *updateJob) settle(logDir string) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.st.State != "restarting" {
+		return
+	}
+	result := filepath.Join(logDir, "update.result")
+	if fi, err := os.Stat(result); err == nil && !fi.ModTime().Before(j.st.Started) {
+		raw, _ := os.ReadFile(result)
+		if f := strings.Fields(string(raw)); len(f) > 0 && f[0] != "0" {
+			j.st.State, j.st.Error = "error", "the installer failed; this version keeps running (logs/update.log)"
+			j.st.Log = append(j.st.Log, "failed: the installer ended with "+f[0])
+			return
+		}
+	}
+	if time.Since(j.st.Started) > restartGrace {
+		j.st.State, j.st.Error = "error", "rcplug was not replaced; this version keeps running (logs/update.log)"
+		j.st.Log = append(j.st.Log, "failed: rcplug was not restarted in time")
+	}
+}
+
+// busyLocked reports whether an update or install runs (u.mu held).
+func (u *Updater) busyLocked() bool {
+	if u.job == nil {
+		return false
+	}
+	u.job.settle(u.m.LogDir())
+	st := u.job.snapshot().State
+	return st == "running" || st == "restarting"
+}
+
 // progress records how far the running phase is.
 func (j *updateJob) progress(phase string, done, total int64) {
 	j.mu.Lock()
@@ -262,6 +301,7 @@ func (u *Updater) Status() UpdateStatus {
 	st := u.status
 	st.Targets = append([]UpdateTarget(nil), u.status.Targets...)
 	if u.job != nil {
+		u.job.settle(u.m.LogDir())
 		st.Job = u.job.snapshot()
 	}
 	u.mu.Unlock()
@@ -603,10 +643,8 @@ func (u *Updater) Install(target string) error {
 	}
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if u.job != nil {
-		if st := u.job.snapshot().State; st == "running" || st == "restarting" {
-			return ErrUpdateBusy
-		}
+	if u.busyLocked() {
+		return ErrUpdateBusy
 	}
 	fu := u.found[target]
 	if fu == nil || !fu.target.Available || fu.url == "" {

@@ -4,8 +4,11 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	capi "github.com/Hustenreizjuengling/rcplug/sdk/console"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Hustenreizjuengling/rcplug/internal/desk"
@@ -34,7 +37,14 @@ func (c *Console) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 	} {
 		rec := httptest.NewRecorder()
 		h(rec, r)
-		add(name, rec.Body.Bytes())
+		body := rec.Body.Bytes()
+		switch name {
+		case "summary.json":
+			body = redactSummary(body)
+		case "audit.json":
+			body = redactAudit(body)
+		}
+		add(name, body)
 	}
 	add("changes.json", c.changesForDiagnostics())
 	c.mu.Lock()
@@ -66,4 +76,58 @@ func (c *Console) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write(buf.Bytes())
+}
+
+// The bundle goes into public bug reports: the device's, the show's and the
+// pads' names leave the summary, the written values that are text and the
+// browsers' addresses leave the write log (plugins stay named).
+func redactSummary(raw []byte) []byte {
+	var s capi.Summary
+	if json.Unmarshal(raw, &s) != nil {
+		return []byte("{}")
+	}
+	hide := func(v *string) {
+		if *v != "" {
+			*v = "(text)"
+		}
+	}
+	hide(&s.Name)
+	hide(&s.Show)
+	for i := range s.Pads {
+		hide(&s.Pads[i].Name)
+	}
+	out, _ := json.MarshalIndent(s, "", "  ")
+	return out
+}
+
+func redactAudit(raw []byte) []byte {
+	var doc struct {
+		Writes []AuditEntry `json:"writes"`
+	}
+	if json.Unmarshal(raw, &doc) != nil {
+		return []byte("{}")
+	}
+	for i := range doc.Writes {
+		e := &doc.Writes[i]
+		if e.Node != "console" { // the console's own actions log fixed words
+			e.Value = plainValue(e.Value)
+		}
+		if e.Remote != "device" && !strings.HasPrefix(e.Remote, "plugin ") {
+			e.Remote = "(browser)"
+		}
+	}
+	out, _ := json.MarshalIndent(doc, "", "  ")
+	return out
+}
+
+// plainValue keeps numbers, switches and nothing; text becomes "(text)".
+func plainValue(v string) string {
+	switch v {
+	case "", "true", "false", "void", "<nil>":
+		return v
+	}
+	if _, err := strconv.ParseFloat(v, 64); err == nil {
+		return v
+	}
+	return "(text)"
 }

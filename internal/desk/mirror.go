@@ -54,7 +54,7 @@ type Mirror struct {
 
 	watchers map[int]func(path []int, name string, v rcproto.Value)
 	// changeWatchers get the value before the change too (WatchChanges).
-	changeWatchers map[int]func(path []int, name string, old, v rcproto.Value)
+	changeWatchers map[int]func(ChangeEvent)
 	nextW          int
 
 	changes  uint64
@@ -152,8 +152,19 @@ func (m *Mirror) applyLocked(c *rcproto.Change) error {
 	for _, fn := range m.watchers {
 		fn(c.Path, c.Name, v)
 	}
-	for _, fn := range m.changeWatchers {
-		fn(c.Path, c.Name, old, v)
+	if len(m.changeWatchers) > 0 {
+		// The node is named now, against the tree the change applies to (a
+		// later structural change would name another node).
+		ev := ChangeEvent{Path: c.Path, Name: c.Name, Node: "?", Index: -1, Old: old, New: v}
+		if n := m.root.At(c.Path); n != nil {
+			ev.Node = n.Type
+			if r, ok := m.layoutRun(n.Type); ok {
+				ev.Index = r.IndexOf(c.Path)
+			}
+		}
+		for _, fn := range m.changeWatchers {
+			fn(ev)
+		}
 	}
 	if i, ok := m.pending[key]; ok {
 		m.batch[i].v = v
@@ -244,13 +255,23 @@ func (m *Mirror) Watch(fn func(path []int, name string, v rcproto.Value)) func()
 	}
 }
 
-// WatchChanges is Watch with the value before the change (Void for a new
-// property). The same rules apply: fn runs under the mirror lock.
-func (m *Mirror) WatchChanges(fn func(path []int, name string, old, v rcproto.Value)) func() {
+// ChangeEvent is a property change as WatchChanges reports it.
+type ChangeEvent struct {
+	Path     []int // valid during the call only
+	Name     string
+	Node     string // the node's type ("?" if unknown)
+	Index    int    // in its type's run of the layout, -1 if none
+	Old, New rcproto.Value
+}
+
+// WatchChanges is Watch with the node's type and index and the value before
+// the change (Void for a new property). The same rules apply: fn runs under
+// the mirror lock.
+func (m *Mirror) WatchChanges(fn func(ChangeEvent)) func() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.changeWatchers == nil {
-		m.changeWatchers = map[int]func([]int, string, rcproto.Value, rcproto.Value){}
+		m.changeWatchers = map[int]func(ChangeEvent){}
 	}
 	id := m.nextW
 	m.nextW++
@@ -414,4 +435,13 @@ func (m *Mirror) Notify(event string, data []byte) {
 			s.lost = true
 		}
 	}
+}
+
+// layoutRun is the run of a node type in the layout (none without one).
+func (m *Mirror) layoutRun(nodeType string) (rcproto.Run, bool) {
+	if m.layout == nil {
+		return rcproto.Run{}, false
+	}
+	r, ok := m.layout.Runs[nodeType]
+	return r, ok
 }

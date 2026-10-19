@@ -258,6 +258,14 @@ func TestUpdatePlatform(t *testing.T) {
 		!strings.Contains(strings.Join(lu.Log, "\n"), "going back") {
 		t.Fatalf("last update = %+v", lu)
 	}
+	// This process lives on after the installer failed: the job ends, and
+	// the next update is not refused as busy.
+	if j := u.Status().Job; j == nil || j.State != "error" {
+		t.Fatalf("job after a failed installer: %+v", j)
+	}
+	if err := u.Install("rcplug"); err == ErrUpdateBusy {
+		t.Fatal("still busy after the installer failed")
+	}
 }
 
 func mustRead(t *testing.T, f string) []byte {

@@ -71,8 +71,8 @@ func (s *tapStream) add(seq uint32, p []byte, now time.Time) bool {
 	}
 	switch d := int32(seq - s.next); {
 	case d <= 0: // in order, or overlapping what we have (a retransmission)
-		if int(-d) < len(p) {
-			s.buf = append(s.buf, p[-d:]...)
+		if back := -int64(d); back < int64(len(p)) { // int64: -MinInt32 does not fit an int32
+			s.buf = append(s.buf, p[back:]...)
 			s.next = seq + uint32(len(p))
 			s.drainAhead()
 		}
@@ -105,8 +105,8 @@ func (s *tapStream) drainAhead() {
 			}
 			delete(s.ahead, seq)
 			s.aheadN -= len(p)
-			if int(-d) < len(p) {
-				s.buf = append(s.buf, p[-d:]...)
+			if back := -int64(d); back < int64(len(p)) {
+				s.buf = append(s.buf, p[back:]...)
 				s.next = seq + uint32(len(p))
 			}
 			progress = true

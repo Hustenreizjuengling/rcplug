@@ -27,3 +27,21 @@ func TestHandlerServesOnlyItsFiles(t *testing.T) {
 		t.Errorf("icons: %s", rec.Header().Get("Content-Type"))
 	}
 }
+
+// Kept by browsers but checked again: an update's new look shows at once.
+func TestHandlerRevalidates(t *testing.T) {
+	h := Handler("/ui/")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/ui/rcplug.css", nil))
+	tag := rec.Header().Get("ETag")
+	if tag == "" || rec.Header().Get("Cache-Control") != "no-cache" {
+		t.Fatalf("headers %v", rec.Header())
+	}
+	req := httptest.NewRequest(http.MethodGet, "/ui/rcplug.css", nil)
+	req.Header.Set("If-None-Match", tag)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotModified || rec.Body.Len() != 0 {
+		t.Fatalf("unchanged: %d, %d bytes", rec.Code, rec.Body.Len())
+	}
+}

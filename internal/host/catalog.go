@@ -234,10 +234,8 @@ func (u *Updater) InstallFromCatalog(repo, name string) error {
 	}
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if u.job != nil {
-		if st := u.job.snapshot().State; st == "running" || st == "restarting" {
-			return ErrUpdateBusy
-		}
+	if u.busyLocked() {
+		return ErrUpdateBusy
 	}
 	fu := u.catFound[repo+"#"+name]
 	if fu == nil {
@@ -398,6 +396,27 @@ func (m *Manager) RemoveCatalog(repo string) bool {
 		}
 	}
 	return false
+}
+
+// CleanLeftovers removes what an update or a removal leaves when the device
+// loses power halfway: <root>/.update (the downloaded package, up to a few
+// hundred MB) and <root>/.removed-* (a plugin on its way out). Only what is
+// older than half an hour goes, so an installer that is still finishing
+// keeps its files. It returns what it removed.
+func (m *Manager) CleanLeftovers() []string {
+	var gone []string
+	found, _ := filepath.Glob(filepath.Join(m.root, ".removed-*"))
+	found = append(found, filepath.Join(m.root, ".update"))
+	for _, p := range found {
+		fi, err := os.Lstat(p)
+		if err != nil || time.Since(fi.ModTime()) < 30*time.Minute {
+			continue
+		}
+		if os.RemoveAll(p) == nil {
+			gone = append(gone, filepath.Base(p))
+		}
+	}
+	return gone
 }
 
 // ---- HTTP

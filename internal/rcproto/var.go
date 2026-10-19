@@ -176,9 +176,34 @@ var ErrShort = errors.New("rcproto: truncated data")
 
 // reader is a cursor over a byte slice.
 type reader struct {
-	b   []byte
-	pos int
+	b     []byte
+	pos   int
+	depth int  // arrays within arrays
+	left  *int // elements the message may still hold (shared with nested readers)
 }
+
+// maxElements bounds what one message decodes into (nodes, properties,
+// array elements together): a Duo's full sync has about 10 000, and a
+// hostile count cannot make the decoder allocate hundreds of MB on a device
+// with little memory to spare.
+const maxElements = 250000
+
+// spend takes n elements from the message's budget.
+func (r *reader) spend(n int) error {
+	if r.left == nil {
+		v := maxElements
+		r.left = &v
+	}
+	if n > *r.left {
+		return fmt.Errorf("rcproto: more than %d elements in one message", maxElements)
+	}
+	*r.left -= n
+	return nil
+}
+
+// capHint is a slice capacity for a count: what is decoded grows the slice,
+// not what the count claims.
+func capHint(n int) int { return min(n, 1024) }
 
 func (r *reader) remaining() int { return len(r.b) - r.pos }
 
@@ -235,6 +260,9 @@ func (r *reader) count() (int, error) {
 	}
 	if v < 0 || v > int64(r.remaining()) {
 		return 0, fmt.Errorf("rcproto: implausible count %d", v)
+	}
+	if err := r.spend(int(v)); err != nil {
+		return 0, err
 	}
 	return int(v), nil
 }
@@ -305,12 +333,18 @@ func (r *reader) value() (Value, error) {
 		if err != nil {
 			return Value{}, err
 		}
-		sub := &reader{b: body}
+		if r.depth >= maxDepth {
+			return Value{}, fmt.Errorf("rcproto: arrays nested too deep")
+		}
+		if err := r.spend(0); err != nil { // the budget nested readers share
+			return Value{}, err
+		}
+		sub := &reader{b: body, depth: r.depth + 1, left: r.left}
 		cnt, err := sub.count()
 		if err != nil {
 			return Value{}, err
 		}
-		arr := make([]Value, 0, cnt)
+		arr := make([]Value, 0, capHint(cnt))
 		for i := 0; i < cnt; i++ {
 			e, err := sub.value()
 			if err != nil {
