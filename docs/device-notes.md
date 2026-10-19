@@ -139,7 +139,9 @@ flashing from Windows (below). What is still open:
    0.8.0 it is how the console works on the device. At boot (first seen with 0.8.11),
    the console took the place before the screen app connected; the screen app then
    showed a desk that matched nothing until the console restarted it. Since 0.8.12 the
-   console lets the screen app connect first at boot and takes over after that. Still
+   console lets the screen app connect first at boot and takes over after that: on
+   the Duo the screen came up normally, the console read along at once, took over ten
+   seconds later and had the screen connected through it about four seconds after. Still
    to watch: the screen finding the mixer again when the console stops (it behaves as
    designed in the simulator).
 
@@ -195,8 +197,9 @@ On 2026-10-19 (firmware 1.7.6, rcplug 0.8.11 before its release):
   Their processes ended, ports 111, 5060 and 5061 closed, the bind mounts lay over
   `/etc/init.d/callme-t-service`, `/etc/init.d/rpcbind` and `/usr/sbin/ModemManager`;
   audio went on and RØDE's menus worked as before. The mixer keeps one `CLOSE_WAIT`
-  socket on 127.0.0.1:2346 from the call engine that went away. Still to see: that they
-  stay off after a restart and come back when switched on.
+  socket on 127.0.0.1:2346 from the call engine that went away. After restarts of the
+  device they stayed off (`rcplugd --services apply` laid the mounts again at boot).
+  Still to see: that they come back when switched on.
 - **The screen:** a plugin with the permission `screen` (the demo PlugRain of
   rcplug-plugins) had the screen for minutes at a time and gave it back by its button
   and by its time; the console held the mixer alone meanwhile and handed the screen
