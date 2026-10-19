@@ -6,7 +6,8 @@ import { canWrite } from '../policy.js';
 import { toggle, slider, vfader, selectCtl, chip, kv, card } from '../controls.js';
 import { hMeter, vMeter, grMeter, hReduction } from '../meters.js';
 import { openDrawer } from '../dialogs.js';
-import { eqCurve, FORMATS } from '../curves.js';
+import { eqCurve, compCurve, gateGraph, deessCurve } from '../curves.js';
+import { formats } from '../scales.js';
 import { PROC, faders, faderLabel, faderDb, sourceLabel, sourceColour, sources, stripSource, unityFader, mixLevel, sourceIndexes } from '../device.js';
 import { recorderCard, monitorCard, inputCard, routingRow } from './parts.js';
 import { actionButtons } from '../plugins.js';
@@ -98,15 +99,21 @@ export function openChannel(i) {
     body.append(h('div', { class: 'row' }, toggle(scope, ch, 'channelOutputMute', t('mute'), 'mute'), toggle(scope, ch, 'channelCueEnable', t('listen'), 'cue'), toggle(scope, ch, 'channelBypassProcessing', t('proc.bypass'), 'mute'),
       actionButtons('channel', channelVars(i))));
     const grid = h('div', { class: 'grid cols-2', style: 'margin-top:12px' });
+    // The graphs the device's screen shows for these pages, with the strip's
+    // level and gain reduction where they move (curves.js).
+    const meter = runPath(store.L.stripMeters, i), reduction = runPath(store.L.reductionMeters, i);
+    const graphs = {
+      'proc.eq': () => eqCurve(scope, ch), 'proc.hpf': () => eqCurve(scope, ch, { hpfOnly: true }),
+      'proc.comp': () => compCurve(scope, ch, meter), 'proc.gate': () => gateGraph(scope, ch, meter), 'proc.deess': () => deessCurve(scope, ch, reduction),
+    };
+    const fmt = formats(t('eq.perOctave'));
     for (const p of PROC) {
       const head = h('h3', null, t(p.title));
       if (p.on && val(ch, p.on) !== undefined) head.append(h('span', { class: 'spacer' }), toggle(scope, ch, p.on, t('on')));
       const c = h('section', { class: 'card' + (p.title === 'proc.eq' ? ' wide' : '') }, head);
-      // The EQ shows its curve (with the high-pass filter), as the device's
-      // screen does; scales in curves.js.
-      if (p.title === 'proc.eq') c.append(eqCurve(scope, ch), h('p', { class: 'muted small', style: 'margin:2px 0 8px' }, t('eq.approx')));
+      if (graphs[p.title] && val(ch, p.on) !== undefined) c.append(graphs[p.title]());
       for (const [prop, key] of p.toggles || []) if (val(ch, prop) !== undefined) c.append(h('div', { class: 'row', style: 'margin:4px 0' }, toggle(scope, ch, prop, t(key))));
-      for (const [prop, key] of p.params) if (val(ch, prop) !== undefined) c.append(slider(scope, ch, prop, { label: t(key), fmt: FORMATS[prop] }));
+      for (const [prop, key] of p.params) if (val(ch, prop) !== undefined) c.append(slider(scope, ch, prop, { label: t(key), fmt: fmt[prop] }));
       grid.append(c);
     }
     body.append(grid);

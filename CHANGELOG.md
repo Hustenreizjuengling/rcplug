@@ -6,6 +6,21 @@ may break compatibility).
 
 ## 0.8.7 - Unreleased
 
+### Added
+- **The device's processing graphs in a channel's details:** the compressor's
+  transfer curve with the channel's level as a dot on it, the noise gate's level
+  history of the last five seconds with its threshold and hysteresis, the de-esser's
+  dip at its frequency (as deep as the current reduction), and the high-pass filter's
+  curve, drawn as the device's screen draws them.
+
+### Changed
+- **Exact units** for every processing setting: the scales come from the device's own
+  screen app (firmware 1.7.6) instead of estimates, e.g. the EQ's low band is 20–200 Hz
+  (quadratic), the compressor's attack 0.1–10 ms (logarithmic); the defaults come out
+  round (100 Hz, 70 Hz high-pass, 2 : 1). The EQ curve uses the device's filters (three
+  bells at 48 kHz). The gate's hysteresis shows in dB. Table in
+  [device-notes.md](docs/device-notes.md#processing-values).
+
 ## 0.8.6 - 2026-10-18
 
 ### Changed

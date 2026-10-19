@@ -51,6 +51,45 @@ buses they carry is not known yet. The shared audio taps can listen to any outpu
 above; with rcplug 0.7.4 their bridge (two channels) costs about 1 % of the device
 (0.7.2, with eight channels: 13 %).
 
+## Processing values
+
+The desk stores a channel's processing settings as 0–1 without units. What they mean
+comes from the device's own screen app (`rc_gui_juce`, firmware 1.7.6): its parameter
+classes turn a stored value *v* into the unit the screen shows, each with its range.
+The console uses the same scales (`internal/console/web/js/scales.js`).
+
+| Settings | Range | From *v* |
+|---|---|---|
+| EQ low / mid / high frequency | 20–200 Hz / 200–2000 Hz / 2–12 kHz | lo + (hi − lo) · v² |
+| EQ gains | −12 to +12 dB | lo + (hi − lo) · v, v rounded to 0.01 |
+| EQ Q | 0.1–10 | lo + (hi − lo) · v |
+| High-pass frequency, slope | 20–200 Hz; 6–24 dB/octave | v²; linear, rounded (steps of 1/3) |
+| Compressor threshold, ratio, make-up | −60 to 0 dB; 1.5–4.5 : 1; 0–9 dB | linear (0.01 steps); v²; linear |
+| Compressor attack, release | 0.1–10 ms; 5–200 ms | lo · (hi / lo)^v |
+| De-esser threshold, ratio, gain | −60 to 0 dB; 1–10 : 1; 0–9 dB | linear; v²; linear |
+| De-esser frequency, attack, release | 1–8 kHz; 0.1–10 ms; 50–2000 ms | lo · (hi / lo)^v |
+| Noise gate threshold | −60 to 0 dB | linear (0.01 steps) |
+| Noise gate attack, hold, release | 0.1–1000 ms; 50–2000 ms; 50–2000 ms | lo · (hi / lo)^v |
+| Noise gate range | 0–100 dB | 100 · √(1 − v), rounded |
+| Noise gate hysteresis | 0–30 dB below the threshold | 30 · v (the screen's gate graph) |
+| APHEX exciter tune, big bottom tune | 600–5000 Hz; 60–312 Hz | v² |
+
+The defaults come out round: low shelf 100 Hz, mid 400 Hz, high 10 kHz, Q 0.3 and
+0.5, high-pass 70 Hz at 12 dB/octave, compressor 2 : 1, gate release 200 ms.
+
+The screen's graphs, which the console draws the same way:
+
+- **EQ:** the three bands as bell filters (also the outer two, whose wide Q makes them
+  look like shelves) at 48 kHz, A = 10^(gain/40), α = sin ω / 2Q, with the high-pass
+  filter; frequencies from 20 Hz to 22 kHz.
+- **Compressor:** output over input level from −60 to +6 dB, a hard knee drawn
+  rounded, make-up gain added; a dot at the channel's level on the curve.
+- **Noise gate:** the channel's level over about five seconds (+6 to −64 dB), open
+  above the threshold and until it falls below the threshold minus the hysteresis,
+  with both lines.
+- **De-esser:** a bell (Q 1.7) at its frequency, as deep as the current reduction, at
+  the height of the threshold.
+
 ## Firmware updates and flashing
 
 The firmware format, the USB update path (`M`/`U` over HID, the update disk) and the

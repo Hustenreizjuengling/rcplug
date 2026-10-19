@@ -57,7 +57,6 @@ show. Ideas and comments are welcome as issues.
    - the real gain ranges;
    - the meaning of a few integer settings (the console's change log, 0.7.3, shows
      them when a setting is changed on the device's screen);
-   - the units of the EQ (Hz, dB, Q) behind the desk's 0–1 values, for the EQ curve;
    - which buses the mixer's unconnected JACK outputs carry
      ([device-notes.md](device-notes.md#the-jack-graph)).
 
@@ -103,7 +102,8 @@ missing:
 
 Done on the way: the headphone volumes and fewer inputs and outputs that the Duo does
 not have (0.8.2), the EQ curve (0.8.4), backups of rcplug's settings with the
-*Backup* plugin (0.8.5).
+*Backup* plugin (0.8.5), the device's processing graphs and exact units read from its
+screen app (0.8.7).
 
 Since 0.8.0 there are no switches for experimental features: what the goal needs is
 on, what it does not need is gone.

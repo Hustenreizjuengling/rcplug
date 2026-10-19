@@ -29,6 +29,15 @@ export function meterNorm(v) {
   return Math.min(1, Math.max(0, (20 * Math.log10(v) + 60) / 60));
 }
 
+// meterDb is a reading in dB (−Infinity for silence), on the same
+// assumption as meterNorm.
+export function meterDb(v) {
+  if (typeof v !== 'number' || !isFinite(v)) return -Infinity;
+  if (v < 0) dbScale = true;
+  if (dbScale) return v;
+  return v > 0 ? 20 * Math.log10(v) : -Infinity;
+}
+
 export function vMeter(scope, path, side) {
   const cv = h('div', { class: 'cv' }); // covers what the level does not reach
   const pk = h('div', { class: 'pk' });
