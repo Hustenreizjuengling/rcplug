@@ -72,7 +72,7 @@ func main() {
 
 	sub, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
-	mux.Handle("GET /", http.FileServer(http.FS(sub)))
+	mux.Handle("GET /", sdk.Files(sub))
 	mux.HandleFunc("GET /api/log", l.handleLog)
 	mux.HandleFunc("POST /api/clear", l.handleClear)
 

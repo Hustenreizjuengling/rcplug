@@ -92,7 +92,7 @@ func main() {
 func (a *app) routes() http.Handler {
 	page, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
-	mux.Handle("GET /", http.FileServer(http.FS(page)))
+	mux.Handle("GET /", sdk.Files(page))
 	mux.HandleFunc("GET /api/view", a.handleView)
 	mux.HandleFunc("GET /api/events", a.handleEvents)
 	mux.HandleFunc("POST /api/settings", a.handleSettings)

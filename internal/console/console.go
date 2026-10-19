@@ -184,9 +184,8 @@ func (c *Console) Handler() http.Handler {
 	c.register(mux)
 	mux.Handle("GET /ui/", ui.Handler("/ui/")) // rcplug's shared look (sdk/ui)
 	sub, _ := fs.Sub(webFS, "web")
-	files := http.FileServer(http.FS(sub))
+	files := sdk.Files(sub) // kept by browsers (ETag), compressed
 	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		files.ServeHTTP(w, r)
 	}))

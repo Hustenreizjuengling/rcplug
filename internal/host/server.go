@@ -154,7 +154,7 @@ func (s *Server) Handler() http.Handler {
 	if s.dashboard != nil {
 		// Plain "/" (no method) so the more specific /plugins/… and /api/…
 		// patterns take precedence; this serves everything else.
-		mux.Handle("/", http.FileServer(http.FS(s.dashboard)))
+		mux.Handle("/", sdk.Files(s.dashboard)) // kept by browsers (ETag), compressed
 	}
 	var h http.Handler = mux
 	if s.Access != nil {

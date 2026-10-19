@@ -644,6 +644,9 @@ To work on the SDK and a plugin together, use a workspace:
 | `CSRF(h)` | Only the `X-Rcplug` check, for your own server |
 | `APIHeader` | `"X-Rcplug"` |
 | `WriteJSON(w, status, v)` | JSON response with `Cache-Control: no-store` |
+| `Files(fsys)` | Serves a plugin's pages from an `fs.FS` (usually embedded): ETags (browsers keep the files and ask whether they changed), text gzip-compressed for browsers that take it, `index.html` for paths ending in `/` |
+| `WriteBody(w, r, contentType, body)` | Writes a body, gzip-compressed when the client takes it and it is at least 1 KB (for large JSON such as the console's tree) |
+| `AcceptsGzip(r)` | Whether the request accepts gzip |
 | `NewError(status, code, msg)`, `WriteError(w, err)` | Errors as `{"error": "…", "code": "…"}`; other errors become 500 `internal` |
 | `Error(w, status, msg)` | A plain error with the code `error` |
 | `LowPriority()` | Lowers all threads to nice 19 (the host has done that already) |

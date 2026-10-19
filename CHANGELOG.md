@@ -6,6 +6,22 @@ may break compatibility).
 
 ## 0.8.13 - Unreleased
 
+### Changed
+- **Opening the console sends a fraction of what it did.** Its pages were sent in full
+  at every visit (no ETag, so browsers could not keep them) and uncompressed, together
+  with the mixer's whole state: about 420 KB each time the console was opened or the
+  dashboard switched to it. Now browsers keep the pages and only ask whether they
+  changed, and text and the state go out gzip-compressed: about 11 KB when the console
+  is opened again (the state; 76 KB for the pages the first time). The dashboard and
+  rcplug's shared look are served the same way. On the Duo, opening the console or
+  switching to it quickly could be heard as a short crackle in the sound; every byte to
+  a browser shares the CPU's interrupt handling with the USB audio.
+
+### Added
+- **SDK:** `sdk.Files` serves a plugin's pages with ETags and gzip, `sdk.WriteBody`
+  writes a large body compressed, `sdk.AcceptsGzip` tells whether a request takes gzip.
+  The plugin guide and the examples use them.
+
 ## 0.8.12 - 2026-10-19
 
 ### Fixed

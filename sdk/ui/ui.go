@@ -13,18 +13,16 @@
 //
 // The files are small (about 24 KB) and versioned with the SDK. Browsers
 // keep them but ask each time whether they changed (ETag), so a page that
-// comes with an update never runs on an older stylesheet or icon set.
+// comes with an update never runs on an older stylesheet or icon set; they go
+// out compressed (sdk.Files).
 package ui
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"embed"
-	"encoding/hex"
 	"io/fs"
 	"net/http"
-	"strings"
-	"time"
+
+	"github.com/Hustenreizjuengling/rcplug/sdk"
 )
 
 //go:embed rcplug.css icons.svg
@@ -33,35 +31,15 @@ var files embed.FS
 // FS holds rcplug.css and icons.svg.
 var FS fs.FS = files
 
-type file struct {
-	data []byte
-	etag string
-}
-
-var served = func() map[string]file {
-	m := map[string]file{}
-	for _, name := range []string{"rcplug.css", "icons.svg"} {
-		b, err := files.ReadFile(name)
-		if err != nil {
-			panic(err)
-		}
-		sum := sha256.Sum256(b)
-		m[name] = file{data: b, etag: `"` + hex.EncodeToString(sum[:8]) + `"`}
-	}
-	return m
-}()
+var handler = sdk.Files(files)
 
 // Handler serves the files under prefix (e.g. "/ui/").
 func Handler(prefix string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		name := strings.TrimPrefix(r.URL.Path, prefix)
-		f, ok := served[name]
-		if !ok {
+	return http.StripPrefix(prefix, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "rcplug.css" && r.URL.Path != "icons.svg" {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Cache-Control", "no-cache") // kept, but checked again (304 while unchanged)
-		w.Header().Set("ETag", f.etag)
-		http.ServeContent(w, r, name, time.Time{}, bytes.NewReader(f.data))
-	})
+		handler.ServeHTTP(w, r)
+	}))
 }

@@ -124,9 +124,10 @@ func (c *Console) handleTree(w http.ResponseWriter, r *http.Request) {
 	b.WriteString(`,"root":`)
 	desk.WriteTree(&b, s.Root, Secret)
 	b.WriteString(`}`)
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write(b.Bytes())
+	// About 200 KB of JSON, a tenth of it compressed: every page load asks
+	// for it.
+	sdk.WriteBody(w, r, "application/json; charset=utf-8", b.Bytes())
 }
 
 func (c *Console) handleSummary(w http.ResponseWriter, r *http.Request) {

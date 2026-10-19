@@ -113,7 +113,7 @@ func main() {
 
 	page, _ := fs.Sub(webFS, "web")
 	mux := http.NewServeMux()
-	mux.Handle("GET /", http.FileServer(http.FS(page)))
+	mux.Handle("GET /", sdk.Files(page))
 
 	log.Printf("onair on %s", *addr)
 	if err := sdk.Serve(ctx, *addr, mux); err != nil {
@@ -129,6 +129,11 @@ Put an `index.html` into `web/` and run `go run .`; the page is at
   when you run the program yourself.
 - `sdk.Serve` listens, shuts down gracefully when the context ends, and refuses
   state-changing requests without the `X-Rcplug` header (see step 7).
+- `sdk.Files` serves the page so that browsers keep it (they only ask whether it
+  changed) and get text compressed. On a RØDECaster every byte to a browser shares the
+  CPU's interrupt handling with the device's USB audio, so a page should not send a few
+  hundred kilobytes at every visit. Send large JSON with `sdk.WriteBody`, which
+  compresses it.
 - Everything the program logs ends up in the plugin's log on the dashboard.
 - **Use relative URLs in the page** (`api/view`, never `/api/view`). The page is
   served at `/plugins/onair/` behind the host and at `/` when you open the port
