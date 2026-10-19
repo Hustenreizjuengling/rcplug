@@ -20,6 +20,9 @@ may break compatibility).
   never restarted, started by a backup or remembered; the console holds the mixer alone
   meanwhile.
 
+Both were tried on a real Duo before the release (firmware 1.7.6, see
+[device-notes.md](docs/device-notes.md#røde-services-and-the-screen-on-a-real-duo)).
+
 ## 0.8.10 - 2026-10-19
 
 ### Added

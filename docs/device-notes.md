@@ -184,6 +184,30 @@ from Windows to a patched 1.7.6):
 - **Diagnostics** now include the network and unix sockets with their processes and
   the names on the D-Bus system bus, which is what this needed.
 
+## RØDE services and the screen on a real Duo
+
+On 2026-10-19 (firmware 1.7.6, rcplug 0.8.11 before its release):
+
+- **RØDE services:** CallMe, rpcbind and ModemManager switched off from the dashboard.
+  Their processes ended, ports 111, 5060 and 5061 closed, the bind mounts lay over
+  `/etc/init.d/callme-t-service`, `/etc/init.d/rpcbind` and `/usr/sbin/ModemManager`;
+  audio went on and RØDE's menus worked as before. The mixer keeps one `CLOSE_WAIT`
+  socket on 127.0.0.1:2346 from the call engine that went away. Still to see: that they
+  stay off after a restart and come back when switched on.
+- **The screen:** a plugin with the permission `screen` (the demo PlugRain of
+  rcplug-plugins) had the screen for minutes at a time and gave it back by its button
+  and by its time; the console held the mixer alone meanwhile and handed the screen
+  back its connection within a second. The panel is DSI, 720 × 1280 at 60 Hz; two dumb
+  buffers flipped with the legacy page flip work. The touchscreen is a Goodix GT911
+  reporting 0–799 × 0–1279 on its single-touch axes, in the panel's orientation. RØDE's
+  `display-start.sh` binds its driver again whenever it starts, so the touchscreen's
+  event device can change; find it by its name.
+- **USB audio and bursts:** the network (Gigabit Ethernet), the storage and the USB
+  audio interface share the CPU's interrupt handling at the same real-time priority.
+  Sending a plugin to the device at the network's full speed made the computer lose the
+  Duo's USB audio for a while (once it reset the device); the toolkit now sends at
+  256 KB/s, as rcplug's in-app updates download.
+
 ## A careful first test
 
 1. Install with the wizard and open the dashboard. Leave the console on *Read only*.
