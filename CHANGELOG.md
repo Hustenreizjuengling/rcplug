@@ -6,6 +6,13 @@ may break compatibility).
 
 ## 0.8.10 - Unreleased
 
+### Added
+- **System › Help** links the toolkit's [diagnostics
+  page](https://hustenreizjuengling.github.io/rcplug-toolkit/diagnostics.html) next to
+  *Download diagnostics*: it shows a bundle's problems, the device's resources over
+  time, the plugins and the console, and what to review before sharing it, read only
+  in the browser.
+
 ## 0.8.9 - 2026-10-19
 
 ### Fixed

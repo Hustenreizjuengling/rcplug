@@ -37,7 +37,7 @@ const T = {
     sysDevice: 'Device', statLoad: 'Load', statMem: 'Memory used', statDisk: 'Storage free', statUp: 'Device up for', statTemp: 'CPU temperature',
     disclaimer: 'rcplug is unofficial software, not affiliated with or endorsed by RØDE Microphones. RØDE and RØDECaster are trademarks of their owner. Use at your own risk.',
     diagTitle: 'Diagnostics', diagText: 'If something does not work: download this bundle (logs, versions, device state; passwords and keys masked) and attach it to a bug report. Review it before posting it publicly.',
-    diagButton: 'Download diagnostics',
+    diagButton: 'Download diagnostics', diagView: 'Look at it in the browser', diagViewHint: 'Opens the file on the toolkit\'s page, read only in your browser: problems, resources over time, and what to review before sharing',
     updTitle: 'Updates', updDesc: 'rcplug and plugins update from signed releases on GitHub. Nothing is downloaded until you check, nothing is installed until you click. Settings and plugin data are kept.',
     updOff: 'Updates are switched off on this device (RCPLUG_UPDATES=off or --updates=false).', updCheck: 'Check for updates', updChecking: 'checking…',
     updNever: 'Not checked yet.', updChecked: 'Last checked: {at}', updCurrent: 'up to date', updAvail: 'update available',
@@ -110,7 +110,7 @@ const T = {
     sysDevice: 'Gerät', statLoad: 'Last', statMem: 'Arbeitsspeicher belegt', statDisk: 'Speicherplatz frei', statUp: 'Gerät läuft seit', statTemp: 'CPU-Temperatur',
     disclaimer: 'rcplug ist inoffizielle Software und steht in keiner Verbindung zu RØDE Microphones. RØDE und RØDECaster sind Marken ihres Inhabers. Nutzung auf eigene Gefahr.',
     diagTitle: 'Diagnose', diagText: 'Wenn etwas nicht funktioniert: dieses Paket herunterladen (Logs, Versionen, Gerätezustand; Passwörter und Schlüssel maskiert) und an einen Fehlerbericht hängen. Vor dem öffentlichen Teilen bitte durchsehen.',
-    diagButton: 'Diagnose herunterladen',
+    diagButton: 'Diagnose herunterladen', diagView: 'Im Browser ansehen', diagViewHint: 'Öffnet die Datei auf der Seite des Toolkits, nur in deinem Browser gelesen: Probleme, Ressourcen über die Zeit und was du vor dem Teilen prüfen solltest',
     updTitle: 'Updates', updDesc: 'rcplug und Plugins aktualisieren sich aus signierten Releases auf GitHub. Heruntergeladen wird erst nach „Nach Updates suchen“, installiert erst nach deinem Klick. Einstellungen und Plugin-Daten bleiben erhalten.',
     updOff: 'Updates sind auf diesem Gerät abgeschaltet (RCPLUG_UPDATES=off oder --updates=false).', updCheck: 'Nach Updates suchen', updChecking: 'suche…',
     updNever: 'Noch nicht gesucht.', updChecked: 'Zuletzt gesucht: {at}', updCurrent: 'aktuell', updAvail: 'Update verfügbar',
@@ -692,7 +692,8 @@ function renderSystem() {
       startEvents();
     } else if (tab === 'help') {
       body.innerHTML = `<div class="stack" style="--gap:16px"><div class="card"><div class="card-head"><h2>${esc(t('diagTitle'))}</h2></div><p class="lead">${esc(t('diagText'))}</p>
-          <a class="btn primary" href="api/diagnostics" download>${ico('download', 'i-sm')}${esc(t('diagButton'))}</a></div>
+          <div class="cluster"><a class="btn primary" href="api/diagnostics" download>${ico('download', 'i-sm')}${esc(t('diagButton'))}</a>
+          <a class="btn ghost" href="https://hustenreizjuengling.github.io/rcplug-toolkit/diagnostics.html" target="_blank" rel="noopener" title="${esc(t('diagViewHint'))}">${esc(t('diagView'))} ${ico('external', 'i-sm')}</a></div></div>
         <div class="card danger"><div class="card-head"><h2>${esc(t('unTitle'))}</h2></div><p class="lead">${esc(t('unDesc'))}</p>
           <div class="cluster"><input class="input" type="text" id="unWord" placeholder="${esc(t('unWordHint'))}" aria-label="${esc(t('unWordHint'))}" autocomplete="off" style="max-width:220px">
           <button class="btn danger" id="unGo">${ico('trash', 'i-sm')}${esc(t('unButton'))}</button><span class="error" id="unErr"></span></div></div>
