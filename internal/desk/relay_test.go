@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -588,4 +589,73 @@ func TestFullControlStaysWhileAPluginHasTheScreen(t *testing.T) {
 	}
 	waitFor(t, "the screen nudged", func() bool { mu.Lock(); defer mu.Unlock(); return restarts == 1 })
 	waitFor(t, "stepping back without the screen", func() bool { return c.Status().RelayCode == "relay_no_screen" })
+}
+
+// At boot the console reads along until the device's screen has connected to
+// the mixer on its own, and takes over only then, by restarting it: taking
+// the place as soon as the mixer opened it left a real Duo's screen showing
+// a desk that matched nothing. A boot that ends without a screen leaves the
+// place to the console.
+func TestFullControlLetsTheScreenConnectFirstAtBoot(t *testing.T) {
+	fastRelay(t)
+	var boot atomic.Bool
+	boot.Store(true)
+	booting = boot.Load
+	oldSettle, oldPoll := relayBootSettle, relayBootPoll
+	relayBootSettle, relayBootPoll = 400*time.Millisecond, 50*time.Millisecond
+	t.Cleanup(func() { relayBootSettle, relayBootPoll = oldSettle, oldPoll })
+
+	sim := oneClientSim(t, rcsim.Options{OneClient: true})
+	c, start, _ := relayClient(t, sim.Addr())
+	c.SetFullControl(true)
+	start()
+	time.Sleep(500 * time.Millisecond)
+	if st := c.Status(); st.Mode != "tap" || !sim.Listening() || sim.Clients() != 0 {
+		t.Fatalf("the console took the free place while the device boots: %s, listening=%v, clients=%d", st.Mode, sim.Listening(), sim.Clients())
+	}
+
+	// The screen comes up and connects to the mixer itself; once it has
+	// stayed, the console takes over the usual way.
+	screen := startScreen(t, sim.Addr())
+	old, oldNow := restartScreen, restartScreenNow
+	restartScreen, restartScreenNow = screen.restart, screen.restart
+	t.Cleanup(func() { restartScreen, restartScreenNow = old, oldNow })
+	waitFor(t, "screen at the mixer", func() bool { return screen.connected() && !sim.Listening() })
+	if st := c.Status(); st.Mode != "tap" {
+		t.Fatalf("took over before the screen settled: %s", st.Mode)
+	}
+	waitFor(t, "screen through the relay", func() bool {
+		st := c.Status()
+		return st.Mode == "relay" && st.Relay != nil && st.Relay.Screen && screen.connected()
+	})
+	screen.mu.Lock()
+	sessions := screen.sessions
+	screen.mu.Unlock()
+	if sessions != 2 {
+		t.Errorf("screen sessions %d, want 2 (mixer, then the console)", sessions)
+	}
+}
+
+func TestFullControlTakesTheFreePlaceWhenTheBootEnds(t *testing.T) {
+	fastRelay(t)
+	var boot atomic.Bool
+	boot.Store(true)
+	booting = boot.Load
+	oldPoll := relayBootPoll
+	relayBootPoll = 50 * time.Millisecond
+	t.Cleanup(func() { relayBootPoll = oldPoll })
+
+	sim := oneClientSim(t, rcsim.Options{OneClient: true, Ping: 50 * time.Millisecond})
+	c, start, _ := relayClient(t, sim.Addr())
+	c.SetFullControl(true)
+	start()
+	time.Sleep(300 * time.Millisecond)
+	if st := c.Status(); st.Mode != "tap" {
+		t.Fatalf("relaying while the device boots: %s", st.Mode)
+	}
+	boot.Store(false) // no screen came
+	waitFor(t, "relay live", func() bool { st := c.Status(); return st.Mode == "relay" && st.State == StateLive })
+	if sim.Listening() || sim.Clients() != 1 {
+		t.Fatalf("the console should hold the place: listening=%v clients=%d", sim.Listening(), sim.Clients())
+	}
 }

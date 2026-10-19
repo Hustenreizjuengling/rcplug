@@ -87,11 +87,17 @@ Duo with firmware 1.7.6: the takeover took four seconds (with the session-open
 handshake), the screen worked normally through the console, and mute, listen, pads,
 routing and channel processing changed from the browser showed on the device.
 
-1. **Taking the place.** If the mixer listens (at boot, before the screen app has
-   connected), the console connects at once. If the screen holds the place, the
-   console restarts the screen app (as *Read the state again* does) and connects in
-   the moment the mixer listens again, before the screen app is back (about three
-   seconds). Once connected it binds the mixer's address (`127.0.0.1:2345`) as soon
+1. **Taking the place.** If the screen holds the place, the console restarts the
+   screen app (as *Read the state again* does) and connects in the moment the mixer
+   listens again, before the screen app is back (about three seconds). If the mixer
+   listens and nobody is connected (the screen app is gone), the console connects at
+   once. While the device boots it does neither: it reads along until the screen app
+   has connected to the mixer on its own and kept the connection for ten seconds, and
+   then takes over by restarting it (or takes the free place when the device has been
+   up for two minutes without a screen). Taking the place as soon as the mixer opened
+   it at boot left the screen app of a real Duo showing a desk that matched nothing,
+   with more faders than the device has, until the console restarted it 45 seconds
+   later. Once connected it binds the mixer's address (`127.0.0.1:2345`) as soon
    as the mixer has closed its listener; if the mixer keeps listening (another
    firmware), it gives the place back at once.
 2. **Relaying.** The screen app connects to the console as it would to the mixer and

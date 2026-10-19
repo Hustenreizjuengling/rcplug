@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.8.12 - Unreleased
 
+### Fixed
+- **The device's screen after a restart of the Duo:** at boot the console took the
+  mixer's only place before RØDE's screen app connected, and the screen app then
+  showed a desk that matched nothing (more faders than the device has) until the
+  console restarted it about a minute later. Now the console reads along at boot until
+  the screen app has connected to the mixer on its own, then takes over the usual way:
+  the screen restarts once, a few seconds, right after it came up. Seen on a real Duo
+  with 0.8.11.
+
 ## 0.8.11 - 2026-10-19
 
 ### Added

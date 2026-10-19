@@ -136,8 +136,11 @@ flashing from Windows (below). What is still open:
    took four seconds (the session-open handshake was needed), the screen app worked
    normally through the console, and mute, listen, pads, routing and channel
    processing changed in the browser showed on the device; nothing was refused. Since
-   0.8.0 it is how the console works on the device. Still to watch: the takeover at
-   boot, and the screen finding the mixer again when the console stops (both behave as
+   0.8.0 it is how the console works on the device. At boot (first seen with 0.8.11),
+   the console took the place before the screen app connected; the screen app then
+   showed a desk that matched nothing until the console restarted it. Since 0.8.12 the
+   console lets the screen app connect first at boot and takes over after that. Still
+   to watch: the screen finding the mixer again when the console stops (it behaves as
    designed in the simulator).
 
 ## First test on a real Duo

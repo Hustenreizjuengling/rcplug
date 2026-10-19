@@ -48,7 +48,9 @@ var (
 	relayBind       = 2 * time.Second        // for the mixer to stop listening
 	relayPoll       = 20 * time.Millisecond  // retry interval while the place is free soon
 	relayTakeover   = 6 * time.Second        // after restarting the screen: how long to try
-	relayBoot       = 2 * time.Minute        // at start: how long to wait for the mixer
+	relayBoot       = 2 * time.Minute        // after the device started: it is booting
+	relayBootSettle = 10 * time.Second       // at boot: the screen at the mixer so long, then take over
+	relayBootPoll   = time.Second            // how often to look meanwhile
 	relayNudge      = 8 * time.Second        // without a screen: restart it once
 	relayNoScreen   = 30 * time.Second       // step back after so long without a screen
 	relayBootNudge  = 45 * time.Second       // the same while the device boots (its screen
@@ -699,13 +701,20 @@ func (c *Client) runDevice(ctx context.Context) {
 	var retryAt time.Time // when to try the next one (zero: none)
 	for ctx.Err() == nil {
 		want, takeover := c.relayWanted()
+		// While the device boots, its screen app connects to the mixer the
+		// first time on its own; taken at once, the place made it show a
+		// desk that matched nothing until it was restarted (seen on a real
+		// Duo). So the console reads along first and takes over once the
+		// screen is at the mixer (bootTakeover), the way it does after any
+		// other start.
+		bootWait := want && first && booting()
+		if bootWait {
+			want = false
+		}
 		if want {
 			wait := relayDial
 			if first {
 				takeover = true
-				if up := uptimeSeconds(); up >= 0 && up < relayBoot.Seconds() {
-					wait = relayBoot - time.Duration(up*float64(time.Second))
-				}
 			}
 			sctx, cancel := context.WithCancel(ctx)
 			c.mu.Lock()
@@ -753,15 +762,49 @@ func (c *Client) runDevice(ctx context.Context) {
 		want = c.wantRelay
 		c.mu.Unlock()
 		watched := make(chan struct{})
-		if want || c.cfg.ScreenMarker != "" { // a plugin may take the screen while reading along
+		switch {
+		case bootWait:
+			go func() { c.bootTakeover(tctx, cancel); close(watched) }()
+		case want || c.cfg.ScreenMarker != "": // a plugin may take the screen while reading along
 			at := retryAt
 			go func() { c.watchPlace(tctx, cancel, at); close(watched) }()
-		} else {
+		default:
 			close(watched)
 		}
 		c.runTap(tctx)
 		cancel()
 		<-watched
+	}
+}
+
+// bootTakeover ends reading along at boot to take the mixer's place: once
+// the device's screen has been connected to the mixer for relayBootSettle
+// (the console restarts it to take over, as after any start), or when the
+// device has finished booting without it (the place is then taken however
+// it is found).
+func (c *Client) bootTakeover(ctx context.Context, switchMode context.CancelFunc) {
+	t := time.NewTicker(relayBootPoll)
+	defer t.Stop()
+	var held time.Time // since when the screen holds the mixer (zero: it does not)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		switch {
+		case busyHolder(c.Port()) == "":
+			held = time.Time{}
+		case held.IsZero():
+			held = time.Now()
+		}
+		if (!held.IsZero() && time.Since(held) >= relayBootSettle) || !booting() {
+			c.mu.Lock()
+			c.takeover = true
+			c.mu.Unlock()
+			switchMode()
+			return
+		}
 	}
 }
 
