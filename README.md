@@ -72,7 +72,8 @@ Installing, updating and removing is done from your computer with
 [rcplug-toolkit](https://github.com/Hustenreizjuengling/rcplug-toolkit): a setup window for Windows,
 macOS and Linux, or a script. It also gets SSH onto the Duo, which has none out of the
 box: you add your own key to the firmware once
-([enable-ssh.md](https://github.com/Hustenreizjuengling/rcplug-toolkit/blob/main/docs/enable-ssh.md)).
+([enable-ssh.md](https://github.com/Hustenreizjuengling/rcplug-toolkit/blob/main/docs/enable-ssh.md)),
+also [right in your browser](https://hustenreizjuengling.github.io/rcplug-toolkit/firmware.html).
 
 This repository's [releases](../../releases) contain the device package the toolkit
 installs: `rcplug-<version>-aarch64.tar.gz` (host, console, device installer) and the

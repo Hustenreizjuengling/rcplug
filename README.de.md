@@ -77,7 +77,7 @@ Installieren, Aktualisieren und Entfernen geht vom Computer aus mit
 Windows, macOS und Linux oder ein Skript. Es bringt auch SSH auf den Duo, der ab Werk
 keinen Zugang hat: Du fügst einmalig deinen eigenen Schlüssel in die Firmware ein
 ([enable-ssh.md](https://github.com/Hustenreizjuengling/rcplug-toolkit/blob/main/docs/enable-ssh.md),
-Englisch).
+Englisch), auch [direkt im Browser](https://hustenreizjuengling.github.io/rcplug-toolkit/firmware.html).
 
 Die [Releases](../../releases) dieses Repositorys enthalten das Gerätepaket, das das
 Toolkit installiert: `rcplug-<version>-aarch64.tar.gz` (Host, Konsole,
