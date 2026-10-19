@@ -877,7 +877,9 @@ func TestFullControlThroughTheAPI(t *testing.T) {
 	}
 	t.Cleanup(sim.Close)
 	// Reading along (it cannot here, without root) as on the device.
-	client := desk.NewClient(desk.Config{Addr: sim.Addr(), Mode: "tap", Logf: quiet}, desk.NewMirror())
+	// Not booting, whatever the test machine's uptime (full control would
+	// wait for the device's screen to connect first).
+	client := desk.NewClient(desk.Config{Addr: sim.Addr(), Mode: "tap", Logf: quiet, Booting: func() bool { return false }}, desk.NewMirror())
 	dir := t.TempDir()
 	c := New(Options{Client: client, DataDir: dir, Logf: quiet, FullControl: true})
 	ctx, cancel := context.WithCancel(context.Background())

@@ -77,6 +77,13 @@ var booting = func() bool {
 	return up >= 0 && up < relayBoot.Seconds()
 }
 
+func (c *Client) booting() bool {
+	if c.cfg.Booting != nil {
+		return c.cfg.Booting()
+	}
+	return booting()
+}
+
 var (
 	errRelayBusy    = sessionErr("relay_busy", "the device's screen holds the mixer's only place; restart it to take over")
 	errRelayRace    = sessionErr("relay_race", "the device's screen connected to the mixer again first")
@@ -265,7 +272,7 @@ func (r *relay) watch(ctx context.Context) error {
 	timeout := time.NewTimer(r.c.cfg.SyncTimeout)
 	defer timeout.Stop()
 	nudge, noScreen := relayNudge, relayNoScreen
-	if booting() {
+	if r.c.booting() {
 		nudge, noScreen = relayBootNudge, relayBootAlone
 	}
 	var nudged time.Time // the alone period a restart of the screen was for
@@ -707,7 +714,7 @@ func (c *Client) runDevice(ctx context.Context) {
 		// Duo). So the console reads along first and takes over once the
 		// screen is at the mixer (bootTakeover), the way it does after any
 		// other start.
-		bootWait := want && first && booting()
+		bootWait := want && first && c.booting()
 		if bootWait {
 			want = false
 		}
@@ -798,7 +805,7 @@ func (c *Client) bootTakeover(ctx context.Context, switchMode context.CancelFunc
 		case held.IsZero():
 			held = time.Now()
 		}
-		if (!held.IsZero() && time.Since(held) >= relayBootSettle) || !booting() {
+		if (!held.IsZero() && time.Since(held) >= relayBootSettle) || !c.booting() {
 			c.mu.Lock()
 			c.takeover = true
 			c.mu.Unlock()

@@ -37,6 +37,10 @@ type Config struct {
 	// Guard protects existing clients (the device GUI); see guard.go. It is
 	// only active for local addresses, where /proc/net/tcp sees both ends.
 	Guard bool
+	// Booting reports whether the device is still starting up, when full
+	// control lets the screen app connect first; nil: the system started less
+	// than two minutes ago. Tests set it (a CI machine may have just started).
+	Booting func() bool
 	// BootGrace delays the first connection until the system has been up this
 	// long, so the GUI is connected before we join (default 75 s).
 	BootGrace time.Duration
