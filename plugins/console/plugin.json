@@ -3,7 +3,7 @@
   "name": "console",
   "title": "Console",
   "description": "The whole mixer in the browser: channels, levels, routing, inputs, effects, pads, recorder and system – mirrored live and optionally remote-controllable.",
-  "version": "0.8.18",
+  "version": "0.8.19",
   "exec": ["./console", "--addr", "127.0.0.1:{{port}}"],
   "httpProxy": "127.0.0.1:{{port}}",
   "autostart": true,
