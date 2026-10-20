@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.8.14 - Unreleased
 
+### Added
+- **Storage in the dashboard's side bar:** under the RAM row the side bar shows how
+  full the device's storage is, with the free space in the tooltip.
+
+### Fixed
+- **Release tool:** a plugin whose manifest also translates the titles of its options
+  lost its whole catalog card (title, description, icon, permissions) in release.json;
+  the card is kept, and only a language's title and description go into it.
+
 ## 0.8.13 - 2026-10-19
 
 ### Changed

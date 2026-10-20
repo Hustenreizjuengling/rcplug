@@ -6,6 +6,7 @@
 const T = {
   en: {
     connecting: 'connecting…', offline: 'The device does not answer', cpu: 'CPU', load: 'load', ramFree: 'RAM free', up: 'up for',
+    storage: 'Storage', storageFree: 'Storage free',
     plugins: 'Plugins', system: 'System', rescan: 'Rescan', rescanHint: 'Read the plugins folder again', skipped: 'Skipped plugin folders:',
     none: 'No plugins installed yet.', noneHint: 'Install one from the catalog below.', open: 'Open', newTab: 'Open in a new tab',
     stop: 'Stop', restart: 'Restart', start: 'Start', log: 'Log', restarts: 'restarts: {n}', startpage: 'start page', audio: 'audio',
@@ -90,6 +91,7 @@ const T = {
   },
   de: {
     connecting: 'verbinde…', offline: 'Das Gerät antwortet nicht', cpu: 'CPU', load: 'Last', ramFree: 'RAM frei', up: 'an seit',
+    storage: 'Speicher', storageFree: 'Speicher frei',
     plugins: 'Plugins', system: 'System', rescan: 'Neu einlesen', rescanHint: 'Plugin-Ordner neu einlesen', skipped: 'Übersprungene Plugin-Ordner:',
     none: 'Noch keine Plugins installiert.', noneHint: 'Installiere eines aus dem Katalog unten.', open: 'Öffnen', newTab: 'In neuem Tab öffnen',
     stop: 'Stoppen', restart: 'Neu starten', start: 'Starten', log: 'Log', restarts: 'Neustarts: {n}', startpage: 'Startseite', audio: 'Audio',
@@ -223,6 +225,8 @@ function fmtUptime(s) {
   return d ? t('days', { d, h }) : h ? t('hours', { h, m }) : t('mins', { m });
 }
 const mb = (kb) => Math.round(kb / 1024);
+// Megabytes as "512 MB" or, from a gigabyte on, "1.5 GB".
+const mbLabel = (n) => (n >= 1024 ? `${(n / 1024).toFixed(1)} GB` : `${Math.round(n)} MB`);
 
 async function refresh() {
   try {
@@ -260,6 +264,10 @@ function renderHealth() {
   if (sys.memTotalKB) {
     const used = 1 - sys.memAvailableKB / sys.memTotalKB;
     rows.push(`<div class="row" title="${esc(t('ramFree'))}: ${esc(mb(sys.memAvailableKB))} MB"><span>RAM</span><b>${esc((used * 100).toFixed(0))} %</b><div class="bar${used > 0.85 ? ' warn' : ''}"><i style="width:${(used * 100).toFixed(0)}%"></i></div></div>`);
+  }
+  if (sys.diskTotalMB > 0) {
+    const used = 1 - sys.diskFreeMB / sys.diskTotalMB;
+    rows.push(`<div class="row" title="${esc(t('storageFree'))}: ${esc(mbLabel(sys.diskFreeMB))}"><span>${esc(t('storage'))}</span><b>${esc((used * 100).toFixed(0))} %</b><div class="bar${used > 0.85 ? ' warn' : ''}"><i style="width:${(used * 100).toFixed(0)}%"></i></div></div>`);
   }
   const bits = [];
   if (sys.cpuTempC !== undefined) bits.push(`${esc(t('cpu'))} <b>${esc(sys.cpuTempC.toFixed(0))} °C</b>`);

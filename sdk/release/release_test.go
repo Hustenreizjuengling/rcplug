@@ -201,3 +201,31 @@ func TestDescribeInfo(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// A manifest that also translates its options (allowed by plugin.schema.json)
+// keeps its catalog card; only title and description of a language are taken.
+func TestDescribeInfoTranslatedOptions(t *testing.T) {
+	dir := t.TempDir()
+	plugin := filepath.Join(dir, "sonar-0.6.0-aarch64.tar.gz")
+	writeTarGz(t, plugin, map[string]string{"plugin.json": `{"name":"sonar","version":"0.6.0","exec":["./sonar"],
+		"title":"Sonar","description":"Where the sound comes from","icon":"◉","permissions":["network"],
+		"translations":{"de":{"title":"Echolot","description":"Richtung","options":{"language":{"title":"Sprache"}}},
+		"fr":{"title":42,"options":{"language":{"title":"Langue"}}}}}`})
+	a, err := Describe(plugin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := a.Info
+	if in == nil || in.Title != "Sonar" || in.Description != "Where the sound comes from" || in.Icon != "◉" {
+		t.Fatalf("info: %+v", in)
+	}
+	if strings.Join(in.Permissions, ",") != "network" {
+		t.Errorf("permissions: %v", in.Permissions)
+	}
+	if len(in.Translations) != 1 || in.Translations["de"]["title"] != "Echolot" || in.Translations["de"]["description"] != "Richtung" {
+		t.Errorf("translations: %v", in.Translations)
+	}
+	if _, ok := in.Translations["de"]["options"]; ok {
+		t.Errorf("options kept: %v", in.Translations)
+	}
+}

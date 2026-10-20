@@ -93,15 +93,24 @@ func clip(s string, n int) string {
 // infoFrom builds a package's PluginInfo from its plugin.json.
 func infoFrom(raw []byte) *PluginInfo {
 	var pm struct {
-		Title        string                       `json:"title"`
-		Description  string                       `json:"description"`
-		Icon         string                       `json:"icon"`
-		NeedsAudio   bool                         `json:"needsAudio"`
-		Permissions  []string                     `json:"permissions"`
-		Translations map[string]map[string]string `json:"translations"`
+		Title       string   `json:"title"`
+		Description string   `json:"description"`
+		Icon        string   `json:"icon"`
+		NeedsAudio  bool     `json:"needsAudio"`
+		Permissions []string `json:"permissions"`
+		// A translation may carry more than title and description
+		// (options, actions); only JSON strings under the two keys count.
+		Translations map[string]map[string]json.RawMessage `json:"translations"`
 	}
 	if json.Unmarshal(raw, &pm) != nil {
 		return nil
+	}
+	str := func(m map[string]json.RawMessage, k string) string {
+		var s string
+		if json.Unmarshal(m[k], &s) != nil {
+			return ""
+		}
+		return s
 	}
 	info := &PluginInfo{Title: clip(pm.Title, maxInfoTitle), Description: clip(pm.Description, maxInfoDescription)}
 	if icon := []rune(strings.TrimSpace(pm.Icon)); len(icon) <= maxInfoIcon {
@@ -122,10 +131,10 @@ func infoFrom(raw []byte) *PluginInfo {
 			continue
 		}
 		t := map[string]string{}
-		if v := clip(tr["title"], maxInfoTitle); v != "" {
+		if v := clip(str(tr, "title"), maxInfoTitle); v != "" {
 			t["title"] = v
 		}
-		if v := clip(tr["description"], maxInfoDescription); v != "" {
+		if v := clip(str(tr, "description"), maxInfoDescription); v != "" {
 			t["description"] = v
 		}
 		if len(t) > 0 {
