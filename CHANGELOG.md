@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.8.16 - Unreleased
+## 0.8.16 - 2026-10-20
 
 ### Changed
 - **A plugin that stands in for RØDE's screen writes at the expert level.** Plugins
