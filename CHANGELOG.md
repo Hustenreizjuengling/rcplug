@@ -6,6 +6,12 @@ may break compatibility).
 
 ## 0.8.18 - Unreleased
 
+### Added
+- **A screen plugin can hand the screen to another** (`POST /api/plugins/<name>/handover`):
+  the plugin that has the screen stops, the other starts without RØDE's screen in
+  between, and when the other ends — however it ends — the first is started again.
+  The `screen` plugin starts the PlugRain demo this way from a tile on its rcplug page.
+
 ## 0.8.17 - 2026-10-20
 
 ### Added

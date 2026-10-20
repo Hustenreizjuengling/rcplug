@@ -97,6 +97,22 @@ func (s *Screen) Take(name string) error {
 	return nil
 }
 
+// Transfer passes the screen from one plugin to another without RØDE's
+// screen in between (a handover: the first plugin stops, the second starts).
+func (s *Screen) Transfer(from, to string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.holder != from {
+		return errScreenTaken
+	}
+	if err := os.WriteFile(s.Marker, []byte(to+"\n"), 0o644); err != nil {
+		return fmt.Errorf("handing the screen over: %w", err)
+	}
+	s.holder = to
+	s.logf("screen: handed over from %s to %s", from, to)
+	return nil
+}
+
 // Release starts RØDE's screen again if name has it ("" releases whoever
 // has it, or a screen left away by an earlier rcplugd).
 func (s *Screen) Release(name string) {

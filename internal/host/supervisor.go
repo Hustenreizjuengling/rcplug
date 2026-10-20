@@ -174,7 +174,7 @@ func (p *Plugin) start() {
 		}
 		p.supervise(ctx)
 		if p.Manifest().has("screen") && p.host.Screen != nil {
-			p.host.Screen.Release(p.Manifest().Name) // however it ended
+			p.host.screenEnded(p.Manifest().Name) // however it ended
 		}
 	}()
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -37,6 +38,11 @@ type Manager struct {
 	// Screen hands the device's screen to plugins with the permission
 	// "screen" (nil: no such plugin starts).
 	Screen *Screen
+	// screenReturn names the plugin to start again when the one the screen
+	// was handed over to ends (see Handover); under screenMu, which the
+	// ending plugin's loop takes (never opMu: a stop waits for that loop).
+	screenMu   sync.Mutex
+	screenHand struct{ from, to string } // the last handover, until `to` ends
 
 	mu       sync.Mutex
 	plugins  map[string]*Plugin
@@ -284,6 +290,68 @@ func (m *Manager) startPlugin(p *Plugin) bool {
 	}
 	p.start()
 	return true
+}
+
+// Handover passes the device's screen from the plugin that has it to
+// another screen plugin: the first stops (its remembered state stays, so it
+// comes back after a reboot), the second starts without RØDE's screen in
+// between, and when the second ends — however it ends — the first is
+// started again. A demo like PlugRain is started from the screen plugin's
+// own menu this way.
+func (m *Manager) Handover(from, to string) error {
+	m.opMu.Lock()
+	defer m.opMu.Unlock()
+	if m.Screen == nil {
+		return errors.New("this rcplug cannot hand over the device's screen")
+	}
+	src, dst := m.get(from), m.get(to)
+	if src == nil || dst == nil {
+		return sdk.NewError(http.StatusNotFound, "not_found", "no such plugin")
+	}
+	if !dst.Manifest().has("screen") {
+		return sdk.NewError(http.StatusBadRequest, "no_screen", to+" does not take over the screen (permission screen)")
+	}
+	if from == to {
+		return sdk.NewError(http.StatusBadRequest, "same_plugin", "a plugin cannot hand the screen to itself")
+	}
+	if m.Screen.Holder() != from {
+		return sdk.NewError(http.StatusConflict, "not_holder", from+" does not have the screen")
+	}
+	if err := m.Screen.Transfer(from, to); err != nil {
+		return err
+	}
+	m.screenMu.Lock()
+	m.screenHand.from, m.screenHand.to = from, to
+	m.screenMu.Unlock()
+	src.log.add("handed the screen over to " + to + "; comes back when it ends")
+	src.stop() // its loop's Release is a no-op: the screen is with the other now
+	dst.log.add("started with the screen handed over from " + from)
+	dst.start()
+	return nil
+}
+
+// screenEnded is called when a screen plugin's run is over: the screen goes
+// back to the plugin it was handed over from, if any, else to RØDE.
+func (m *Manager) screenEnded(name string) {
+	// Only the plugin the screen was handed to ends the handover; the one
+	// that handed it over ends too, right after, and must not consume it.
+	m.screenMu.Lock()
+	ret := ""
+	if m.screenHand.to == name {
+		ret = m.screenHand.from
+		m.screenHand.from, m.screenHand.to = "", ""
+	}
+	m.screenMu.Unlock()
+	if ret != "" && ret != name && m.Screen != nil && m.Screen.Holder() == name {
+		if p := m.get(ret); p != nil && m.loadState().Enabled[ret] {
+			if err := m.Screen.Transfer(name, ret); err == nil {
+				p.log.add("started again: " + name + " gave the screen back")
+				p.start()
+				return
+			}
+		}
+	}
+	m.Screen.Release(name)
 }
 
 // startScreenAtBoot starts a remembered screen plugin once RØDE's screen

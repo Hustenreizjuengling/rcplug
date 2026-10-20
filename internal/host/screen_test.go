@@ -238,3 +238,68 @@ func TestScreenPluginWaitsForRode(t *testing.T) {
 		return s.Running && ts.Holder() == "screendemo"
 	})
 }
+
+// TestScreenHandover: the plugin with the screen hands it to another screen
+// plugin without RØDE's screen in between; when that one ends, the first is
+// started again, and its remembered state is untouched.
+func TestScreenHandover(t *testing.T) {
+	root := t.TempDir()
+	loop := "#!/bin/sh\ntrap 'exit 0' INT TERM\nwhile [ ! -f \"$RCPLUG_DATA_DIR/end\" ]; do sleep 0.1; done\nrm -f \"$RCPLUG_DATA_DIR/end\"\n"
+	writePlugin(t, root, "ui", loop, `{"name":"ui","title":"UI","version":"1.0","exec":["./run.sh"],"permissions":["screen"]}`)
+	writePlugin(t, root, "demo", loop, `{"name":"demo","title":"Demo","version":"1.0","exec":["./run.sh"],"permissions":["screen"]}`)
+	writePlugin(t, root, "plain", loop, `{"name":"plain","title":"Plain","version":"1.0","exec":["./run.sh"]}`)
+	ts := newTestScreen(t)
+	m := NewManager(root, 9330)
+	m.Screen = ts.Screen
+	if _, err := m.Load(); err != nil {
+		t.Fatal(err)
+	}
+	defer m.StopAll()
+	defer func() {
+		if t.Failed() {
+			u, _ := statusOf(m, "ui")
+			d, _ := statusOf(m, "demo")
+			t.Logf("holder %q starts %d\nui %+v %q\ndemo %+v %q", ts.Holder(), ts.started(), u, m.Logs("ui"), d, m.Logs("demo"))
+		}
+	}()
+	m.Enable("ui")
+	waitFor(t, "ui with the screen", 3*time.Second, func() bool { return ts.Holder() == "ui" })
+
+	if err := m.Handover("ui", "plain"); err == nil {
+		t.Fatal("handed the screen to a plugin without the permission")
+	}
+	if err := m.Handover("demo", "ui"); err == nil {
+		t.Fatal("a plugin that does not hold the screen handed it over")
+	}
+	if err := m.Handover("ui", "demo"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "demo with the screen, ui stopped", 3*time.Second, func() bool {
+		u, _ := statusOf(m, "ui")
+		d, _ := statusOf(m, "demo")
+		return ts.Holder() == "demo" && d.Running && !u.Running
+	})
+	if ts.started() != 0 {
+		t.Fatalf("RØDE's screen was started %d times during the handover", ts.started())
+	}
+	if b, _ := os.ReadFile(filepath.Join(root, "state.json")); !strings.Contains(string(b), `"ui": true`) || strings.Contains(string(b), `"demo": true`) {
+		t.Fatalf("remembered state after the handover: %s", b)
+	}
+
+	// The demo ends by itself: the UI comes back, RØDE's screen never started.
+	data := filepath.Join(root, "data", "demo")
+	os.MkdirAll(data, 0o755)
+	os.WriteFile(filepath.Join(data, "end"), nil, 0o644)
+	waitFor(t, "ui back with the screen", 5*time.Second, func() bool {
+		u, _ := statusOf(m, "ui")
+		return ts.Holder() == "ui" && u.Running
+	})
+	if ts.started() != 0 {
+		t.Fatalf("RØDE's screen was started %d times", ts.started())
+	}
+	// Stopping the UI now gives the screen back to RØDE.
+	m.Disable("ui")
+	if ts.Holder() != "" || ts.started() != 1 {
+		t.Fatalf("after the stop: holder %q, RØDE started %d times", ts.Holder(), ts.started())
+	}
+}

@@ -72,6 +72,7 @@ something need the header `X-Rcplug: 1`.
 | `GET /api/plugins` | `{"plugins": [...], "invalid": [...]}`: each plugin's manifest data, state (`running`, `starting`, `backoff`, `stopped`), PID, restarts and last error; skipped directories with the reason |
 | `GET /api/plugins/<name>/logs` | `{"lines": [...]}`: the plugin's last 500 output lines |
 | `POST /api/plugins/<name>/enable`, `/disable`, `/restart` | Start (and remember as enabled), stop (and remember as disabled), restart an enabled plugin |
+| `POST /api/plugins/<name>/handover` | Pass the device's screen from one screen plugin to another (`{"from": …}`); the first comes back when the second ends |
 | `POST /api/reload` | Rescan the plugins directory |
 | `GET /api/system` | Host name, version, uptime, load, memory, CPU temperature, free storage |
 | `GET /api/diagnostics` | The diagnostics bundle (zip) |

@@ -300,6 +300,29 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 		ok = s.m.Disable(name)
 	case "restart":
 		ok = s.m.Restart(name)
+	case "handover":
+		// {"from": "<the plugin that has the screen>"}; a plugin may only
+		// hand over its own screen.
+		var req struct {
+			From string `json:"from"`
+		}
+		_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&req)
+		if caller, isPlugin := s.Events.pluginOf(r.Header.Get("X-Rcplug-Token")); isPlugin {
+			if req.From != "" && req.From != caller {
+				sdk.WriteError(w, sdk.NewError(http.StatusForbidden, "not_yours", "a plugin hands over its own screen only"))
+				return
+			}
+			req.From = caller
+		}
+		if req.From == "" {
+			sdk.WriteError(w, sdk.NewError(http.StatusBadRequest, "bad_request", `"from" names the plugin that has the screen`))
+			return
+		}
+		if err := s.m.Handover(req.From, name); err != nil {
+			sdk.WriteError(w, err)
+			return
+		}
+		ok = true
 	default:
 		http.Error(w, "unknown action", http.StatusNotFound)
 		return

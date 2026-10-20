@@ -291,7 +291,11 @@ a plugin:
   again, up to three times in ten minutes; after that the plugin is switched off and
   RØDE's screen stays, so a broken plugin can never leave the device without a screen;
 - is started again after its options change and after an update, like other plugins;
-- is the only one with the screen: a second one does not start while one has it;
+- is the only one with the screen: a second one does not start while one has it — but
+  it can **hand the screen over** to another screen plugin (`POST
+  /api/plugins/<other>/handover` with its own token): it stops, the other starts without
+  RØDE's screen in between, and when the other ends it is started again. The `screen`
+  plugin starts PlugRain this way from a tile;
 - writes to the desk (with `desk:write`) at the console's *expert* level, whatever
   level the browsers have: every existing property except the deny list (firmware,
   network, shows, file paths, credentials), with type checks — RØDE's own screen sets
@@ -501,6 +505,7 @@ The dashboard's API, open to plugins (`$RCPLUG_HOST_URL`) and scripts. POSTs nee
 | `GET /api/plugins` | `{"plugins": [...], "invalid": [...]}`: per plugin `name`, `title`, `description`, `version`, `hasUI`, `needsAudio`, `permissions`, `removable`, `enabled`, `state`, `running`, `pid`, `restarts`, `lastErr`, `port`, `primary`, `order`, `icon`, `unknownFields`, `translations`, `actions` |
 | `GET /api/plugins/<name>/logs` | `{"lines": [...]}`, the last 500 lines |
 | `POST /api/plugins/<name>/enable`, `/disable`, `/restart` | Start and remember, stop and remember, restart |
+| `POST /api/plugins/<name>/handover` | Hand the device's screen from the plugin that has it (`{"from": "<name>"}`; a plugin may only name itself) to screen plugin `<name>`: the first stops, the second starts without RØDE's screen in between, and when the second ends the first is started again |
 | `POST /api/reload` | Rescan the plugins directory |
 | `POST /api/plugins/<name>/remove` `{"confirm": "<name>", "purge": false}` | Stops the plugin and deletes its directory; `purge` also deletes its data, settings and logs. Not for plugins of rcplug's device package (`removable` is false) |
 | `GET /api/catalog`, `GET /api/catalog?refresh=1` | The [plugin catalog](updates.md#plugin-catalog): `sources` and `plugins` (`name`, `title`, `description`, `icon`, `translations`, `permissions`, `version`, `size`, `repo`, `official`, `installed`) as last seen; `refresh=1` asks GitHub again (at most every 20 s) |
