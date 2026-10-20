@@ -6,6 +6,10 @@ may break compatibility).
 
 ## 0.8.15 - Unreleased
 
+### Changed
+- **RAM and storage in the side bar name the numbers**, not only a percentage: used
+  of total ("212 / 471 MB", "1.4 / 3.6 GB") and, under the bar, the free space.
+
 ## 0.8.14 - 2026-10-20
 
 ### Added

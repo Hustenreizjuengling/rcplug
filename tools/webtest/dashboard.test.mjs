@@ -30,3 +30,16 @@ test('placeholders match between the languages', () => {
   const bad = Object.keys(T.en).filter((k) => k in T.de && ph(T.en[k]) !== ph(T.de[k]));
   assert.deepEqual(bad, []);
 });
+
+test('sizes are named in one unit, GB from 1024 MB on', () => {
+  const helpers = script.slice(script.indexOf('const mbUnit ='), script.indexOf('\nasync function refresh()'));
+  const { mbLabel, mbPair } = new Function(helpers + '\nreturn { mbLabel, mbPair };')();
+  assert.equal(mbLabel(259.4), '259 MB');
+  assert.equal(mbLabel(1023), '1023 MB');
+  assert.equal(mbLabel(1024), '1.0 GB');
+  assert.equal(mbLabel(1536), '1.5 GB');
+  assert.equal(mbPair(212, 471), '212 / 471 MB');
+  assert.equal(mbPair(1434, 3686), '1.4 / 3.6 GB');
+  // the whole decides the unit, even for a small part
+  assert.equal(mbPair(51, 3686), '0.0 / 3.6 GB');
+});
