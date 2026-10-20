@@ -123,13 +123,8 @@ func TestScreenPluginLifecycle(t *testing.T) {
 	if _, err := m.Load(); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(300 * time.Millisecond)
-	if s, _ := statusOf(m, "screendemo"); s.Running || ts.Holder() != "" {
-		t.Fatalf("started by itself: %+v", s)
-	}
-
-	// Started from the dashboard; it ends by itself ("back to RØDE").
-	m.Enable("screendemo")
+	// Remembered as running: it comes back at rcplug's start (no boot wait
+	// in the test screen) and then ends by itself ("back to RØDE").
 	waitFor(t, "running with the screen", 3*time.Second, func() bool {
 		s, _ := statusOf(m, "screendemo")
 		return s.Running && ts.Holder() == "screendemo"
@@ -159,9 +154,9 @@ func TestScreenPluginLifecycle(t *testing.T) {
 	if ts.Holder() != "" || ts.started() != 2 {
 		t.Fatalf("after stop: holder %q, starts %d", ts.Holder(), ts.started())
 	}
-	// Nothing about it is remembered for the next start of rcplug.
-	if b, _ := os.ReadFile(filepath.Join(root, "state.json")); strings.Contains(string(b), `"screendemo": true`) && !strings.Contains(string(b), `"screendemo": false`) {
-		t.Fatalf("state.json remembers the screen plugin as running: %s", b)
+	// The stop is remembered for the next start of rcplug.
+	if b, _ := os.ReadFile(filepath.Join(root, "state.json")); !strings.Contains(string(b), `"screendemo": false`) {
+		t.Fatalf("state.json does not remember the stop: %s", b)
 	}
 
 	// Another plugin cannot take the screen while one has it.
@@ -182,4 +177,64 @@ func TestScreenPluginNeverAutostarts(t *testing.T) {
 	if _, err := LoadManifest(filepath.Join(root, "plugins", "bad")); err == nil || !strings.Contains(err.Error(), "never starts by itself") {
 		t.Fatalf("manifest: %v", err)
 	}
+}
+
+// TestScreenPluginCrashBudget: a screen plugin that keeps failing is started
+// again a few times, then switched off with RØDE's screen back, and the
+// switch-off is remembered.
+func TestScreenPluginCrashBudget(t *testing.T) {
+	old := retryBackoff
+	retryBackoff = 10 * time.Millisecond
+	defer func() { retryBackoff = old }()
+	root := t.TempDir()
+	writePlugin(t, root, "crashy", "#!/bin/sh\nexit 1\n",
+		`{"name":"crashy","title":"Crashy","version":"1.0","exec":["./run.sh"],"permissions":["screen"]}`)
+	ts := newTestScreen(t)
+	m := NewManager(root, 9310)
+	m.Screen = ts.Screen
+	if _, err := m.Load(); err != nil {
+		t.Fatal(err)
+	}
+	m.Enable("crashy")
+	waitFor(t, "switched off after the crashes", 5*time.Second, func() bool {
+		s, _ := statusOf(m, "crashy")
+		return s.State == StateStopped && !s.Enabled && ts.Holder() == ""
+	})
+	s, _ := statusOf(m, "crashy")
+	if s.Restarts != screenCrashBudget-1 || !strings.Contains(s.LastErr, "failed 3 times") {
+		t.Fatalf("status after the crashes: %+v", s)
+	}
+	if ts.started() != 1 {
+		t.Fatalf("RØDE's screen started %d times, want once", ts.started())
+	}
+	if b, _ := os.ReadFile(filepath.Join(root, "state.json")); !strings.Contains(string(b), `"crashy": false`) {
+		t.Fatalf("the switch-off is not remembered: %s", b)
+	}
+}
+
+// TestScreenPluginWaitsForRode: at rcplug's start a remembered screen plugin
+// waits for RØDE's screen program (or the boot wait) before it takes the
+// screen, so the two never share the display.
+func TestScreenPluginWaitsForRode(t *testing.T) {
+	root := t.TempDir()
+	writePlugin(t, root, "screendemo",
+		"#!/bin/sh\ntrap 'exit 0' INT TERM\nwhile :; do sleep 0.1; done\n",
+		`{"name":"screendemo","title":"Demo","version":"1.0","exec":["./run.sh"],"permissions":["screen"]}`)
+	os.WriteFile(filepath.Join(root, "state.json"), []byte(`{"enabled": {"screendemo": true}}`), 0o644)
+	ts := newTestScreen(t)
+	ts.BootWait = 1500 * time.Millisecond // the test's screen program never appears
+	m := NewManager(root, 9320)
+	m.Screen = ts.Screen
+	if _, err := m.Load(); err != nil {
+		t.Fatal(err)
+	}
+	defer m.StopAll()
+	time.Sleep(500 * time.Millisecond)
+	if s, _ := statusOf(m, "screendemo"); s.Running || ts.Holder() != "" {
+		t.Fatalf("took the screen before RØDE's program was up: %+v", s)
+	}
+	waitFor(t, "started after the boot wait", 4*time.Second, func() bool {
+		s, _ := statusOf(m, "screendemo")
+		return s.Running && ts.Holder() == "screendemo"
+	})
 }

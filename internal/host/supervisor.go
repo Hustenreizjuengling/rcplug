@@ -198,8 +198,20 @@ func (p *Plugin) stop() {
 	p.log.add("stopped by host")
 }
 
+// retryBackoff is the first pause before a failed plugin is started again
+// (doubling up to 30 s); tests shorten it.
+var retryBackoff = time.Second
+
+// A screen plugin that fails more than screenCrashBudget times within
+// screenCrashWindow is switched off and RØDE's screen stays.
+const (
+	screenCrashBudget = 3
+	screenCrashWindow = 10 * time.Minute
+)
+
 func (p *Plugin) supervise(ctx context.Context) {
-	backoff := time.Second
+	backoff := retryBackoff
+	var crashes []time.Time // a screen plugin's failures, for its budget
 	for ctx.Err() == nil {
 		began := time.Now()
 		err := p.runOnce(ctx)
@@ -215,8 +227,41 @@ func (p *Plugin) supervise(ctx context.Context) {
 			msg = err.Error()
 		}
 		if p.Manifest().has("screen") {
-			// A plugin with the screen runs once: it ends by itself (back
-			// to RØDE's screen) or fails, and is not started again.
+			// A plugin with the screen that ends by itself handed the screen
+			// back to RØDE on purpose: this run is over (it comes back at
+			// the next start of the device). One that fails is started
+			// again, up to screenCrashBudget times in screenCrashWindow;
+			// then RØDE's screen stays and the plugin is switched off, so a
+			// broken one can never keep the device without a screen.
+			if err != nil {
+				now := time.Now()
+				kept := crashes[:0]
+				for _, t := range crashes {
+					if now.Sub(t) < screenCrashWindow {
+						kept = append(kept, t)
+					}
+				}
+				crashes = append(kept, now)
+				if len(crashes) < screenCrashBudget {
+					p.mu.Lock()
+					p.restarts++
+					p.state, p.pid, p.lastErr = StateBackoff, 0, msg
+					p.mu.Unlock()
+					p.log.add(fmt.Sprintf("failed (%s), starting again in %s (%d of %d)", msg, backoff, len(crashes), screenCrashBudget))
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(backoff):
+					}
+					if backoff < 30*time.Second {
+						backoff *= 2
+					}
+					continue
+				}
+				msg = fmt.Sprintf("failed %d times in %s (last: %s); switched off, RØDE's screen stays — start it again from the dashboard",
+					len(crashes), screenCrashWindow, msg)
+				p.host.saveState(p.Manifest().Name, false)
+			}
 			p.mu.Lock()
 			p.cancel, p.enabled, p.state, p.pid = nil, false, StateStopped, 0
 			if err != nil {

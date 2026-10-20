@@ -38,9 +38,18 @@ type Screen struct {
 	logf     func(string, ...interface{})
 	// start runs the display service's start; tests replace it.
 	start func(service string) error
+	// BootWait is how long a remembered screen plugin waits at rcplugd's
+	// start for RØDE's screen program to appear before it takes the screen
+	// anyway (rcplugd starts before the display service at boot).
+	BootWait time.Duration
 
 	mu     sync.Mutex
 	holder string
+}
+
+// AppRunning reports whether RØDE's screen program is running.
+func (s *Screen) AppRunning() bool {
+	return len(s.find(func(comm, _ string) bool { return comm == s.App })) > 0
 }
 
 // NewScreen returns the controller for RØDE's screen on the Duo.
@@ -49,7 +58,7 @@ func NewScreen(logf func(string, ...interface{})) *Screen {
 		logf = func(string, ...interface{}) {}
 	}
 	return &Screen{Marker: ScreenMarker, Service: "/etc/init.d/rode-display-service", Loop: "display-start.sh",
-		App: "rc_gui_juce", procRoot: "/proc", logf: logf, start: func(service string) error {
+		App: "rc_gui_juce", procRoot: "/proc", logf: logf, BootWait: 90 * time.Second, start: func(service string) error {
 			return spawnDetached(`exec /bin/sh "$1" start >/dev/null 2>&1`, service)
 		}}
 }

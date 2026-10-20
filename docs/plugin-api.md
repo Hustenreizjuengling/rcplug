@@ -280,11 +280,17 @@ exited by itself, crashed, rcplug stopped or updated), the host starts RØDE's d
 service again; a restarted rcplugd does the same if it finds the screen still away. Such
 a plugin:
 
-- never starts by itself: `autostart` must be false, its running state is not
-  remembered and not restored from a backup; it starts only from the dashboard;
-- runs once: when its process exits, it is not started again (to give the screen back,
-  it simply exits);
-- is not started again after its options change or after an update;
+- never starts unasked: `autostart` must be false, and the first start is always
+  made in the dashboard. Once started, it is remembered like any other plugin: it
+  comes back at every start of the device (once RØDE's screen program is up, so the two
+  never share the display) until it is stopped in the dashboard, and a backup restores
+  that state;
+- gives the screen back by exiting: a run that ends by itself (exit status 0, the
+  *Back to RØDE* button) is over, and the plugin is not started again until the next
+  start of the device or of the dashboard's switch. A run that **fails** is started
+  again, up to three times in ten minutes; after that the plugin is switched off and
+  RØDE's screen stays, so a broken plugin can never leave the device without a screen;
+- is started again after its options change and after an update, like other plugins;
 - is the only one with the screen: a second one does not start while one has it;
 - writes to the desk (with `desk:write`) at the console's *expert* level, whatever
   level the browsers have: every existing property except the deny list (firmware,

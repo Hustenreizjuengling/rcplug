@@ -336,8 +336,8 @@ func TestServicesAPI(t *testing.T) {
 }
 
 // A backup carries which RØDE services are off; restoring it switches them
-// so. A backup from before (no field) leaves them alone, and a plugin with
-// the screen is never started from a backup.
+// so. A backup from before (no field) leaves them alone. A plugin with the
+// screen is in it like any other (its state is remembered since 0.8.17).
 func TestServicesInBackups(t *testing.T) {
 	r := newSvcRig(t, testCatalog(), map[string]string{"/etc/init.d/callme-t-service": "#!/bin/sh\n"})
 	writePlugin(t, r.root, "screendemo", "#!/bin/sh\nsleep 30\n", `{"name":"screendemo","version":"1","exec":["./run.sh"],"permissions":["screen"]}`)
@@ -350,8 +350,8 @@ func TestServicesInBackups(t *testing.T) {
 		t.Fatalf("backup services %v", b.ServicesOff)
 	}
 	for _, p := range b.Plugins {
-		if p.Name == "screendemo" && p.Enabled != nil {
-			t.Fatal("a screen plugin's running state is in the backup")
+		if p.Name == "screendemo" && (p.Enabled == nil || *p.Enabled) {
+			t.Fatalf("a screen plugin's running state should be in the backup, off: %+v", p)
 		}
 	}
 
@@ -364,7 +364,9 @@ func TestServicesInBackups(t *testing.T) {
 	for _, c := range plan.Changes {
 		changes = append(changes, c.What+" "+c.ID+" "+string(c.To))
 	}
-	if strings.Join(changes, ",") != "service callme false" || len(plan.Skipped) != 1 || plan.Skipped[0].ID != "teleporter" {
+	// The screen plugin's state is restored like any other's (this manager
+	// has no screen controller, so the start itself is refused here).
+	if strings.Join(changes, ",") != "enabled  true,service callme false" || len(plan.Skipped) != 1 || plan.Skipped[0].ID != "teleporter" {
 		t.Fatalf("plan %v, skipped %+v", changes, plan.Skipped)
 	}
 	if _, errs := m.restore(plan, r.s); len(errs) != 0 {
@@ -374,12 +376,14 @@ func TestServicesInBackups(t *testing.T) {
 		t.Fatal("restoring did not switch CallMe off")
 	}
 	if s, _ := statusOf(m, "screendemo"); s.Running {
-		t.Fatal("a backup started the screen plugin")
+		t.Fatal("the screen plugin ran without a screen controller")
 	}
 
 	b.ServicesOff = nil // a backup from before
-	if p := m.plan(b); len(p.Changes) != 0 {
-		t.Fatalf("an old backup changes services: %+v", p.Changes)
+	for _, c := range m.plan(b).Changes {
+		if c.What == "service" {
+			t.Fatalf("an old backup changes services: %+v", c)
+		}
 	}
 	m.StopAll()
 }

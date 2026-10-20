@@ -82,7 +82,7 @@ func (m *Manager) Backup(version string) RcplugBackup {
 			continue
 		}
 		p := BackupPlugin{Name: man.Name, Title: man.Title, Version: man.Version}
-		if pl := m.get(man.Name); pl != nil && !man.has("screen") { // one with the screen only ever starts by hand
+		if pl := m.get(man.Name); pl != nil {
 			on := pl.status().Enabled
 			p.Enabled = &on
 		}
@@ -167,7 +167,7 @@ func (m *Manager) plan(b RcplugBackup) BackupPlan {
 			plan.Missing = append(plan.Missing, want)
 			continue
 		}
-		if want.Enabled != nil && !man.has("screen") && (have.Enabled == nil || *have.Enabled != *want.Enabled) {
+		if want.Enabled != nil && (have.Enabled == nil || *have.Enabled != *want.Enabled) {
 			from := json.RawMessage("null")
 			if have.Enabled != nil {
 				from = rawJSON(*have.Enabled)

@@ -6,6 +6,17 @@ may break compatibility).
 
 ## 0.8.17 - Unreleased
 
+### Added
+- **A screen plugin comes back after a reboot.** A plugin that takes over the device's
+  screen is still started by hand the first time, but from then on it is remembered
+  like any other plugin: at rcplug's start it waits for RØDE's screen program to come
+  up (so the two never share the display) and then takes the screen again, until it is
+  stopped in the dashboard; a backup restores that state too. A run that ends by itself
+  (*Back to RØDE*) is over for this session; a run that fails is started again, up to
+  three times in ten minutes, after which the plugin is switched off and RØDE's screen
+  stays — a broken plugin can never leave the device without a screen. Options changes
+  and updates restart it like other plugins.
+
 ### Changed
 - The plugin API's documentation describes how a plugin offers a page to a screen
   plugin (`GET`/`POST /screen`), as Sonar and Backup do.

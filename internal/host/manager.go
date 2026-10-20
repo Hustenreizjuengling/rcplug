@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/Hustenreizjuengling/rcplug/sdk"
+	"time"
 )
 
 // Manager loads plugins from <root>/plugins, assigns each a loopback port, and
@@ -187,7 +188,12 @@ func (m *Manager) Load() ([]string, error) {
 	for _, name := range added {
 		p := m.get(name)
 		if p.Manifest().has("screen") {
-			continue // only ever started from the dashboard (Enable)
+			// Only ever started from the dashboard; once started, it comes
+			// back at every start of rcplug until it is stopped.
+			if ps.Enabled[name] {
+				go m.startScreenAtBoot(p)
+			}
+			continue
 		}
 		want := p.Manifest().Autostart
 		if v, ok := ps.Enabled[name]; ok {
@@ -257,21 +263,57 @@ func (m *Manager) Enable(name string) bool {
 	if p == nil {
 		return false
 	}
+	if !m.startPlugin(p) {
+		return true
+	}
+	m.saveState(name, true)
+	return true
+}
+
+// startPlugin starts a plugin, taking the device's screen first for one
+// that needs it; false when the screen could not be taken.
+func (m *Manager) startPlugin(p *Plugin) bool {
 	if p.Manifest().has("screen") {
-		// The screen first, for this run only: nothing is remembered.
-		if err := m.takeScreen(name); err != nil {
+		if err := m.takeScreen(p.Manifest().Name); err != nil {
 			p.mu.Lock()
 			p.lastErr = err.Error()
 			p.mu.Unlock()
 			p.log.add("not started: " + err.Error())
-			return true
+			return false
 		}
-		p.start()
-		return true
 	}
 	p.start()
-	m.saveState(name, true)
 	return true
+}
+
+// startScreenAtBoot starts a remembered screen plugin once RØDE's screen
+// program has come up (rcplugd starts before the display service at boot,
+// and taking the screen earlier would leave two programs on it), or after
+// Screen.BootWait at the latest. A stop from the dashboard meanwhile wins.
+func (m *Manager) startScreenAtBoot(p *Plugin) {
+	name := p.Manifest().Name
+	if m.Screen != nil && m.Screen.BootWait > 0 {
+		end := time.Now().Add(m.Screen.BootWait)
+		for !m.Screen.AppRunning() && time.Now().Before(end) {
+			time.Sleep(time.Second)
+		}
+	}
+	m.opMu.Lock()
+	defer m.opMu.Unlock()
+	if cur := m.get(name); cur != p {
+		return // reloaded or removed meanwhile
+	}
+	if !m.loadState().Enabled[name] {
+		return // stopped from the dashboard while waiting
+	}
+	p.mu.Lock()
+	running := p.cancel != nil
+	p.mu.Unlock()
+	if running {
+		return
+	}
+	p.log.add("started at rcplug's start (it was running when the device last ran)")
+	m.startPlugin(p)
 }
 
 func (m *Manager) takeScreen(name string) error {
@@ -307,15 +349,8 @@ func (m *Manager) Restart(name string) bool {
 	enabled := p.enabled
 	p.mu.Unlock()
 	if enabled {
-		p.stop()
-		if p.Manifest().has("screen") {
-			// Stopping gave the screen back; take it again for the new run.
-			if err := m.takeScreen(name); err != nil {
-				p.log.add("not started again: " + err.Error())
-				return true
-			}
-		}
-		p.start()
+		p.stop() // a screen plugin gave the screen back: taken again below
+		m.startPlugin(p)
 	}
 	return true
 }
@@ -350,14 +385,9 @@ func (m *Manager) SetOptions(name string, values map[string]json.RawMessage) (fo
 	enabled := p.enabled
 	p.mu.Unlock()
 	if enabled {
-		if p.Manifest().has("screen") {
-			p.log.add("options changed in the dashboard; stopped (start it again to use them)")
-			p.stop()
-		} else {
-			p.log.add("options changed in the dashboard; restarting")
-			p.stop()
-			p.start()
-		}
+		p.log.add("options changed in the dashboard; restarting")
+		p.stop()
+		m.startPlugin(p)
 	}
 	return true, enabled, nil
 }
@@ -392,14 +422,9 @@ func (m *Manager) ReplacePlugin(name, staged string) (started bool, err error) {
 	target := filepath.Join(m.pluginsDir, name)
 	backup := staged + ".previous"
 	_ = os.RemoveAll(backup)
-	// A plugin with the screen is not started again by an update: that is
-	// always the user's step (the screen came back when it stopped).
-	if p != nil && p.Manifest().has("screen") {
-		wasEnabled = false
-	}
 	restore := func() {
 		if p != nil && wasEnabled {
-			p.start()
+			m.startPlugin(p)
 		}
 	}
 	hadOld := false
@@ -424,7 +449,7 @@ func (m *Manager) ReplacePlugin(name, staged string) (started bool, err error) {
 		return false, err
 	}
 	if np := m.get(name); np != nil && wasEnabled {
-		np.start()
+		m.startPlugin(np)
 	}
 	if np := m.get(name); np != nil {
 		np.log.add("updated to version " + np.Manifest().Version)
