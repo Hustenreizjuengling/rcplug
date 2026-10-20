@@ -22,7 +22,9 @@ import (
 //	screen      take over the device's screen: while the plugin runs, RØDE's
 //	            screen program is stopped, and it is started again when the
 //	            plugin ends (screen.go). Such a plugin never starts by
-//	            itself: only from the dashboard, and only once (no restarts)
+//	            itself: only from the dashboard, and only once (no restarts).
+//	            With desk:write it writes at the console's expert level,
+//	            as RØDE's screen sets everything
 //
 // Plugins run as root on the device, so this guards against mistakes and
 // tells users what a plugin is for; it does not contain a plugin that means

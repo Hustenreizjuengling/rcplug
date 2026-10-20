@@ -6,6 +6,15 @@ may break compatibility).
 
 ## 0.8.16 - Unreleased
 
+### Changed
+- **A plugin that stands in for RØDE's screen writes at the expert level.** Plugins
+  write to the desk at the console's basic level, whatever level the browsers have;
+  that left a replacement screen (permission `screen` with `desk:write`) unable to set
+  what RØDE's own screen sets: the clock on the home screen, metering, haptics, the
+  pads' names, colours and modes, the custom mixes and more. Such a plugin now writes
+  at the expert level: every existing property except the deny list, with type checks.
+  Other plugins are unchanged.
+
 ## 0.8.15 - 2026-10-20
 
 ### Changed

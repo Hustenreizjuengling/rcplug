@@ -149,8 +149,9 @@ Every write:
 - from a browser: carries `X-Rcplug-Pin: <pin>` if a PIN is set;
 - from a plugin: carries its token, `X-Rcplug-Token: $RCPLUG_TOKEN` (the SDK's client
   sends it), and the plugin declares `"permissions": ["desk:write"]` in its
-  `plugin.json`. It then writes at the *Control* level's rules without the PIN, whatever
-  level the browsers have; write protection stops it, and `api/control`,
+  `plugin.json`. It then writes at the *basic* level's rules without the PIN, whatever
+  level the browsers have (a plugin that also holds `screen` writes at the *expert*
+  level, as RØDE's screen does); write protection stops it, and `api/control`,
   `api/settings`, `api/pin`, `api/pin/reset`, `api/reconnect` and `api/resync` are for
   people only (`plugin_not_allowed`). See
   [plugin-api.md](plugin-api.md#permissions),

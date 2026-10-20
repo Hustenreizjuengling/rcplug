@@ -273,7 +273,13 @@ func (c *Console) writeAs(by who, epoch uint64, path []int, name string, value i
 	level, limit := c.Level() // outside the mirror lock taken by Write
 	remote := by.label()
 	if by.plugin != "" && limit == "" {
-		level = LevelBasic // a plugin's permission, whatever level the browser has set
+		// A plugin's permission, whatever level the browsers have set: the
+		// basic rules, or, for the plugin that stands in for RØDE's screen,
+		// the expert level (that screen sets everything).
+		level = LevelBasic
+		if by.can("screen") {
+			level = LevelExpert
+		}
 	}
 	if release {
 		level, limit = LevelExpert, ""

@@ -270,7 +270,7 @@ shows it on the plugin's card, so users know before they start it.
 | `audio` | Hears the desk's inputs and outputs through the [shared audio taps](#audio) | the host: `api/audio/stream` answers 403 without it |
 | `network` | Talks to other machines on the network or the internet | shown only |
 | `device` | Uses the device's hardware, or files outside its own directories | shown only |
-| `screen` | Takes over the device's screen while it runs (see below) | the host: it stops RØDE's screen before the plugin starts and starts it again when the plugin ends |
+| `screen` | Takes over the device's screen while it runs (see below); with `desk:write`, it writes at the console's expert level, as RØDE's screen sets everything | the host: it stops RØDE's screen before the plugin starts and starts it again when the plugin ends; the console: the expert level's checks |
 
 **`screen`: the device's screen.** While a plugin with this permission runs, RØDE's
 screen program and the loop that restarts it are stopped, and the plugin may draw on
@@ -285,7 +285,11 @@ a plugin:
 - runs once: when its process exits, it is not started again (to give the screen back,
   it simply exits);
 - is not started again after its options change or after an update;
-- is the only one with the screen: a second one does not start while one has it.
+- is the only one with the screen: a second one does not start while one has it;
+- writes to the desk (with `desk:write`) at the console's *expert* level, whatever
+  level the browsers have: every existing property except the deny list (firmware,
+  network, shows, file paths, credentials), with type checks — RØDE's own screen sets
+  the same things. Other plugins write at the *basic* level.
 
 Meanwhile the console holds the mixer alone (it reads `/run/rcplug-screen`, where the
 host writes the plugin's name) instead of waiting for RØDE's screen. The device's big

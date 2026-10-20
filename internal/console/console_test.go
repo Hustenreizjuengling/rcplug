@@ -1125,6 +1125,18 @@ func TestPluginsNeedDeskWrite(t *testing.T) {
 	if a := r.do(t, "GET", "/api/audit", nil).raw; !strings.Contains(string(a), "plugin scenes") {
 		t.Errorf("audit does not name the plugin: %s", a)
 	}
+	// Beyond the basic rules (the clock on the home screen is not one of
+	// them): only the plugin that stands in for RØDE's screen may.
+	clock := map[string]interface{}{"epoch": epoch, "path": l.Path("SYSTEM", 0), "name": "systemDateTimeOnHome", "value": true}
+	if res := r.post(t, "/api/set", clock, asPlugin("desk:write")...); res.code != 403 || res.body["code"] != "denied" {
+		t.Fatalf("a plugin beyond the basic rules: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/set", clock, asPlugin("desk:write,screen")...); res.code != 200 {
+		t.Fatalf("the screen plugin beyond the basic rules: %d %s", res.code, res.raw)
+	}
+	if res := r.post(t, "/api/set", clock, asPlugin("screen")...); res.code != 403 || res.body["code"] != "permission_desk_write" {
+		t.Fatalf("screen without desk:write: %d %s", res.code, res.raw)
+	}
 	// Straight to the console's port, past rcplugd: an unknown plugin.
 	if res := r.post(t, "/api/set", body); res.code != 403 || res.body["code"] != "permission_desk_write" {
 		t.Fatalf("past rcplugd: %d %s", res.code, res.raw)
