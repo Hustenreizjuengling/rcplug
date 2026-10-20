@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.8.17 - Unreleased
+## 0.8.17 - 2026-10-20
 
 ### Added
 - **A screen plugin comes back after a reboot.** A plugin that takes over the device's
