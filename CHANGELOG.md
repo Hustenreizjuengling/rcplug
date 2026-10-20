@@ -6,6 +6,10 @@ may break compatibility).
 
 ## 0.8.17 - Unreleased
 
+### Changed
+- The plugin API's documentation describes how a plugin offers a page to a screen
+  plugin (`GET`/`POST /screen`), as Sonar and Backup do.
+
 ## 0.8.16 - 2026-10-20
 
 ### Changed

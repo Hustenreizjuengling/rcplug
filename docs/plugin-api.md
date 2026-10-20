@@ -291,6 +291,12 @@ a plugin:
   network, shows, file paths, credentials), with type checks — RØDE's own screen sets
   the same things. Other plugins write at the *basic* level.
 
+**A page on the screen.** Any plugin with an HTTP proxy can offer a page to such a
+screen plugin without drawing anything: it serves a JSON description of a few
+controls at `GET /screen?lang=<de|en>` and takes changes at `POST /screen`. The
+format is the screen plugin's (see the `screen` plugin's README in rcplug-plugins);
+Sonar and Backup serve one.
+
 Meanwhile the console holds the mixer alone (it reads `/run/rcplug-screen`, where the
 host writes the plugin's name) instead of waiting for RØDE's screen. The device's big
 encoder is read by RØDE's screen program and does nothing while a plugin has the screen.
