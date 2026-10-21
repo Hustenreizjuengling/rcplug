@@ -6,6 +6,13 @@ may break compatibility).
 
 ## 0.8.19 - Unreleased
 
+### Fixed
+- **The screen handover no longer leaves the display black for three seconds.** The host
+  stopped the plugin that handed over while that plugin was still waiting for the answer
+  to its handover request, so it could not end cleanly and was killed after the host's
+  three-second grace period. The answer comes first now; the stop and the start of the
+  other plugin follow.
+
 ## 0.8.18 - 2026-10-20
 
 ### Added

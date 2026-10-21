@@ -324,9 +324,17 @@ func (m *Manager) Handover(from, to string) error {
 	m.screenHand.from, m.screenHand.to = from, to
 	m.screenMu.Unlock()
 	src.log.add("handed the screen over to " + to + "; comes back when it ends")
-	src.stop() // its loop's Release is a no-op: the screen is with the other now
-	dst.log.add("started with the screen handed over from " + from)
-	dst.start()
+	// The stop and the start happen after this returns: the caller is
+	// usually the plugin that hands over, waiting for the answer in its own
+	// loop, and stopping it before it has the answer would leave it hanging
+	// until it is killed (3 s of black screen).
+	go func() {
+		m.opMu.Lock()
+		defer m.opMu.Unlock()
+		src.stop() // its loop's Release is a no-op: the screen is with the other now
+		dst.log.add("started with the screen handed over from " + from)
+		dst.start()
+	}()
 	return nil
 }
 

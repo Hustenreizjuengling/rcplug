@@ -293,9 +293,9 @@ a plugin:
 - is started again after its options change and after an update, like other plugins;
 - is the only one with the screen: a second one does not start while one has it — but
   it can **hand the screen over** to another screen plugin (`POST
-  /api/plugins/<other>/handover` with its own token): it stops, the other starts without
-  RØDE's screen in between, and when the other ends it is started again. The `screen`
-  plugin starts PlugRain this way from a tile;
+  /api/plugins/<other>/handover` with its own token): the answer comes at once, then it
+  is stopped and the other starts without RØDE's screen in between, and when the other
+  ends it is started again. The `screen` plugin starts PlugRain this way from a tile;
 - writes to the desk (with `desk:write`) at the console's *expert* level, whatever
   level the browsers have: every existing property except the deny list (firmware,
   network, shows, file paths, credentials), with type checks — RØDE's own screen sets
