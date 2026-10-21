@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.8.19 - Unreleased
+## 0.8.19 - 2026-10-21
 
 ### Fixed
 - **The screen handover no longer leaves the display black for three seconds.** The host
