@@ -8,11 +8,6 @@ may break compatibility).
 
 ## 0.8.25 - 2026-10-21
 
-### Fixed
-- A plugin that takes the screen on request and keeps it through an update is
-  remembered as holding it, so the screen comes back to it after the next start of the
-  device.
-
 ## 0.8.24 - 2026-10-21
 
 ### Added
