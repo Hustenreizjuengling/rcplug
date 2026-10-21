@@ -6,6 +6,11 @@ may break compatibility).
 
 ## 0.8.21 - Unreleased
 
+### Changed
+- **The console's change stream answers a control change within a few milliseconds**
+  instead of at the next 60 ms tick, so a screen plugin follows a button or fader press
+  as promptly as RØDE's screen does. Meter readings keep their own pace.
+
 ## 0.8.20 - 2026-10-21
 
 ### Changed

@@ -71,6 +71,7 @@ type Console struct {
 	opts   Options
 	client *desk.Client
 	mirror *desk.Mirror
+	nudge  chan struct{} // a control change waits to be broadcast
 	pin    *pinStore
 
 	mu            sync.Mutex
@@ -93,7 +94,7 @@ func New(o Options) *Console {
 	if o.Logf == nil {
 		o.Logf = func(string, ...interface{}) {}
 	}
-	c := &Console{opts: o, client: o.Client, mirror: o.Client.Mirror(), pin: newPinStore(o.DataDir), desk: newDeskEvents(o.Publish),
+	c := &Console{opts: o, client: o.Client, mirror: o.Client.Mirror(), nudge: make(chan struct{}, 1), pin: newPinStore(o.DataDir), desk: newDeskEvents(o.Publish),
 		changes: newChangeLog()}
 	if o.DataDir != "" {
 		if err := sdk.LoadJSON(c.settingsPath(), &c.settings); err != nil {
@@ -160,7 +161,9 @@ func (c *Console) Level() (Level, string) {
 	return l, ""
 }
 
-// Run broadcasts coalesced changes to live clients until ctx ends.
+// Run broadcasts coalesced changes to live clients until ctx ends: every
+// 60 ms, and within a few milliseconds of a control change (a button, a
+// fader), so a screen plugin answers the desk as promptly as RØDE's screen.
 func (c *Console) Run(ctx context.Context) {
 	go c.runMeters(ctx)
 	go c.runDeskEvents(ctx)
@@ -172,6 +175,9 @@ func (c *Console) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			c.mirror.Broadcast(Secret)
+		case <-c.nudge:
+			time.Sleep(3 * time.Millisecond) // the rest of the same batch of changes
 			c.mirror.Broadcast(Secret)
 		}
 	}

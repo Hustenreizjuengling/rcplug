@@ -67,6 +67,10 @@ func (c *Console) watchChanges(ev desk.ChangeEvent) {
 		return
 	}
 	select {
+	case c.nudge <- struct{}{}: // a control change: broadcast promptly (Run)
+	default:
+	}
+	select {
 	case c.changes.ch <- rawChange{at: time.Now(), path: append([]int(nil), ev.Path...), name: ev.Name, node: ev.Node, index: ev.Index, old: ev.Old, new: ev.New}:
 	default:
 		c.changes.mu.Lock()
