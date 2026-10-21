@@ -6,9 +6,31 @@ may break compatibility).
 
 ## 0.8.26 - Unreleased
 
+### Removed
+- **The screen on request is taken back out** (the permission `screen:request`,
+  `GET /api/screen`, `POST /api/screen/take` and `/api/screen/release`, the remembered
+  screen holder): the host is as in 0.8.23 again, where a screen plugin holds the
+  device's screen for its whole run. The permission name stays accepted so a plugin
+  still declaring it loads, without effect.
+
 ## 0.8.25 - 2026-10-21
 
+### Fixed
+- A plugin that takes the screen on request and keeps it through an update is
+  remembered as holding it, so the screen comes back to it after the next start of the
+  device.
+
 ## 0.8.24 - 2026-10-21
+
+### Added
+- **The device's screen on request (permission `screen:request`).** A plugin with it
+  runs like any other plugin, so its web pages are always there, and takes the device's
+  screen when it asks for it (`POST /api/screen/take`), giving it back without ending
+  (`POST /api/screen/release`); `GET /api/screen` tells who has it. The host remembers
+  who holds the screen across a restart of the device and hands it back once RØDE's
+  screen program is up. A handover to a demo leaves such a plugin running, and the
+  screen returns to it when the demo ends. It writes at the console's screen level and
+  may set the clock, like `screen`.
 
 ## 0.8.23 - 2026-10-21
 

@@ -30,7 +30,8 @@ import (
 // tells users what a plugin is for; it does not contain a plugin that means
 // harm.
 
-var knownPermissions = map[string]bool{"desk:write": true, "audio": true, "network": true, "device": true, "screen": true}
+var knownPermissions = map[string]bool{"desk:write": true, "audio": true, "network": true, "device": true, "screen": true,
+	"screen:request": true} // accepted without effect (a plugin of 0.8.24/0.8.25 still loads)
 
 func validatePermissions(m *Manifest) error {
 	seen := map[string]bool{}
