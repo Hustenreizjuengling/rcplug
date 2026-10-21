@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.8.24 - Unreleased
+## 0.8.24 - 2026-10-21
 
 ### Added
 - **The device's screen on request (permission `screen:request`).** A plugin with it
