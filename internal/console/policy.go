@@ -417,6 +417,14 @@ func coerce(cur rcproto.Value, name string, in interface{}) (rcproto.Value, erro
 	switch cur.Kind {
 	case rcproto.KindBoolTrue, rcproto.KindBoolFalse:
 		b, ok := in.(bool)
+		if !ok && name == "screenDimAfterSeconds" {
+			// The device ships the dim time as a bool until RØDE's screen
+			// first sets it; that screen writes the seconds as an int, and
+			// the desk takes the new type.
+			if f, isNum := number(in); isNum && f == math.Trunc(f) && f >= 0 && f <= 86400 {
+				return rcproto.Int(int64(f)), nil
+			}
+		}
 		if !ok {
 			return rcproto.Value{}, fmt.Errorf("expected true or false")
 		}

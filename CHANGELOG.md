@@ -6,6 +6,10 @@ may break compatibility).
 
 ## 0.8.23 - Unreleased
 
+### Fixed
+- `api/set` takes the screen dim time (`GUI.screenDimAfterSeconds`) as seconds while
+  the device still holds the factory's bool, the way RØDE's screen first sets it.
+
 ## 0.8.22 - 2026-10-21
 
 ### Added

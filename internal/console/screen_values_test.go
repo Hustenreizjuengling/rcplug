@@ -42,3 +42,18 @@ func TestScreenPlayerPath(t *testing.T) {
 		t.Fatal("other paths stay denied at screen level")
 	}
 }
+
+// The dim time arrives as a bool from the factory and becomes an int once
+// set, as RØDE's screen writes it.
+func TestCoerceDimAfterSeconds(t *testing.T) {
+	v, err := coerce(rcproto.Bool(false), "screenDimAfterSeconds", 300.0)
+	if err != nil || v.Kind != rcproto.KindInt || v.I != 300 {
+		t.Fatalf("seconds for the factory bool: %v %v", v, err)
+	}
+	if _, err := coerce(rcproto.Bool(false), "screenDimAfterSeconds", 1.5); err == nil {
+		t.Fatal("a fraction accepted")
+	}
+	if _, err := coerce(rcproto.Bool(false), "systemDateTime24h", 1.0); err == nil {
+		t.Fatal("a number for another bool accepted")
+	}
+}
