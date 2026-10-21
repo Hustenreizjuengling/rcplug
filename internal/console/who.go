@@ -38,11 +38,6 @@ func (c *Console) who(r *http.Request) who {
 	return w
 }
 
-// screen reports whether the plugin stands in for RØDE's screen: it holds
-// the screen for its whole run ("screen") or takes it when asked
-// ("screen:request"); both write at the screen level.
-func (w who) screen() bool { return w.can("screen") || w.can("screen:request") }
-
 func (w who) can(perm string) bool {
 	for _, p := range w.perms {
 		if p == perm {

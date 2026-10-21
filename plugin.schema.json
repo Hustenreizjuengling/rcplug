@@ -56,7 +56,7 @@
       "description": "What the plugin does beyond its own pages, shown on its card in the dashboard. desk:write: changes the desk through the console (the console refuses writes from plugins without it). audio: hears the desk through the shared audio taps (the host refuses the stream without it). network and device: shown only. See docs/plugin-api.md#permissions.",
       "uniqueItems": true,
       "items": {
-        "enum": ["desk:write", "audio", "network", "device", "screen", "screen:request"]
+        "enum": ["desk:write", "audio", "network", "device", "screen"]
       }
     },
     "primary": {

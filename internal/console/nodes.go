@@ -66,7 +66,7 @@ func (c *Console) structural(by who, epoch uint64, what string, build func(s des
 	var ch *rcproto.Change
 	var err error
 	switch {
-	case by.plugin == "" || !by.screen():
+	case by.plugin == "" || !by.can("screen"):
 		err = errNodesScreenOnly
 	case !by.can("desk:write"):
 		err = errNoDeskWrite(by.plugin)

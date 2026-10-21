@@ -280,7 +280,7 @@ func (c *Console) writeAs(by who, epoch uint64, path []int, name string, value i
 		// the screen level (that screen sets everything, and makes the
 		// requests the deny list keeps from everyone else).
 		level = LevelBasic
-		if by.screen() {
+		if by.can("screen") {
 			level = LevelScreen
 		}
 	}
