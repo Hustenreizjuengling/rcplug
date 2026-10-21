@@ -36,7 +36,9 @@ func (c *Console) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/trigger", c.withPIN(c.handleTrigger))
 	mux.HandleFunc("POST /api/link", c.withPIN(c.handleLink))
 	mux.HandleFunc("POST /api/record", c.withPIN(c.handleRecord))
-	mux.HandleFunc("POST /api/release", c.handleRelease) // only presses the console holds, see heldPress
+	mux.HandleFunc("POST /api/release", c.handleRelease)        // only presses the console holds, see heldPress
+	mux.HandleFunc("POST /api/node/add", c.handleNodeAdd)       // the screen plugin only, see nodes.go
+	mux.HandleFunc("POST /api/node/remove", c.handleNodeRemove) // the screen plugin only, see nodes.go
 	mux.HandleFunc("POST /api/control", c.forPeople(c.withPIN(c.handleControl)))
 	mux.HandleFunc("POST /api/settings", c.forPeople(c.withPIN(c.handleSettings)))
 	mux.HandleFunc("POST /api/reconnect", c.forPeople(c.withPIN(c.handleReconnect)))
@@ -275,10 +277,11 @@ func (c *Console) writeAs(by who, epoch uint64, path []int, name string, value i
 	if by.plugin != "" && limit == "" {
 		// A plugin's permission, whatever level the browsers have set: the
 		// basic rules, or, for the plugin that stands in for RØDE's screen,
-		// the expert level (that screen sets everything).
+		// the screen level (that screen sets everything, and makes the
+		// requests the deny list keeps from everyone else).
 		level = LevelBasic
 		if by.can("screen") {
-			level = LevelExpert
+			level = LevelScreen
 		}
 	}
 	if release {
@@ -453,7 +456,7 @@ func (c *Console) physicalFader(path []int) (ok bool) {
 // panelFader checks a physical fader position for the front panel: expert
 // level, a whole number within the fader's range.
 func panelFader(level Level, n *rcproto.Node, value interface{}) (rcproto.Value, error) {
-	if level != LevelExpert {
+	if level < LevelExpert {
 		return rcproto.Value{}, sdk.NewError(http.StatusForbidden, "expert_required", "setting a physical fader on the front panel requires the expert control level")
 	}
 	f, ok := value.(float64)

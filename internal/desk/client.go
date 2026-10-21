@@ -714,8 +714,8 @@ func (c *Client) Write(epoch uint64, build func(s Snapshot) (*rcproto.Change, er
 		return nil, ErrOffline
 	}
 	return c.mirror.commit(epoch, build, func(ch *rcproto.Change) error {
-		if ch.Type != rcproto.PropertyChanged {
-			return sdk.NewError(http.StatusBadRequest, "invalid_change", "only property changes can be written")
+		if !clientChange(ch) {
+			return sdk.NewError(http.StatusBadRequest, "invalid_change", "only property changes and child nodes can be written")
 		}
 		_ = conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 		if _, err := conn.Write(rcproto.Frame(ch.Encode())); err != nil {

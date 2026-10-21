@@ -584,9 +584,20 @@ func (r *relay) fromScreen(s *screenConn) {
 }
 
 // send delivers a change of the console to the mixer and to the screen.
+// clientChange reports whether a change is one a client may send the desk:
+// a property value, or a child node added or removed (RØDE's screen saves
+// presets and quick dials so).
+func clientChange(ch *rcproto.Change) bool {
+	switch ch.Type {
+	case rcproto.PropertyChanged, rcproto.ChildAdded, rcproto.ChildRemoved:
+		return true
+	}
+	return false
+}
+
 func (r *relay) send(ch *rcproto.Change) error {
-	if ch.Type != rcproto.PropertyChanged {
-		return sdk.NewError(http.StatusBadRequest, "invalid_change", "only property changes can be written")
+	if !clientChange(ch) {
+		return sdk.NewError(http.StatusBadRequest, "invalid_change", "only property changes and child nodes can be written")
 	}
 	body := ch.Encode()
 	frame := rcproto.Frame(body)

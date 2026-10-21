@@ -390,7 +390,17 @@ func (s *Server) setLocked(path []int, name string, v rcproto.Value) {
 }
 
 func (s *Server) handleClientLocked(c *client, ch *rcproto.Change) {
-	if ch.Type != rcproto.PropertyChanged {
+	switch ch.Type {
+	case rcproto.PropertyChanged:
+	case rcproto.ChildAdded, rcproto.ChildRemoved:
+		// The desk takes a client's child nodes (RØDE's screen saves a
+		// preset or a quick dial so) and keeps them; no echo to the writer.
+		s.writes = append(s.writes, *ch)
+		if err := s.applyLocked(ch, c); err != nil {
+			s.opts.Logf("rcsim: %v", err)
+		}
+		return
+	default:
 		s.opts.Logf("rcsim: ignoring client %s", ch.Type)
 		return
 	}

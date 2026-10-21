@@ -6,6 +6,31 @@ may break compatibility).
 
 ## 0.8.22 - Unreleased
 
+### Added
+- **The screen plugin writes what RØDE's screen writes.** A plugin with the `screen`
+  permission (and `desk:write`) now writes at the console's *screen* level: everything
+  the expert level allows, plus the requests and management the deny list keeps from
+  browsers and other plugins (firmware update and reset requests, transfer mode, erase
+  and eject, cloud sign-in, shows, presets, calls, network and Bluetooth pairing
+  settings, the credentials among them). Readings, limits, identities, factory test
+  modes and file paths stay denied for it too. People cannot choose that level.
+- **Child nodes for the screen plugin:** `POST api/node/add` and `api/node/remove` on
+  the console add a processing preset (`FXPRESET`) or a CallMe quick dial
+  (`SIPPHONEBOOK`) and remove it again, the way RØDE's screen does; no other node kinds,
+  nobody else. The desk client and the simulator send and take child changes.
+- **`POST /api/system/clock`** on the host sets the device's clock and time zone for the
+  screen plugin's date and time page (system clock, `hwclock --systohc`, the
+  `/etc/localtime` link, as RØDE's screen does).
+- The manifest schema lists the `screen` permission.
+- **`api/set` takes a binary signal's payload as a hex string** (`[value, toggle]` as the
+  desk stores it), so the screen plugin requests pad recording states, playhead
+  positions and player jumps the way RØDE's screen does. The screen level may also
+  write the player's file path (`PLAYER.playerFilePath`, an absolute path without `..`),
+  the one path that screen writes; every other path stays denied.
+- The source table knows all 30 sources of firmware 1.7.6: the two wireless channels
+  (19, 20) and the nine sync sources of a connected RØDECaster Video (21…29), so
+  `channelInputSource` may name them and the tree's `meta.sources` lists them.
+
 ## 0.8.21 - 2026-10-21
 
 ### Changed

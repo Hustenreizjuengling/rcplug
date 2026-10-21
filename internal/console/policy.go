@@ -1,6 +1,7 @@
 package console
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"net/http"
@@ -31,6 +32,12 @@ const (
 	// LevelExpert: any existing property except the deny list, with type
 	// checks but without range checks.
 	LevelExpert
+	// LevelScreen: the plugin that stands in for RØDE's screen. It needs
+	// the requests that screen makes (firmware update, transfer mode, erase,
+	// sign-in, shows, presets, calls, network, pairing), so only the
+	// readings, limits and identities stay denied (screenDenied). Never
+	// chosen by people: it comes with the "screen" permission.
+	LevelScreen
 )
 
 func (l Level) String() string {
@@ -39,6 +46,8 @@ func (l Level) String() string {
 		return "basic"
 	case LevelExpert:
 		return "expert"
+	case LevelScreen:
+		return "screen"
 	}
 	return "off"
 }
@@ -122,6 +131,55 @@ func set(names ...string) map[string]bool {
 		m[n] = true
 	}
 	return m
+}
+
+// screenAllowed lifts parts of the deny list for the plugin that stands in
+// for RØDE's screen (LevelScreen): the requests and management that screen
+// makes. A nil set allows the whole node type. Readings, limits, identities,
+// credentials in OAUTH beyond the sign-in requests, factory test modes and
+// file paths stay denied.
+var screenAllowed = map[string]map[string]bool{
+	"SYSTEM": set("updateCheckRequested", "updateInitiateRequested", "downloadInitiateRequested",
+		"downloadCancelRequested", "updateRebootRequested", "updateResetDeviceRequested",
+		"updateResetAppRequested", "updateResetAfterFWURequested", "updateViaUSB", "transferModeType",
+		"rcSyncModeRequest", "systemMainMode", "engineMode", "shareAnom", "shareResource", "systemBetaMode"),
+	"STORAGEVOLUME":      set("storageVolumeErase", "storageVolumeEject", "storageVolumeFormat", "storageVolumeRecDestination"),
+	"RECORDINGS":         nil,
+	"RECORDING":          nil,
+	"PADRECORDER":        set("padRecordClear"),
+	"OAUTH":              set("requestSignIn", "requestSignOut"),
+	"NETWORK":            nil,
+	"PROXY":              nil,
+	"SHOWCONTROL":        nil,
+	"SHOW":               nil,
+	"SHOWS":              nil,
+	"CURRENTSHOW":        nil,
+	"FXPRESETS":          nil,
+	"FXPRESET":           nil,
+	"SIPPHONEBOOKARRAY":  nil,
+	"STREAMERXMIXPRESET": nil,
+	"SIPADVANCED":        nil,
+	"SIPCALLING":         nil,
+	"SIPREGISTRATION":    nil,
+	"SIPCALLSLOTS":       nil,
+	"RADIO":              nil,
+	"RADIORX":            nil,
+}
+
+// isDeniedAt is isDenied for a level: the screen level writes what
+// screenAllowed lifts, everyone else meets the full deny list.
+func isDeniedAt(level Level, nodeType, prop string) bool {
+	if level == LevelScreen {
+		// The one file path RØDE's screen writes: the recording the player
+		// loads (CheckWrite keeps its value an absolute path without "..").
+		if nodeType == "PLAYER" && prop == "playerFilePath" {
+			return false
+		}
+		if m, ok := screenAllowed[nodeType]; ok && !strings.Contains(strings.ToLower(prop), "path") && (m == nil || m[prop]) {
+			return false
+		}
+	}
+	return isDenied(nodeType, prop)
 }
 
 // isDenied reports whether a property is on the hard deny list. Any property
@@ -248,10 +306,13 @@ var triggerProps = set("mixLinkRequest", "mixUnlinkRequest")
 // Writable reports whether level permits writing the property at all (before
 // value checks). Used to tell the UI which controls are live.
 func Writable(level Level, nodeType, prop string) bool {
-	if level == LevelOff || Secret(nodeType, prop) || isDenied(nodeType, prop) {
+	// Secrets (credentials, call addresses, …) are never read out through
+	// the web UI; only the device's own screen, or the plugin standing in
+	// for it, enters them.
+	if level == LevelOff || (Secret(nodeType, prop) && level != LevelScreen) || isDeniedAt(level, nodeType, prop) {
 		return false
 	}
-	if level == LevelExpert {
+	if level >= LevelExpert {
 		return true
 	}
 	_, ok := basicRules[nodeType][prop]
@@ -319,6 +380,10 @@ func CheckWrite(level Level, s desk.Snapshot, path []int, name string, in interf
 	if err != nil {
 		return rcproto.Value{}, errf(http.StatusBadRequest, "invalid_value", "%s.%s: %v", n.Type, name, err)
 	}
+	if strings.Contains(strings.ToLower(name), "path") && v.Kind == rcproto.KindString &&
+		(!strings.HasPrefix(v.S, "/") || strings.Contains(v.S, "..") || strings.ContainsAny(v.S, "\x00\n")) {
+		return rcproto.Value{}, errf(http.StatusBadRequest, "invalid_value", "%s.%s: an absolute path without .. is expected", n.Type, name)
+	}
 	if err := checkValue(level, n, s.Layout, path, name, cur, &v); err != nil {
 		return rcproto.Value{}, errf(http.StatusBadRequest, "out_of_range", "%s.%s: %v", n.Type, name, err)
 	}
@@ -338,6 +403,16 @@ func coerce(cur rcproto.Value, name string, in interface{}) (rcproto.Value, erro
 	}
 	if triggerProps[name] {
 		return rcproto.Value{}, fmt.Errorf(`trigger property: send "press"`)
+	}
+	if s, ok := in.(string); ok && cur.Kind == rcproto.KindBinary {
+		// A signal property's payload ([value, toggle] as the desk stores
+		// it) as a hex string, the way the screen plugin requests
+		// progress, recording states and jumps.
+		b, err := hex.DecodeString(s)
+		if err != nil || len(b) == 0 || len(b) > 64 {
+			return rcproto.Value{}, fmt.Errorf(`expected "press", "release" or the payload as a hex string`)
+		}
+		return rcproto.Binary(b), nil
 	}
 	switch cur.Kind {
 	case rcproto.KindBoolTrue, rcproto.KindBoolFalse:
@@ -403,11 +478,11 @@ func number(in interface{}) (float64, bool) {
 // in every level the structural sanity checks (fader bounds, mix format).
 func checkValue(level Level, n *rcproto.Node, l *rcproto.Layout, path []int, name string, cur rcproto.Value, v *rcproto.Value) error {
 	switch {
-	case n.Type == "FADER" && name == "faderLevel" && level == LevelExpert:
+	case n.Type == "FADER" && name == "faderLevel" && level >= LevelExpert:
 		return intBounds(n, v, "faderMin", "faderMax")
 	case n.Type == "POT" && name == "potLevel":
 		return intBounds(n, v, "potMin", "potMax")
-	case n.Type == "MIX" && name == "mixLevelWithAnchor" && level == LevelExpert:
+	case n.Type == "MIX" && name == "mixLevelWithAnchor" && level >= LevelExpert:
 		return checkMixLevel(n, l, path, v)
 	}
 	if level != LevelBasic {

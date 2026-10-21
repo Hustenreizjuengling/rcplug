@@ -161,9 +161,11 @@ Every write:
 
 | Request | Body | Effect |
 |---|---|---|
-| `api/set` | `{"epoch", "path", "name", "value"}` | Sets an existing property. The value is converted to the property's type; numeric strings are refused. |
+| `api/set` | `{"epoch", "path", "name", "value"}` | Sets an existing property. The value is converted to the property's type; numeric strings are refused.. A binary signal property (`…Signal`, `…Request`, `padRecordClear`, `playerJumpToSample`) also takes its payload as a hex string (`[value, toggle]` as the desk stores it; the screen plugin sends those) |
 | `api/press` | `{"epoch", "path", "name", "ms"}` | A button press: `true`, then `false` after `ms` (default 150, at most 30 000; e.g. `PADBUTTON.padButtonPressed`). To hold a button, press with a long `ms` and release it yourself with `api/release`; a later press of the same button is not released by an earlier one's timer. |
 | `api/release` | `{"epoch", "path", "name"}` as the press had them | Lets go of a button the console holds from `api/press`; `{"ok": true, "released": …}`. Needs no PIN and no level (it can only let go of what the console pressed), so a hold always ends, even if control was turned off meanwhile; after a structural change it finds the button again by its place in its family. |
+| `api/node/add` | `{"epoch", "path": <parent>, "type", "props": {name: value}, "index"?}` | Adds a child node: a processing preset (`FXPRESET` under `FXPRESETS`) or a CallMe quick dial (`SIPPHONEBOOK` under `SIPPHONEBOOKARRAY`), appended (or at `index`), its properties typed like a sibling's. Only the plugin with the screen (as RØDE's screen saves them); answers `{"ok", "path"}` and the tree's epoch moves on |
+| `api/node/remove` | `{"epoch", "path": <the node>}` | Removes such a node again (never one with children, never any other kind). The screen plugin only |
 | `api/trigger` | `{"epoch", "path", "name"}` | A binary trigger pulse (e.g. `MIX.mixLinkRequest`) |
 | `api/link` | `{"epoch", "source", "output", "link"}` | Links or unlinks a routing cell with the sequence the device expects |
 | `api/record` | `{"epoch", "value"}` | Recorder: 0 stop, 1 pause, 2 record |

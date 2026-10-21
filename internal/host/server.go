@@ -38,6 +38,11 @@ type Server struct {
 	Access *Access
 	// Events is the event bus; nil switches its API off.
 	Events *Bus
+	// Clock sets the device's clock for POST /api/system/clock; nil uses the
+	// device's (tests inject one).
+	Clock ClockSetter
+	// permissionsFor overrides the plugin permission lookup (tests).
+	permissionsFor func(name string) []string
 	// Taps are the shared audio taps; nil switches their API off.
 	Taps *Taps
 	// Services switches RØDE's services off and on; nil switches the API off.
@@ -111,6 +116,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /ui/", ui.Handler("/ui/"))
 	mux.HandleFunc("GET /api/plugins", s.handlePlugins)
 	mux.HandleFunc("GET /api/system", s.handleSystem)
+	mux.HandleFunc("POST /api/system/clock", s.handleClock)
 	mux.HandleFunc("GET /api/processes", s.handleProcesses)
 	mux.Handle("POST /api/uninstall", sdk.CSRF(http.HandlerFunc(s.handleUninstall)))
 	mux.HandleFunc("GET /api/plugins/{name}/logs", s.handleLogs)

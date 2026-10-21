@@ -99,8 +99,11 @@ type Name struct {
 	Label string `json:"label"`
 }
 
-// Sources are the 19 audio sources in protocol order (channelInputSource,
-// INPUTSOURCE ordinal and first MIX matrix dimension).
+// Sources are the 30 audio sources in protocol order (channelInputSource
+// and INPUTSOURCE ordinal): the 19 of firmware 1.0 (the first MIX matrix
+// dimension), the two channels of the internal wireless receiver (1.7.3)
+// and the nine sources a RØDECaster Video feeds in sync mode (1.7.6; their
+// kind is INPUTSOURCE.inputRcvAudioSourceType).
 var Sources = []Name{
 	{"combo1", "Mic 1"}, {"combo2", "Mic 2"}, {"combo3", "Mic 3"}, {"combo4", "Mic 4"},
 	{"combo1_2", "Mic 1+2"}, {"combo2_3", "Mic 2+3"}, {"combo3_4", "Mic 3+4"},
@@ -108,7 +111,14 @@ var Sources = []Name{
 	{"soundpad", "SMART Pads"}, {"game", "Game"}, {"music", "Music"},
 	{"virtuala", "Virtual A"}, {"virtualb", "Virtual B"},
 	{"callme1", "Call 1"}, {"callme2", "Call 2"}, {"callme3", "Call 3"},
+	{"wireless1", "Wireless 1"}, {"wireless2", "Wireless 2"},
+	{"sync1", "Sync 1"}, {"sync2", "Sync 2"}, {"sync3", "Sync 3"}, {"sync4", "Sync 4"}, {"sync5", "Sync 5"},
+	{"sync6", "Sync 6"}, {"sync7", "Sync 7"}, {"sync8", "Sync 8"}, {"sync9", "Sync 9"},
 }
+
+// MixSources is how many sources the MIX matrix's first dimension has on
+// the firmware the matrix was decoded on (the 19 of firmware 1.0).
+const MixSources = 19
 
 // Outputs are the 13 mix buses in protocol order (second MIX dimension).
 var Outputs = []Name{
