@@ -4,7 +4,7 @@ All notable changes. The format follows [Keep a Changelog](https://keepachangelo
 versions follow [Semantic Versioning](https://semver.org/) (before 1.0, minor versions
 may break compatibility).
 
-## 0.8.22 - Unreleased
+## 0.8.22 - 2026-10-21
 
 ### Added
 - **The screen plugin writes what RØDE's screen writes.** A plugin with the `screen`
