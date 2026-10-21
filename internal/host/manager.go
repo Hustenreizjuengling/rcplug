@@ -550,6 +550,11 @@ func (m *Manager) releaseScreenUnlessRunning(name string) {
 		running := p.cancel != nil
 		p.mu.Unlock()
 		if running {
+			if p.Manifest().has("screen:request") && m.loadState().Panel != name {
+				// It kept the screen through the update; it keeps it
+				// through the next start of the device too.
+				m.savePanel(name)
+			}
 			return
 		}
 	}
