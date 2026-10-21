@@ -79,6 +79,7 @@ func (s *Screen) Take(name string) error {
 	if s.holder != "" && s.holder != name {
 		return errScreenTaken
 	}
+	kept := s.holder == name // a restart or update: the screen stayed with it
 	// The marker first: the console must not start the screen again while
 	// it goes away.
 	if err := os.WriteFile(s.Marker, []byte(name+"\n"), 0o644); err != nil {
@@ -93,7 +94,11 @@ func (s *Screen) Take(name string) error {
 		apps = s.find(func(comm, _ string) bool { return comm == s.App })
 	}
 	signal(apps, syscall.SIGKILL)
-	s.logf("screen: RØDE's screen stopped for %s", name)
+	if kept {
+		s.logf("screen: stays with %s", name)
+	} else {
+		s.logf("screen: RØDE's screen stopped for %s", name)
+	}
 	return nil
 }
 

@@ -303,3 +303,60 @@ func TestScreenHandover(t *testing.T) {
 		t.Fatalf("after the stop: holder %q, RØDE started %d times", ts.Holder(), ts.started())
 	}
 }
+
+// TestScreenRestartKeepsScreen: a screen plugin restarted, given new options
+// or updated keeps the screen; RØDE's screen program is not started for the
+// moment in between. An update that leaves the plugin unable to start gives
+// the screen back.
+func TestScreenRestartKeepsScreen(t *testing.T) {
+	root := t.TempDir()
+	loop := "#!/bin/sh\ntrap 'exit 0' INT TERM\nwhile [ ! -f \"$RCPLUG_DATA_DIR/end\" ]; do sleep 0.1; done\nrm -f \"$RCPLUG_DATA_DIR/end\"\n"
+	manifest := `{"name":"ui","title":"UI","version":"1.0","exec":["./run.sh"],"permissions":["screen"]}`
+	writePlugin(t, root, "ui", loop, manifest)
+	ts := newTestScreen(t)
+	m := NewManager(root, 9340)
+	m.Screen = ts.Screen
+	if _, err := m.Load(); err != nil {
+		t.Fatal(err)
+	}
+	defer m.StopAll()
+	defer func() {
+		if t.Failed() {
+			u, _ := statusOf(m, "ui")
+			t.Logf("holder %q starts %d\nui %+v %q", ts.Holder(), ts.started(), u, m.Logs("ui"))
+		}
+	}()
+	m.Enable("ui")
+	waitFor(t, "ui with the screen", 3*time.Second, func() bool { return ts.Holder() == "ui" })
+	pid := func() int { s, _ := statusOf(m, "ui"); return s.PID }
+	first := pid()
+
+	m.Restart("ui")
+	waitFor(t, "running again after the restart", 3*time.Second, func() bool { return pid() != 0 && pid() != first })
+	if ts.Holder() != "ui" || ts.started() != 0 {
+		t.Fatalf("after the restart: holder %q, RØDE started %d times", ts.Holder(), ts.started())
+	}
+	second := pid()
+
+	staged := filepath.Join(root, "staged")
+	os.MkdirAll(staged, 0o755)
+	os.WriteFile(filepath.Join(staged, "run.sh"), []byte(loop), 0o755)
+	os.WriteFile(filepath.Join(staged, "plugin.json"), []byte(strings.Replace(manifest, `"1.0"`, `"1.1"`, 1)), 0o644)
+	if started, err := m.ReplacePlugin("ui", staged); err != nil || !started {
+		t.Fatalf("update: started %v, %v", started, err)
+	}
+	waitFor(t, "running again after the update", 3*time.Second, func() bool { return pid() != 0 && pid() != second })
+	if ts.Holder() != "ui" || ts.started() != 0 {
+		t.Fatalf("after the update: holder %q, RØDE started %d times", ts.Holder(), ts.started())
+	}
+
+	// An update to a plugin that cannot start gives the screen back.
+	broken := filepath.Join(root, "broken")
+	os.MkdirAll(broken, 0o755)
+	os.WriteFile(filepath.Join(broken, "plugin.json"), []byte(`{"name":"ui","title":`), 0o644)
+	_, _ = m.ReplacePlugin("ui", broken)
+	waitFor(t, "screen back after a broken update", 5*time.Second, func() bool { return ts.Holder() == "" })
+	if ts.started() != 1 {
+		t.Fatalf("RØDE started %d times after the broken update", ts.started())
+	}
+}

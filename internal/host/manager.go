@@ -43,6 +43,7 @@ type Manager struct {
 	// ending plugin's loop takes (never opMu: a stop waits for that loop).
 	screenMu   sync.Mutex
 	screenHand struct{ from, to string } // the last handover, until `to` ends
+	screenKeep string                    // a screen plugin being restarted or updated: it keeps the screen
 
 	mu       sync.Mutex
 	plugins  map[string]*Plugin
@@ -339,11 +340,17 @@ func (m *Manager) Handover(from, to string) error {
 }
 
 // screenEnded is called when a screen plugin's run is over: the screen goes
-// back to the plugin it was handed over from, if any, else to RØDE.
+// back to the plugin it was handed over from, if any, else to RØDE — unless
+// the plugin is being restarted or updated (stopKeepingScreen), when it
+// keeps the screen for its next run.
 func (m *Manager) screenEnded(name string) {
 	// Only the plugin the screen was handed to ends the handover; the one
 	// that handed it over ends too, right after, and must not consume it.
 	m.screenMu.Lock()
+	if m.screenKeep == name {
+		m.screenMu.Unlock()
+		return
+	}
 	ret := ""
 	if m.screenHand.to == name {
 		ret = m.screenHand.from
@@ -399,6 +406,45 @@ func (m *Manager) takeScreen(name string) error {
 	return m.Screen.Take(name)
 }
 
+// stopKeepingScreen stops p for a restart or an update: a screen plugin
+// keeps the screen meanwhile, so RØDE's screen program is not started for
+// the moment in between (it would only be stopped again at once, and while
+// it still comes up it takes the display memory the plugin's next process
+// needs). The caller starts p again, or releases the screen if it cannot.
+func (m *Manager) stopKeepingScreen(p *Plugin) {
+	name := p.Manifest().Name
+	keep := m.Screen != nil && m.Screen.Holder() == name
+	if keep {
+		m.screenMu.Lock()
+		m.screenKeep = name
+		m.screenMu.Unlock()
+	}
+	p.stop()
+	if keep {
+		m.screenMu.Lock()
+		m.screenKeep = ""
+		m.screenMu.Unlock()
+		p.log.add("keeps the screen meanwhile")
+	}
+}
+
+// releaseScreenUnlessRunning gives the screen back to RØDE if plugin name
+// has it but is not running (an update or restart that could not start it).
+func (m *Manager) releaseScreenUnlessRunning(name string) {
+	if m.Screen == nil || m.Screen.Holder() != name {
+		return
+	}
+	if p := m.get(name); p != nil {
+		p.mu.Lock()
+		running := p.cancel != nil
+		p.mu.Unlock()
+		if running {
+			return
+		}
+	}
+	m.Screen.Release(name)
+}
+
 // Disable stops a plugin and persists the choice.
 func (m *Manager) Disable(name string) bool {
 	m.opMu.Lock()
@@ -425,8 +471,9 @@ func (m *Manager) Restart(name string) bool {
 	enabled := p.enabled
 	p.mu.Unlock()
 	if enabled {
-		p.stop() // a screen plugin gave the screen back: taken again below
+		m.stopKeepingScreen(p)
 		m.startPlugin(p)
+		m.releaseScreenUnlessRunning(name)
 	}
 	return true
 }
@@ -462,8 +509,9 @@ func (m *Manager) SetOptions(name string, values map[string]json.RawMessage) (fo
 	p.mu.Unlock()
 	if enabled {
 		p.log.add("options changed in the dashboard; restarting")
-		p.stop()
+		m.stopKeepingScreen(p)
 		m.startPlugin(p)
+		m.releaseScreenUnlessRunning(name)
 	}
 	return true, enabled, nil
 }
@@ -493,7 +541,8 @@ func (m *Manager) ReplacePlugin(name, staged string) (started bool, err error) {
 		p.mu.Lock()
 		wasEnabled = p.enabled
 		p.mu.Unlock()
-		p.stop()
+		m.stopKeepingScreen(p)
+		defer m.releaseScreenUnlessRunning(name)
 	}
 	target := filepath.Join(m.pluginsDir, name)
 	backup := staged + ".previous"

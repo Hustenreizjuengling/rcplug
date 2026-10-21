@@ -6,6 +6,14 @@ may break compatibility).
 
 ## 0.8.20 - Unreleased
 
+### Changed
+- **A screen plugin keeps the screen while it is restarted, updated or given new
+  options.** RØDE's screen program was started for the moment in between and stopped
+  again at once; while it still came up it took the display memory the plugin's new
+  process needs (the kernel log showed a failed allocation at every update). The display
+  stays black for that moment instead. An update that leaves the plugin unable to start
+  still gives the screen back.
+
 ## 0.8.19 - 2026-10-21
 
 ### Fixed

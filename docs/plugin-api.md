@@ -277,8 +277,9 @@ screen program and the loop that restarts it are stopped, and the plugin may dra
 the display (`/dev/dri/card0`, 720 × 1280 portrait) and read the touchscreen
 (`/dev/input/event0`). When the plugin ends, however it ends (stopped in the dashboard,
 exited by itself, crashed, rcplug stopped or updated), the host starts RØDE's display
-service again; a restarted rcplugd does the same if it finds the screen still away. Such
-a plugin:
+service again; a restarted rcplugd does the same if it finds the screen still away. A
+restart, an update or new options keep the screen with the plugin: RØDE's screen does
+not come back for the moment in between. Such a plugin:
 
 - never starts unasked: `autostart` must be false, and the first start is always
   made in the dashboard. Once started, it is remembered like any other plugin: it
