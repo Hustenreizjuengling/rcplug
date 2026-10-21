@@ -55,6 +55,9 @@ type Manager struct {
 
 type persistState struct {
 	Enabled map[string]bool `json:"enabled"`
+	// Panel names the plugin that holds the device's screen on request
+	// (permission screen:request) and gets it again after a restart.
+	Panel string `json:"panel,omitempty"`
 	// AutoCheck: the user switched on the daily check for updates.
 	AutoCheck bool `json:"autoCheck,omitempty"`
 	// Catalogs: plugin catalogs the user added (catalog.go).
@@ -108,6 +111,15 @@ func (m *Manager) saveState(name string, enabled bool) {
 	defer stateMu.Unlock()
 	ps := m.loadState()
 	ps.Enabled[name] = enabled
+	_ = sdk.SaveJSON(m.stateFile(), ps)
+}
+
+// savePanel remembers which plugin wants the device's screen ("" none).
+func (m *Manager) savePanel(name string) {
+	stateMu.Lock()
+	defer stateMu.Unlock()
+	ps := m.loadState()
+	ps.Panel = name
 	_ = sdk.SaveJSON(m.stateFile(), ps)
 }
 
@@ -194,6 +206,12 @@ func (m *Manager) Load() ([]string, error) {
 	}
 	for _, name := range added {
 		p := m.get(name)
+		if p.Manifest().has("screen:request") && ps.Panel == name {
+			// It runs like any plugin and asks for the screen itself;
+			// the screen it had when the device last ran comes back to it
+			// once RØDE's screen program is up.
+			go m.restorePanelAtBoot(p)
+		}
 		if p.Manifest().has("screen") {
 			// Only ever started from the dashboard; once started, it comes
 			// back at every start of rcplug until it is stopped.
@@ -332,7 +350,9 @@ func (m *Manager) Handover(from, to string) error {
 	go func() {
 		m.opMu.Lock()
 		defer m.opMu.Unlock()
-		src.stop() // its loop's Release is a no-op: the screen is with the other now
+		if !src.Manifest().has("screen:request") {
+			src.stop() // its loop's Release is a no-op: the screen is with the other now
+		}
 		dst.log.add("started with the screen handed over from " + from)
 		dst.start()
 	}()
@@ -359,7 +379,16 @@ func (m *Manager) screenEnded(name string) {
 	m.screenMu.Unlock()
 	if ret != "" && ret != name && m.Screen != nil && m.Screen.Holder() == name {
 		if p := m.get(ret); p != nil && m.loadState().Enabled[ret] {
+			p.mu.Lock()
+			running := p.cancel != nil
+			p.mu.Unlock()
 			if err := m.Screen.Transfer(name, ret); err == nil {
+				if running {
+					// It kept running without the screen (screen:request)
+					// and finds the screen back with it (the marker).
+					p.log.add(name + " gave the screen back")
+					return
+				}
 				p.log.add("started again: " + name + " gave the screen back")
 				p.start()
 				return
@@ -404,6 +433,88 @@ func (m *Manager) takeScreen(name string) error {
 		return errors.New("this rcplug cannot hand over the device's screen")
 	}
 	return m.Screen.Take(name)
+}
+
+// TakeScreenFor gives the device's screen to a running plugin that asks for
+// it (permission screen:request) and remembers the wish for the next start
+// of the device.
+func (m *Manager) TakeScreenFor(name string) error {
+	m.opMu.Lock()
+	defer m.opMu.Unlock()
+	p := m.get(name)
+	if p == nil {
+		return sdk.NewError(http.StatusNotFound, "not_found", "no such plugin")
+	}
+	if !p.Manifest().has("screen:request") {
+		return sdk.NewError(http.StatusForbidden, "permission_screen", name+` does not declare the permission "screen:request"`)
+	}
+	p.mu.Lock()
+	running := p.cancel != nil
+	p.mu.Unlock()
+	if !running {
+		return sdk.NewError(http.StatusConflict, "not_running", name+" is not running")
+	}
+	if err := m.takeScreen(name); err != nil {
+		return err
+	}
+	m.savePanel(name)
+	p.log.add("has the device's screen")
+	return nil
+}
+
+// ReleaseScreenFor gives the screen back to RØDE if plugin name has it, and
+// forgets the wish.
+func (m *Manager) ReleaseScreenFor(name string) {
+	m.opMu.Lock()
+	defer m.opMu.Unlock()
+	if m.Screen != nil && m.Screen.Holder() == name {
+		m.Screen.Release(name)
+		if p := m.get(name); p != nil {
+			p.log.add("gave the device's screen back")
+		}
+	}
+	if m.loadState().Panel == name {
+		m.savePanel("")
+	}
+}
+
+// ScreenState tells who has the device's screen and who wants it.
+func (m *Manager) ScreenState() (holder, wanted string) {
+	if m.Screen != nil {
+		holder = m.Screen.Holder()
+	}
+	return holder, m.loadState().Panel
+}
+
+// restorePanelAtBoot gives the screen back to the plugin that had it when
+// the device last ran (permission screen:request), once RØDE's screen
+// program has come up, or after Screen.BootWait at the latest.
+func (m *Manager) restorePanelAtBoot(p *Plugin) {
+	name := p.Manifest().Name
+	if m.Screen != nil && m.Screen.BootWait > 0 {
+		end := time.Now().Add(m.Screen.BootWait)
+		for !m.Screen.AppRunning() && time.Now().Before(end) {
+			time.Sleep(time.Second)
+		}
+	}
+	// The plugin itself may take a moment to start; give it that.
+	for i := 0; i < 30; i++ {
+		p.mu.Lock()
+		running := p.cancel != nil
+		p.mu.Unlock()
+		if running {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	if m.loadState().Panel != name || m.get(name) != p {
+		return // released, reloaded or removed meanwhile
+	}
+	if err := m.TakeScreenFor(name); err != nil {
+		p.log.add("the device's screen did not come back: " + err.Error())
+	} else {
+		p.log.add("has the device's screen again (it had it when the device last ran)")
+	}
 }
 
 // stopKeepingScreen stops p for a restart or an update: a screen plugin

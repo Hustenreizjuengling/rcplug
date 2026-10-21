@@ -6,6 +6,16 @@ may break compatibility).
 
 ## 0.8.24 - Unreleased
 
+### Added
+- **The device's screen on request (permission `screen:request`).** A plugin with it
+  runs like any other plugin, so its web pages are always there, and takes the device's
+  screen when it asks for it (`POST /api/screen/take`), giving it back without ending
+  (`POST /api/screen/release`); `GET /api/screen` tells who has it. The host remembers
+  who holds the screen across a restart of the device and hands it back once RØDE's
+  screen program is up. A handover to a demo leaves such a plugin running, and the
+  screen returns to it when the demo ends. It writes at the console's screen level and
+  may set the clock, like `screen`.
+
 ## 0.8.23 - 2026-10-21
 
 ### Fixed

@@ -120,7 +120,7 @@ func (s *Server) handleClock(w http.ResponseWriter, r *http.Request) {
 	if perms == nil {
 		perms = s.pluginPermissions
 	}
-	if !hasPermission(perms(name), "screen") {
+	if ps := perms(name); !hasPermission(ps, "screen") && !hasPermission(ps, "screen:request") {
 		sdk.WriteError(w, sdk.NewError(http.StatusForbidden, "permission_screen", name+` does not declare the permission "screen" in its plugin.json`))
 		return
 	}
